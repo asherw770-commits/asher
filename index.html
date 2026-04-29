@@ -14,7 +14,7 @@ html,body{height:100%;background:var(--bg);color:var(--t0);font-family:'Heebo',s
 button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
 #app{display:flex;flex-direction:column;height:100dvh;max-width:520px;margin:0 auto;position:relative}
 .P{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.S{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px}
+.S{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(90px + env(safe-area-inset-bottom))}
 .H{background:var(--s2);border-bottom:1px solid var(--bd);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .B{background:var(--s3);border:1px solid var(--bm);border-radius:8px;padding:5px 12px;color:var(--t0);cursor:pointer;font-size:12px;font-weight:500}.B:active{opacity:.7}
 .N{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;display:flex;background:var(--s2);border-top:1px solid var(--bd);padding-bottom:max(env(safe-area-inset-bottom),8px);z-index:100}
@@ -493,8 +493,8 @@ e.innerHTML='<div class="O" onclick="document.getElementById(\'phmov\').innerHTM
 ld();rr();
 setInterval(()=>{const e=document.getElementById('hmClk');if(e){const n=new Date;e.textContent=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')}},10000);
 </script>
-<div id="syncStatus" style="position:fixed;top:8px;left:8px;z-index:9999;background:rgba(15,23,42,.92);border:1px solid rgba(148,163,184,.25);border-radius:999px;padding:4px 10px;font-family:'Heebo',sans-serif;font-size:11px;font-weight:600;color:#9ba8bb;display:flex;align-items:center;gap:6px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s" onclick="window.__fbStatusClick&&window.__fbStatusClick()" title="לחץ לפרטים">
-  <span id="syncDot" style="width:8px;height:8px;border-radius:50%;background:#6b7280;display:inline-block"></span>
+<div id="syncStatus" style="position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));left:8px;z-index:9999;background:rgba(15,23,42,.92);border:1px solid rgba(148,163,184,.25);border-radius:999px;padding:3px 9px;font-family:'Heebo',sans-serif;font-size:10px;font-weight:600;color:#9ba8bb;display:flex;align-items:center;gap:5px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s;opacity:.8" onclick="window.__fbStatusClick&&window.__fbStatusClick()" title="לחץ לפרטים">
+  <span id="syncDot" style="width:7px;height:7px;border-radius:50%;background:#6b7280;display:inline-block"></span>
   <span id="syncText">מתחבר...</span>
 </div>
 
@@ -548,7 +548,8 @@ window.__fbStatusClick = function() {
 };
 
 async function flushSave() {
-  if (!pendingData || !auth.currentUser) return;
+  if (!pendingData || !auth.currentUser || inFlight) return;
+  inFlight = true;
   const data = pendingData;
   const json = pendingJson;
   pendingData = null;
@@ -572,8 +573,20 @@ async function flushSave() {
     pendingData = data;
     pendingJson = json;
     setStatus('error', 'שגיאה');
+  } finally {
+    inFlight = false;
+    lastFlushAt = Date.now();
+    // If something arrived during the write, schedule a follow-up
+    if (pendingData) {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(flushSave, MIN_GAP_MS);
+    }
   }
 }
+
+let inFlight = false;
+let lastFlushAt = 0;
+const MIN_GAP_MS = 400; // Minimum gap between writes during a burst
 
 window.__fbSave = function(data) {
   let json;
@@ -597,8 +610,16 @@ window.__fbSave = function(data) {
     setStatus('error', 'מסמך גדול מדי');
     console.warn('Document size:', size);
   }
+  // Leading-edge: if we haven't written recently and nothing is in flight, flush immediately.
+  // Otherwise, schedule a trailing flush so rapid successive changes are batched.
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(flushSave, 1500);
+  const sinceLast = Date.now() - lastFlushAt;
+  if (!inFlight && sinceLast >= MIN_GAP_MS) {
+    flushSave();
+  } else {
+    const wait = Math.max(MIN_GAP_MS - sinceLast, 200);
+    saveTimer = setTimeout(flushSave, wait);
+  }
 };
 
 setStatus('connecting', 'מתחבר...');
