@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+.env
+.env.local
+.env.*.local
+.vercel
+.idea/
+.vscode/
+*.log
+firebase-debug.log
+.firebase/

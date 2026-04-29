@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0f1c">
+<title>ש״ב – ניהול ישיבה</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0f1c;--s1:#131926;--s2:#1a2235;--s3:#202c42;--bd:rgba(148,163,184,.1);--bm:rgba(148,163,184,.18);--go:#c9a84c;--gd:rgba(201,168,76,.15);--gb:rgba(201,168,76,.35);--t0:#e8edf5;--t1:#9ba8bb;--t2:#5e6e85;--gr:#22c55e;--grd:rgba(34,197,94,.13);--rd:#ef4444;--rdd:rgba(239,68,68,.13);--am:#f59e0b;--amd:rgba(245,158,11,.13);--pu:#a78bfa;--pud:rgba(167,139,250,.13);--bl:#3b82f6;--bld:rgba(59,130,246,.12)}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;scrollbar-width:none}*::-webkit-scrollbar{display:none}
+html,body{height:100%;background:var(--bg);color:var(--t0);font-family:'Heebo',sans-serif;overflow:hidden}
+button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
+#app{display:flex;flex-direction:column;height:100dvh;max-width:520px;margin:0 auto;position:relative}
+.P{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.S{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px}
+.H{background:var(--s2);border-bottom:1px solid var(--bd);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.B{background:var(--s3);border:1px solid var(--bm);border-radius:8px;padding:5px 12px;color:var(--t0);cursor:pointer;font-size:12px;font-weight:500}.B:active{opacity:.7}
+.N{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;display:flex;background:var(--s2);border-top:1px solid var(--bd);padding-bottom:max(env(safe-area-inset-bottom),8px);z-index:100}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;cursor:pointer;color:var(--t2);font-size:10px;position:relative}.ni.on{color:var(--go)}.ni:active{opacity:.7}
+.ni .bg{position:absolute;top:2px;right:calc(50% - 18px);background:var(--rd);color:#fff;font-size:8px;font-weight:700;border-radius:10px;padding:1px 4px;min-width:14px;text-align:center}
+.C{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin-bottom:5px}
+.ch{display:inline-flex;border-radius:14px;padding:2px 7px;font-size:10px;font-weight:500;white-space:nowrap}
+.av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+.R{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:12px;margin-bottom:5px}
+.O{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.M{background:var(--s1);border-radius:16px 16px 0 0;border:1px solid var(--bm);border-bottom:none;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding-bottom:max(env(safe-area-inset-bottom),16px)}
+.sl{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.8px;margin:2px 0 6px}
+.fb{padding:5px 12px;border-radius:14px;font-size:12px;font-weight:500;border:1px solid var(--bm);color:var(--t2);background:transparent;cursor:pointer;white-space:nowrap;flex-shrink:0}.fb:active{opacity:.7}.fb.on{background:var(--t0);color:var(--bg);border-color:var(--t0)}
+.T{display:flex;border-bottom:1px solid var(--bd);padding:0 12px;overflow-x:auto;flex-shrink:0}
+.tb{padding:8px 11px;font-size:12px;font-weight:500;cursor:pointer;color:var(--t2);border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0}.tb.on{color:var(--go);border-bottom-color:var(--go);font-weight:700}
+.SG{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:8px 12px}
+.sc{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:6px 4px;text-align:center}.sc .n{font-size:20px;font-weight:700;line-height:1}.sc .l{font-size:9px;color:var(--t2);margin-top:2px}
+.ab{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid}.ab:active{opacity:.7}
+.so{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--bm);background:var(--s3);font-size:14px;cursor:pointer;text-align:right;color:var(--t0);margin-bottom:7px}.so:active{opacity:.7}
+.inp{width:100%;background:var(--s3);border:1px solid var(--bm);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--t0);box-sizing:border-box}
+.ta{width:100%;background:var(--s3);border:1px solid var(--bm);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--t0);box-sizing:border-box;resize:vertical;line-height:1.7}
+.ng{display:grid;grid-template-columns:1fr 1fr;gap:5px;max-height:280px;overflow-y:auto}
+.ni2{padding:8px 10px;background:var(--s3);border:1px solid var(--bm);border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px}.ni2:active,.ni2.sel{border-color:var(--gb);background:var(--gd)}
+.pg{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+.pb{padding:11px 4px;background:var(--s3);border:1.5px solid var(--bm);border-radius:8px;color:var(--t2);font-size:14px;font-weight:700;cursor:pointer;text-align:center}.pb:active{opacity:.7}.pb.sel{border-color:var(--go);background:var(--gd);color:var(--go)}
+.dlo{padding:12px 14px;background:var(--s3);border:1px solid var(--bm);border-radius:8px;cursor:pointer;margin-bottom:5px;display:flex;justify-content:space-between}.dlo:active{opacity:.7}.dlo.sel{border-color:var(--gb);background:var(--gd)}
+.ro{padding:11px 13px;background:var(--s3);border:1px solid var(--bm);border-radius:8px;cursor:pointer;margin-bottom:5px;display:flex;align-items:center;gap:9px}.ro:active{opacity:.7}.ro.sel{border-color:var(--gb);background:var(--gd)}
+.ar{width:100%;padding:12px 14px;background:var(--s3);border:1px solid var(--bm);border-radius:10px;cursor:pointer;text-align:right;margin-bottom:6px;display:flex;align-items:center;gap:10px}.ar:active{opacity:.7}
+.ss{background:var(--s1);border:1px solid var(--bd);border-right:3px solid var(--go);border-radius:10px;padding:10px 12px;margin-bottom:5px}
+.ht{border-collapse:separate;border-spacing:0;font-size:10px;min-width:100%}.ht th{color:var(--t2);font-weight:500;padding:7px 3px;text-align:center;white-space:nowrap;border-bottom:1px solid var(--bd);background:var(--s1)}.ht th:first-child{text-align:right;min-width:90px;padding-right:10px;position:sticky;right:0;z-index:2;background:var(--s1);border-left:1px solid var(--bm)}.ht td{padding:3px;text-align:center;border-top:1px solid var(--bd);background:var(--s1)}.ht td:first-child{text-align:right;color:var(--t0);padding-right:10px;white-space:nowrap;position:sticky;right:0;z-index:1;background:var(--s1);border-left:1px solid var(--bm);font-weight:500}
+.hd{width:16px;height:16px;border-radius:50%;margin:auto;display:flex;align-items:center;justify-content:center}
+.pd{display:flex;gap:16px;margin-bottom:30px}.pdt{width:18px;height:18px;border-radius:50%;border:2px solid var(--t2);transition:all .15s}.pdt.on{background:var(--go);border-color:var(--go)}.pdt.err{background:var(--rd);border-color:var(--rd)}
+.pk{display:grid;grid-template-columns:repeat(3,72px);gap:10px}.pkb{width:72px;height:56px;border-radius:14px;border:1px solid var(--bm);background:var(--s2);color:var(--t0);font-size:26px;font-weight:600;cursor:pointer;font-family:'Heebo',sans-serif}.pkb:active{background:var(--s3)}.pkb.e{border:none;background:transparent;cursor:default}
+.al{background:var(--rdd);border:1px solid rgba(239,68,68,.25);border-radius:14px;padding:11px 14px;margin-bottom:10px}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const uid=()=>Math.random().toString(36).slice(2,9),td=()=>{const n=new Date;if(n.getHours()<19){n.setDate(n.getDate()-1)}return n.toISOString().slice(0,10)},fm=d=>d?new Date(d).toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'—',ds=d=>d?Math.floor((Date.now()-new Date(d))/864e5):null,ad=n=>{const d=new Date;d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const DN=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const HD=['','א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ז׳','ח׳','ט׳','י׳','י״א','י״ב','י״ג','י״ד','ט״ו','ט״ז','י״ז','י״ח','י״ט','כ׳','כ״א','כ״ב','כ״ג','כ״ד','כ״ה','כ״ו','כ״ז','כ״ח','כ״ט','ל׳'];
+const HYR={'5785':'תשפ״ה','5786':'תשפ״ו','5787':'תשפ״ז','5788':'תשפ״ח'};
+function hF(dt){try{const d=new Date(dt),dy=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{day:'numeric'}).format(d)),mo=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(d),yr=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{year:'numeric'}).format(d);const yn=yr.replace(/[^\d]/g,'');return(HD[dy]||dy)+' ב'+mo+' '+(HYR[yn]||yr)}catch{return''}}
+function hS(dt){try{const d=new Date(dt),dy=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{day:'numeric'}).format(d)),mo=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(d);return(HD[dy]||dy)+' '+mo}catch{return''}}
+const NM=[];
+const PRC=['א','מז','מא','10ש'],PAL=['ב','ג','ד','ה','ו','ז','ח','ט','י','יא','יב','כ'];
+const RSN=[{k:'talk',i:'💬',l:'דיבורים בחדר',hh:1},{k:'lights',i:'💡',l:'כיבוי אורות'},{k:'late',i:'⏰',l:'איחור בצהריים'},{k:'other',i:'✏️',l:'אחר',ho:1}];
+const DLS=[{k:'today',l:'הערב',t:'21:30',d:0,h:21,m:30},{k:'tl',l:'מחר צהריים',t:'15:30',d:1,h:15,m:30},{k:'te',l:'מחר ערב',t:'21:30',d:1,h:21,m:30},{k:'2l',l:'עוד יומיים צהריים',t:'15:30',d:2,h:15,m:30},{k:'2e',l:'עוד יומיים ערב',t:'21:30',d:2,h:21,m:30}];
+function dld(k){const o=DLS.find(x=>x.k===k);if(!o)return new Date;const d=new Date;d.setDate(d.getDate()+o.d);d.setHours(o.h,o.m,0,0);return d}
+function dll(k){const o=DLS.find(x=>x.k===k);return o?o.l+' '+o.t:k}
+const HOL=[
+// אלול - פתיחה
+{d:'2025-08-24',l:'פתיחת שיעור א׳'},{d:'2025-09-01',l:'פתיחת שיעור ב׳-ג׳'},
+// תשרי
+{d:'2025-09-23',l:'ר״ה א׳',off:1},{d:'2025-09-24',l:'ר״ה ב׳',off:1},{d:'2025-09-25',l:'צום גדליה'},{d:'2025-10-02',l:'יוה״כ',off:1},
+{d:'2025-10-07',l:'סוכות',off:1},{d:'2025-10-08',l:'סוכות',off:1},{d:'2025-10-09',l:'חוה״מ סוכות'},{d:'2025-10-10',l:'חוה״מ סוכות'},{d:'2025-10-11',l:'שבת חוה״מ',off:1},{d:'2025-10-12',l:'חוה״מ סוכות'},
+{d:'2025-10-13',l:'הו״ר'},{d:'2025-10-14',l:'שמח״ת',off:1},{d:'2025-10-15',l:'אסרו חג'},
+// חשון
+// כסלו
+{d:'2025-11-30',l:'אסיפת הורים'},
+{d:'2025-12-14',l:'חנוכה'},{d:'2025-12-15',l:'חנוכה'},{d:'2025-12-16',l:'חנוכה'},{d:'2025-12-17',l:'חנוכה'},{d:'2025-12-18',l:'חנוכה'},{d:'2025-12-19',l:'חנוכה'},{d:'2025-12-20',l:'חנוכה'},{d:'2025-12-21',l:'חנוכה'},
+// טבת
+{d:'2026-01-01',l:'צום י׳ טבת'},
+// שבט
+// אדר
+{d:'2026-03-03',l:'תענית אסתר'},{d:'2026-03-04',l:'פורים',off:1},{d:'2026-03-05',l:'שושן פורים'},
+// ניסן
+{d:'2026-04-02',l:'פסח',off:1},{d:'2026-04-03',l:'פסח',off:1},{d:'2026-04-04',l:'חוה״מ פסח'},{d:'2026-04-05',l:'חוה״מ פסח'},{d:'2026-04-06',l:'חוה״מ פסח'},{d:'2026-04-07',l:'חוה״מ פסח'},{d:'2026-04-08',l:'ז׳ פסח',off:1},{d:'2026-04-09',l:'אחש״פ',off:1},
+// אייר
+{d:'2026-05-12',l:'ל״ג בעומר'},
+// סיון
+{d:'2026-05-22',l:'שבועות',off:1},{d:'2026-05-23',l:'שבועות',off:1},
+{d:'2026-06-07',l:'אסיפת הורים'},{d:'2026-06-14',l:'שבת הכנה',off:1},
+// תמוז
+{d:'2026-07-05',l:'צום י״ז תמוז'},
+// אב
+{d:'2026-07-27',l:'ת״ב'}
+];
+function isYD(d){const dk=d.toISOString().slice(0,10),h=HOL.find(x=>x.d===dk);if(d.getDay()===6)return false;if(h&&h.off)return false;return[0,1,2,3,4,5].includes(d.getDay())}
+function getHol(dt){const dk=typeof dt==='string'?dt:dt.toISOString().slice(0,10);return HOL.find(x=>x.d===dk)||null}
+const AB=['rgba(59,130,246,.15)','rgba(34,197,94,.12)','rgba(245,158,11,.12)','rgba(239,68,68,.1)','rgba(168,85,247,.12)','rgba(20,184,166,.12)','rgba(251,146,60,.12)','rgba(236,72,153,.12)'];
+const AF=['#60a5fa','#4ade80','#fbbf24','#f87171','#c084fc','#2dd4bf','#fb923c','#f472b6'];
+const ai=n=>(n.charCodeAt(0)+(n.charCodeAt(n.length-1)||0))%AB.length;
+const ii=n=>{const p=n.trim().split(' ');return p.length>=2?p[0][0]+p[1][0]:p[0][0]};
+function aH(n,s,f){return'<div class="av" style="width:'+s+'px;height:'+s+'px;background:'+AB[ai(n)]+';color:'+AF[ai(n)]+';font-size:'+f+'px">'+ii(n)+'</div>'}
+function cH(c,b,t){return'<span class="ch" style="background:'+b+';color:'+c+';border:1px solid '+c+'22">'+t+'</span>'}
+function sLN(a,b){const la=a.trim().split(' '),lb=b.trim().split(' ');return(la[la.length-1]||'').localeCompare(lb[lb.length-1]||'','he')||(la[0]||'').localeCompare(lb[0]||'','he')}
+function cpML(){const gm2=(n,d2)=>{let c=0;for(let i=1;i<=d2;i++){const d=new Date;d.setDate(d.getDate()-i);const h2=D.ph[d.toISOString().slice(0,10)];if(h2&&h2.m&&h2.m.includes(n))c++}return c};const ml=D.pb.filter(b=>iA(b)&&gm2(b,pMF)===pMF);if(!ml.length){alert('אין חסרים לתקופה זו');return}const txt=ml.sort(sLN).join('\n');navigator.clipboard.writeText(txt).then(()=>alert('הועתקו '+ml.length+' שמות!')).catch(()=>{prompt('העתק ידנית:',txt)})}
+function es(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+let D;const K='yv9';
+function ld(){try{const s=localStorage.getItem(K);if(s)D={...df(),...JSON.parse(s)};else D=df()}catch{D=df()}}
+function sv(){try{localStorage.setItem(K,JSON.stringify(D))}catch{}}
+function df(){return{pb:[...NM],pt:{},ph:{},ps:{},wt:[],wh:[],cs:NM.map(n=>({id:uid(),name:n,urgent:false,notes:'',friends:'',cb:''})),cx:[],ci:[],tk:[],pin:'1234'}}
+let pg='home';function go(p){pg=p;rr()}
+function gS(n){const s=D.ps[n];if(!s||s.type==='normal')return'normal';if(s.type==='np')return'np';if(s.type==='away')return'away';if(s.type==='conf'){if(s.until&&s.until<td()){D.ps[n]={type:'normal'};sv();return'normal'}return'conf'}return'normal'}
+function iA(n){const s=gS(n);return s==='normal'}
+function sk(n){let s=0;for(let i=1;i<=60;i++){const d=new Date;d.setDate(d.getDate()-i);const h=D.ph[d.toISOString().slice(0,10)];if(h&&h.m&&h.m.includes(n))s++;else break}return s}
+function cT(id){return D.cx.some(s=>s.si===id&&s.dt===td())}
+function lS(id){return[...D.cx].filter(s=>s.si===id).sort((a,b)=>b.dt.localeCompare(a.dt))[0]||null}
+// ═══ RENDER + NAV ═══
+function rr(){const now=new Date;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now)t.status='late'});D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));sv();let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h}
+function rN(){const lt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length;const ac=D.pb.filter(iA),ms=ac.filter(b=>D.pt[b]!==true).length;const ot=D.tk.filter(t=>!t.dn).length;
+return'<div class="N">'+[{k:'home',i:'🏠',l:'ראשי',b:0},{k:'phones',i:'📱',l:'הפקדות',b:ms||0},{k:'writing',i:'📝',l:'כתיבה',b:lt||0},{k:'tasks',i:'📋',l:'משימות',b:ot||0},{k:'pin',i:'🔒',l:'שיחות',b:0},{k:'settings',i:'⚙️',l:'הגדרות',b:0}].map(t=>{const on=pg===t.k||(t.k==='pin'&&pg.startsWith('c'));return'<div class="ni'+(on?' on':'')+'" onclick="go(\''+t.k+'\')"><span style="font-size:16px;position:relative">'+t.i+(t.b?'<span class="bg">'+t.b+'</span>':'')+'</span><span style="font-size:8px;margin-top:2px">'+t.l+'</span></div>'}).join('')+'</div>'}
+// ═══ HOME DASHBOARD ═══
+function rHm(){const ac=D.pb.filter(iA),dc=ac.filter(b=>D.pt[b]===true).length,mc=ac.length-dc;
+const wLt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length,wWt=D.wt.filter(t=>t.status==='waiting').length;
+const otk=D.tk.filter(t=>!t.dn).length;
+const now=new Date,dy=DN[now.getDay()],tm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+const hol=getHol(td()),yesh=isYD(now);
+let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:17px;color:var(--t0)">🏠 דשבורד</span><div style="width:60px"></div></div><div class="S" style="padding:8px 12px 100px">';
+// Big clock
+h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:16px;margin-bottom:8px;text-align:center"><div id="hmClk" style="font-size:42px;font-weight:700;color:var(--go);font-variant-numeric:tabular-nums;letter-spacing:4px">'+tm+'</div></div>';
+// Date & yeshiva status
+h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:14px;margin-bottom:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--t0)">יום '+dy+'</div><div style="font-size:13px;color:var(--t1);margin-top:2px">'+hF(now)+'</div>';
+if(hol)h+='<div style="margin-top:6px">'+cH('var(--go)','var(--gd)','📅 '+hol.l)+'</div>';
+h+='<div style="margin-top:6px">'+cH(yesh?'var(--gr)':'var(--am)',yesh?'var(--grd)':'var(--amd)',yesh?'✓ יום ישיבה':'⛔ אין ישיבה')+'</div>';
+h+='</div>';
+// Quick stats grid
+h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
+h+='<div class="C" style="cursor:pointer;text-align:center" onclick="go(\'phones\')"><div style="font-size:11px;color:var(--t2)">📱 הפקדות</div><div style="display:flex;gap:6px;justify-content:center;margin-top:4px">'+cH('var(--gr)','var(--grd)',dc+'')+cH('var(--rd)','var(--rdd)',mc+' חסר')+'</div></div>';
+h+='<div class="C" style="cursor:pointer;text-align:center" onclick="go(\'writing\')"><div style="font-size:11px;color:var(--t2)">📝 כתיבה</div><div style="display:flex;gap:6px;justify-content:center;margin-top:4px">'+cH('var(--am)','var(--amd)',wWt+' ממתין')+cH('var(--rd)','var(--rdd)',wLt+' איחור')+'</div></div>';
+h+='<div class="C" style="cursor:pointer;text-align:center" onclick="go(\'tasks\')"><div style="font-size:11px;color:var(--t2)">📋 משימות</div><div style="margin-top:4px">'+cH(otk>0?'var(--am)':'var(--gr)',otk>0?'var(--amd)':'var(--grd)',otk>0?otk+' פתוחות':'✓')+'</div></div>';
+h+='<div class="C" style="text-align:center"><div style="font-size:11px;color:var(--t2)">👥 בחורים</div><div style="margin-top:4px">'+cH('var(--t0)','var(--s3)',D.pb.length+' רשומים')+'</div></div>';
+h+='</div>';
+// Late writing details
+if(wLt>0){h+='<div class="sl">⚠️ משימות כתיבה באיחור</div>';D.wt.filter(t=>t.status==='late'||t.status==='doubled').sort((a,b)=>sLN(a.nm,b.nm)).slice(0,8).forEach(t=>{h+='<div class="C" style="border-color:rgba(239,68,68,.18)"><div style="display:flex;align-items:center;gap:8px">'+aH(t.nm,28,10)+'<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--t0)">'+t.nm+'</div><div style="font-size:11px;color:var(--t2)">'+(t.pk&&t.pk.length>1?'פרקים: '+t.pk.join(', '):'פרק '+(t.pk&&t.pk[0]||'?'))+'</div></div><div style="display:flex;gap:4px"><button style="padding:4px 8px;border-radius:6px;background:var(--grd);border:1px solid rgba(34,197,94,.2);color:var(--gr);font-size:10px;font-weight:700;cursor:pointer" onclick="_presSc(()=>{wD(\''+t.id+'\')})">✅ הביא</button><button style="padding:4px 8px;border-radius:6px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:10px;font-weight:700;cursor:pointer" onclick="_presSc(()=>{wA(\''+t.id+'\')})">❌</button></div></div></div>'});if(wLt>8)h+='<div style="font-size:11px;color:var(--t2);margin-top:2px">ועוד '+(wLt-8)+' משימות...</div>'}
+// Open tasks
+if(otk>0){h+='<div class="sl" style="margin-top:4px">📋 משימות פתוחות</div>';D.tk.filter(t=>!t.dn).slice(0,4).forEach(t=>{h+='<div class="C"><div style="font-size:13px;color:var(--t0)">'+es(t.tx)+'</div>'+(t.ps?'<div style="font-size:10px;color:var(--t2)">👤 '+es(t.ps)+'</div>':'')+'</div>'})}
+// Auto backup status
+if(D._lastAutoBackup){h+='<div style="text-align:center;margin-top:10px;font-size:10px;color:var(--t2)">💾 גיבוי אוטומטי נשמר: '+new Date(D._lastAutoBackup).toLocaleDateString('he-IL')+' '+new Date(D._lastAutoBackup).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})+'</div>'}
+h+='</div></div>';return h}
+// ═══ SETTINGS ═══
+function rSt(){let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:17px;color:var(--t0)">⚙️ הגדרות</span><div style="width:60px"></div></div><div class="S" style="padding:8px 12px 100px">';
+h+='<div class="C" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:14px;color:var(--t0)">👥 ניהול בחורים ('+D.pb.length+')</span><div style="display:flex;gap:5px"><button style="padding:6px 10px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:11px;font-weight:700;cursor:pointer" onclick="addBoy()">+ יחיד</button><button style="padding:6px 10px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:11px;font-weight:700;cursor:pointer" onclick="addBulk()">+ כמות</button></div></div>';
+const srt=[...D.pb].sort(sLN);srt.forEach((b,i)=>{h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bd)">'+aH(b,28,10)+'<div style="flex:1;font-size:13px;color:var(--t0)">'+es(b)+'</div><button style="padding:3px 8px;border-radius:6px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:11px;cursor:pointer" onclick="rmBoyI('+i+')">הסר</button></div>'});
+h+='</div>';
+h+='<div class="C"><div style="font-weight:700;font-size:14px;color:var(--t0);margin-bottom:8px">🔑 קוד נעילה</div><div style="display:flex;gap:8px"><input class="inp" id="pinInp" value="'+(D.pin||'1234')+'" style="width:100px;text-align:center;font-size:18px;letter-spacing:6px" maxlength="4"><button style="padding:8px 16px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:13px;font-weight:700;cursor:pointer" onclick="D.pin=document.getElementById(\'pinInp\').value;sv();alert(\'נשמר!\')">שמור</button></div></div>';
+// Backup & Restore
+h+='<div class="C" style="margin-top:10px"><div style="font-weight:700;font-size:14px;color:var(--t0);margin-bottom:6px">💾 גיבוי ושחזור</div><div style="font-size:11px;color:var(--t2);margin-bottom:10px">מייצא/מייבא את כל הנתונים: שיחות, הפקדות, משימות כתיבה, הכל.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button style="padding:10px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:12px;font-weight:700;cursor:pointer" onclick="expData()">⬇ ייצוא גיבוי</button><button style="padding:10px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:12px;font-weight:700;cursor:pointer" onclick="document.getElementById(\'impFile\').click()">⬆ ייבוא גיבוי</button></div><input type="file" id="impFile" accept="application/json,.json" style="display:none" onchange="impData(this)"><div style="font-size:10px;color:var(--t2);margin-top:8px">💡 כדאי לעשות ייצוא גיבוי פעם בשבוע ולפני שדרוג האפליקציה</div></div>';
+// Sample data
+h+='<div class="C" style="margin-top:10px"><div style="font-weight:700;font-size:14px;color:var(--t0);margin-bottom:6px">📄 ייצוא שיחות לטקסט</div><div style="font-size:11px;color:var(--t2);margin-bottom:10px">מייצא את כל השיחות מתקופה מוגדרת לקובץ טקסט נייד לעריכה.</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px"><button style="padding:10px 6px;border-radius:8px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:12px;font-weight:700;cursor:pointer" onclick="expText(\'week\')">📄 שבוע</button><button style="padding:10px 6px;border-radius:8px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:12px;font-weight:700;cursor:pointer" onclick="expText(\'month\')">📄 חודש</button><button style="padding:10px 6px;border-radius:8px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:12px;font-weight:700;cursor:pointer" onclick="expText(\'year\')">📄 שנה</button></div><div style="font-size:10px;color:var(--t2);margin-top:8px">💡 קובץ הטקסט ניתן לפתיחה בכל תוכנה (Word, מסמכי Google, וכו׳)</div></div>';
+// Export phones to CSV
+h+='<div class="C" style="margin-top:10px"><div style="font-weight:700;font-size:14px;color:var(--t0);margin-bottom:6px">📊 ייצוא הפקדות טלפונים</div><div style="font-size:11px;color:var(--t2);margin-bottom:10px">מייצא את טבלת ההפקדות לקובץ Excel/Sheets (CSV).</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button style="flex:1;padding:10px 6px;border-radius:8px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:11px;font-weight:700;cursor:pointer" onclick="expPh(\'all\')">📊 הכל</button><button style="flex:1;padding:10px 6px;border-radius:8px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:11px;font-weight:700;cursor:pointer" onclick="expPh(\'month\')">📊 חודש</button><button style="flex:1;padding:10px 6px;border-radius:8px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:11px;font-weight:700;cursor:pointer" onclick="oPhMon()">📊 חודש עברי</button></div><div style="font-size:10px;color:var(--t2)">💡 ניתן לפתוח ב-Excel, Google Sheets</div></div>';
+// Reset all
+h+='<div class="C" style="margin-top:10px;border-color:rgba(239,68,68,.25)"><div style="font-weight:700;font-size:14px;color:var(--rd);margin-bottom:6px">🗑 איפוס מלא</div><div style="font-size:11px;color:var(--t2);margin-bottom:10px">מוחק את כל הנתונים ומתחיל מאפס. הפעולה בלתי הפיכה!</div><button style="width:100%;padding:10px;border-radius:8px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:12px;font-weight:700;cursor:pointer" onclick="resetAll()">🗑 אפס הכל</button></div>';
+h+='</div></div>';return h}
+let _srtBoys=[];
+function rStPreSort(){_srtBoys=[...D.pb].sort(sLN)}
+function addBoy(){const nm=prompt('שם פרטי ושם משפחה:');if(!nm||!nm.trim())return;const n=nm.trim();if(D.pb.includes(n)){alert('כבר קיים!');return}D.pb.push(n);D.cs.push({id:uid(),name:n,urgent:false,notes:'',friends:'',cb:''});sv();rr()}
+function addBulk(){let e=document.getElementById('bkov');if(!e){e=document.createElement('div');e.id='bkov';document.body.appendChild(e)}
+e.innerHTML='<div class="O" onclick="document.getElementById(\'bkov\').innerHTML=\'\'"><div class="M" onclick="event.stopPropagation()"><div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div><div style="font-size:15px;font-weight:700;padding:8px 16px">הוספת בחורים מרובה</div><div style="padding:8px 16px 20px"><div style="font-size:12px;color:var(--t2);margin-bottom:6px">שם פרטי ושם משפחה בכל שורה:</div><textarea class="ta" id="bkta" rows="8" placeholder="יוסי כהן\nדוד לוי\nמשה ישראלי" style="direction:rtl;margin-bottom:10px"></textarea><button style="width:100%;padding:12px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14px;font-weight:700;cursor:pointer" onclick="doBulkAdd()">הוסף הכל</button></div></div></div>'}
+function doBulkAdd(){const ta=document.getElementById('bkta');if(!ta)return;const lines=ta.value.split('\n').map(l=>l.trim()).filter(Boolean);let added=0,skip=0;lines.forEach(n=>{if(!n.includes(' ')){skip++;return}if(D.pb.includes(n)){skip++;return}D.pb.push(n);D.cs.push({id:uid(),name:n,urgent:false,notes:'',friends:'',cb:''});added++});sv();document.getElementById('bkov').innerHTML='';alert('נוספו '+added+' בחורים'+(skip>0?' ('+skip+' דולגו)':''));rr()}
+function rmBoyI(sortIdx){const srt=[...D.pb].sort(sLN);const n=srt[sortIdx];if(!n)return;if(!confirm('להסיר את '+n+'?'))return;rmBoyByName(n)}
+function rmBoyByName(n){D.pb=D.pb.filter(b=>b!==n);D.cs=D.cs.filter(s=>s.name!==n);D.wt=D.wt.filter(t=>t.nm!==n);D.wh=D.wh.filter(t=>t.nm!==n);D.ci=D.ci.filter(t=>t.sn!==n);delete D.ps[n];delete D.pt[n];sv();rr()}
+function expData(){try{const dt=new Date().toISOString().slice(0,10);const payload={version:1,exportedAt:new Date().toISOString(),data:D};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='yeshiva-backup-'+dt+'.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);alert('הגיבוי הורד בהצלחה!')}catch(e){alert('שגיאה: '+e.message)}}
+function impData(input){const f=input.files&&input.files[0];if(!f)return;if(!confirm('ייבוא יחליף את כל הנתונים הקיימים. המשך?')){input.value='';return}const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);const nd=p.data||p;if(!nd.pb||!Array.isArray(nd.pb)){alert('הקובץ לא תקין');return}D=nd;sv();rr();alert('הייבוא הצליח!')}catch(e){alert('שגיאה בקריאת הקובץ: '+e.message)}};r.onerror=()=>alert('שגיאה בקריאת הקובץ');r.readAsText(f);input.value=''}
+function resetAll(){if(!confirm('האם אתה בטוח? כל הנתונים יימחקו לצמיתות!'))return;if(!confirm('בטוח בטוח? אין דרך חזרה!'))return;localStorage.removeItem(K);D=df();sv();rr();alert('כל הנתונים נמחקו. האפליקציה מתחילה מאפס.')}
+function expText(period){try{const now=new Date;let fd,label;if(period==='week'){const w=new Date(now);w.setDate(w.getDate()-7);fd=w.toISOString().slice(0,10);label='שבוע אחרון'}else if(period==='month'){const m=new Date(now);m.setDate(m.getDate()-30);fd=m.toISOString().slice(0,10);label='חודש אחרון'}else{const y=new Date(now);y.setFullYear(y.getFullYear()-1);fd=y.toISOString().slice(0,10);label='שנה אחרונה'}
+const sx=D.cx.filter(s=>s.dt>=fd).sort((a,b)=>a.dt.localeCompare(b.dt));
+if(!sx.length){alert('אין שיחות בתקופה זו');return}
+// Group by student
+const byS={};sx.forEach(s=>{const st=D.cs.find(x=>x.id===s.si);const nm=st?st.name:'לא ידוע';if(!byS[nm])byS[nm]=[];byS[nm].push(s)});
+// Build text
+let txt='ישיבה - סיכום שיחות - '+label+'\n';
+txt+='תאריך ייצוא: '+now.toLocaleDateString('he-IL')+' '+now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})+'\n';
+txt+='='.repeat(60)+'\n\n';
+const sorted=Object.keys(byS).sort(sLN);
+sorted.forEach(nm=>{
+ txt+='\n'+'█'.repeat(40)+'\n';
+ txt+='★ '+nm+'\n';
+ txt+='█'.repeat(40)+'\n';
+ const total=byS[nm].reduce((a,s)=>a+(s.du||0),0);
+ txt+='סה״כ '+byS[nm].length+' שיחות, '+total+' דקות\n\n';
+ byS[nm].forEach((s,i)=>{
+  txt+='─── שיחה '+(i+1)+' ───\n';
+  txt+='📅 תאריך: '+s.dt+'\n';
+  if(s.du)txt+='⏱ משך: '+s.du+' דקות\n';
+  if(s.sm){txt+='\n📝 סיכום השיחה:\n'+s.sm+'\n'}
+  if(s.np&&s.np.length){txt+='\n🔍 לשיחה הבאה:\n';s.np.forEach(p=>{txt+='• '+p+'\n'})}
+  // Tasks and questions created in this conversation's date
+  const ciForThis=D.ci.filter(c=>{const st=D.cs.find(x=>x.id===s.si);return st&&c.si===st.id&&c.dt===s.dt});
+  const tsks=ciForThis.filter(c=>c.tp==='task'),qsts=ciForThis.filter(c=>c.tp==='question');
+  if(tsks.length){txt+='\n✅ משימות:\n';tsks.forEach(t=>{txt+='• '+t.tx+(t.st==='done'?' [הושלם]':' [פתוח]')+'\n'})}
+  if(qsts.length){txt+='\n❓ שאלות לבדיקה:\n';qsts.forEach(q=>{txt+='• '+q.tx+(q.st==='done'?' [נבדק]':' [פתוח]')+'\n'})}
+  txt+='\n'
+ })
+});
+// Also include tasks/questions without matching conversation date
+sorted.forEach(nm=>{
+ const st=D.cs.find(x=>x.name===nm);if(!st)return;
+ const convDates=new Set(byS[nm].map(s=>s.dt));
+ const orphans=D.ci.filter(c=>c.si===st.id&&!convDates.has(c.dt));
+ if(orphans.length){
+  txt+='\n──── משימות ושאלות נוספות ('+nm+') ────\n';
+  orphans.forEach(c=>{
+   txt+=(c.tp==='task'?'✅ ':'❓ ')+c.tx+(c.st==='done'?' [הושלם]':' [פתוח]')+'\n'
+  })
+ }
+});
+const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;const dt=now.toISOString().slice(0,10);a.download='שיחות-'+label.replace(/ /g,'-')+'-'+dt+'.txt';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);alert('הקובץ הורד! '+Object.keys(byS).length+' בחורים, '+sx.length+' שיחות')}catch(e){alert('שגיאה: '+e.message)}}
+
+// ═══ PHONES (הפקדות טלפונים) ═══
+let pT='tonight',pF='all',pHP=7,pMF=1;
+function rPh(){const ac=D.pb.filter(iA),dc=ac.filter(b=>D.pt[b]===true).length,mc=ac.length-dc,cc=D.pb.filter(b=>gS(b)==='conf').length;
+let li=[...D.pb].sort(sLN);if(pF==='miss')li=li.filter(b=>D.pt[b]!==true&&iA(b));if(pF==='dep')li=li.filter(b=>D.pt[b]===true);if(pF==='sp')li=li.filter(b=>gS(b)!=='normal');
+let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:17px;color:var(--t0)">📱 הפקדות טלפונים</span><div style="font-size:11px;color:var(--t1)">'+hF(new Date)+'</div></div>';
+h+='<div class="SG">'+[{n:dc,l:'הפקידו',c:'var(--gr)'},{n:mc,l:'חסרים',c:'var(--rd)'},{n:cc,l:'מוחרמים',c:'var(--pu)'},{n:D.pb.length,l:'סה״כ',c:'var(--t0)'}].map(s=>'<div class="sc"><div class="n" style="color:'+s.c+'">'+s.n+'</div><div class="l">'+s.l+'</div></div>').join('')+'</div>';
+h+='<div class="T">'+[['tonight','הלילה'],['history','היסטוריה'],['boys','בחורים']].map(([k,l])=>'<div class="tb'+(pT===k?' on':'')+'" onclick="pT=\''+k+'\';rr()">'+l+'</div>').join('')+'</div><div class="S" style="padding:8px 12px 100px">';
+if(pT==='tonight'){
+h+='<div style="display:flex;gap:5px;margin-bottom:8px;overflow-x:auto">'+[['all','הכל'],['miss','חסרים'],['dep','הפקידו'],['sp','מוחרמים']].map(([k,l])=>'<button class="fb'+(pF===k?' on':'')+'" onclick="pF=\''+k+'\';rr()">'+l+'</button>').join('')+'</div>';
+li.forEach(b=>{const dp=D.pt[b]===true,st=gS(b),s=sk(b);
+h+='<div class="R" style="background:'+(dp?'rgba(34,197,94,.04)':st!=='normal'?'var(--pud)':'var(--s1)')+';border:1px solid '+(dp?'rgba(34,197,94,.2)':!dp&&st==='normal'?'rgba(239,68,68,.15)':'var(--bd)')+';'+(!dp&&st==='normal'?'border-right:3px solid var(--rd)':'')+'">'+(st==='normal'?'<div style="cursor:pointer;display:flex;align-items:center;gap:9px;flex:1;min-width:0" onclick="tP(\''+es(b)+'\')">'+aH(b,34,12)+'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;color:var(--t0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+b+'</div><div style="font-size:11px;color:'+(dp?'var(--gr)':'var(--rd)')+';margin-top:1px">'+(dp?'✓ הפקיד':s>0?s+' ימים חוסר':'לא הפקיד')+'</div></div></div>':'<div style="display:flex;align-items:center;gap:9px;flex:1;min-width:0">'+aH(b,34,12)+'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;color:var(--t0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+b+'</div><div style="font-size:11px;color:'+(st==='conf'?'var(--pu)':st==='np'?'var(--t2)':st==='away'?'var(--am)':'var(--t2)')+';margin-top:1px">'+(st==='np'?'אין טלפון':st==='conf'?'מוחרם':st==='away'?'לא נמצא':'')+'</div></div></div>')+(s>0&&!dp&&st==='normal'?cH('var(--rd)','var(--rdd)',s+'י׳'):'')+'<button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="event.stopPropagation();oPS(\''+es(b)+'\')">⚙</button></div>'});
+h+='<div style="display:flex;gap:6px;margin-top:8px"><button style="flex:1;height:44px;border-radius:12px;background:var(--bl);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer" onclick="sPN()">💾 שמור</button><button style="height:44px;padding:0 10px;border-radius:12px;background:var(--rdd);color:var(--rd);font-size:10px;font-weight:600;border:1px solid rgba(239,68,68,.25);cursor:pointer" onclick="mAM()">סמן שאר כחסרים</button><button style="height:44px;padding:0 12px;border-radius:12px;background:var(--s3);color:var(--t2);font-size:12px;border:1px solid var(--bm);cursor:pointer" onclick="D.pt={};sv();rr()">אפס</button></div>'}
+if(pT==='history'){
+const gm=(n,d2)=>{let c=0;for(let i=1;i<=d2;i++){const d=new Date;d.setDate(d.getDate()-i);const h2=D.ph[d.toISOString().slice(0,10)];if(h2&&h2.m&&h2.m.includes(n))c++}return c};
+const ml=D.pb.filter(b=>iA(b)&&gm(b,pMF)===pMF);
+h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:12px;margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--t0);margin-bottom:8px">מי לא הפקיד?</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">'+[1,2,3,5,7,14].map(n=>'<button class="fb'+(pMF===n?' on':'')+'" style="'+(pMF===n?'background:var(--rdd);color:var(--rd);border-color:rgba(239,68,68,.25)':'')+'" onclick="pMF='+n+';rr()">'+(n===1?'אתמול':n===7?'שבוע':n===14?'שבועיים':n+' ימים')+'</button>').join('')+'</div>'+(ml.length===0?'<div style="font-size:12px;color:var(--gr)">✓ כולם הפקידו</div>':'<div style="display:flex;flex-wrap:wrap;gap:4px">'+ml.map(b=>'<span style="background:var(--rdd);color:var(--rd);border:1px solid rgba(239,68,68,.2);border-radius:20px;padding:3px 9px;font-size:11px">'+b+' ('+sk(b)+')</span>').join('')+'</div>')+'<button style="width:100%;margin-top:8px;padding:8px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:12px;font-weight:600;cursor:pointer" onclick="cpML()">📋 העתק שמות חסרים</button>'+'</div>';
+h+='<div style="display:flex;gap:5px;margin-bottom:8px">'+[7,14,30].map(n=>'<button class="fb'+(pHP===n?' on':'')+'" onclick="pHP='+n+';rr()">'+(n===7?'שבוע':n===14?'שבועיים':'חודש')+'</button>').join('')+'</div>';
+h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;overflow-x:auto"><table class="ht"><thead><tr><th>שם</th>';
+for(let i=0;i<pHP;i++){const d=new Date;d.setDate(d.getDate()-(pHP-1-i));h+='<th>'+hS(d).split(' ')[0]+'</th>'}
+h+='</tr></thead><tbody>';[...D.pb].sort(sLN).forEach(b=>{h+='<tr><td>'+b+'</td>';for(let i=0;i<pHP;i++){const d=new Date;d.setDate(d.getDate()-(pHP-1-i));const k=d.toISOString().slice(0,10),hh=D.ph[k],dp=hh&&hh.dp&&hh.dp.includes(b),ms=hh&&hh.m&&hh.m.includes(b);h+='<td style="color:'+(dp?'var(--gr)':ms?'var(--rd)':'var(--t2)')+';font-weight:'+(dp||ms?'700':'400')+';font-size:12px">'+(dp?'V':ms?'X':'')+'</td>'}h+='</tr>'});h+='</tbody></table></div>'}
+if(pT==='boys'){[...D.pb].sort(sLN).forEach(b=>{const st=gS(b);h+='<div class="R" style="background:var(--s1);border:1px solid var(--bd)">'+aH(b,34,12)+'<div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--t0)">'+b+'</div>'+(st==='conf'?cH('var(--pu)','var(--pud)','מוחרם'):st==='np'?cH('var(--t2)','var(--s3)','ללא טלפון'):st==='away'?cH('var(--am)','var(--amd)','לא נמצא'):'')+'</div><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="oPS(\''+es(b)+'\')">סטטוס</button></div>'})}
+h+='</div></div>';return h}
+
+function tP(n){const sc=document.querySelector('.S');const sp=sc?sc.scrollTop:0;const w=D.pt[n]===true;D.pt[n]=!w;if(!w)D.pt[n+'_t']=new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});else delete D.pt[n+'_t'];sv();rr();setTimeout(()=>{const sc2=document.querySelector('.S');if(sc2)sc2.scrollTop=sp},0)}
+function sPN(){const ac=D.pb.filter(iA);D.ph[td()]={dp:ac.filter(b=>D.pt[b]===true),m:ac.filter(b=>D.pt[b]!==true),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};sv();rr()}
+function mAM(){D.pb.filter(iA).forEach(b=>{if(D.pt[b]!==true)D.pt[b]=false});sv();rr()}
+let pSN=null;
+function oPS(n){pSN=n;let e=document.getElementById('pov');if(!e){e=document.createElement('div');e.id='pov';document.body.appendChild(e)}e.innerHTML='<div class="O" onclick="cPO()"><div class="M" onclick="event.stopPropagation()"><div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div><div style="font-size:15px;font-weight:700;padding:8px 16px;text-align:center">'+pSN+'</div><div style="padding:8px 16px 20px"><button class="so" onclick="sPS(\'normal\')">✓ רגיל</button><button class="so" onclick="sPS(\'np\')">📵 אין טלפון</button><button class="so" onclick="sPS(\'away\')">🏠 לא נמצא בישיבה</button><div style="background:var(--pud);border:1px solid rgba(167,139,250,.25);border-radius:12px;padding:12px;margin-bottom:8px"><div style="font-size:13px;font-weight:600;color:var(--t0);margin-bottom:8px">🔒 החרמה</div><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:12px;color:var(--t2)">ימים:</span><input type="number" id="cdi" value="3" min="1" max="30" style="width:50px;background:var(--s3);border:1px solid var(--bm);border-radius:6px;padding:5px 8px;color:var(--t0);font-size:14px;font-weight:600;text-align:center"></div><button style="width:100%;height:40px;border-radius:8px;background:var(--pu);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer" onclick="sPS(\'conf\')">אשר</button></div><button style="width:100%;height:38px;border-radius:8px;background:var(--s3);color:var(--t2);font-size:13px;border:1px solid var(--bm);cursor:pointer" onclick="cPO()">ביטול</button></div></div></div>'}
+function cPO(){document.getElementById('pov').innerHTML=''}
+function sPS(t){if(t==='normal')delete D.ps[pSN];else if(t==='np')D.ps[pSN]={type:'np'};else if(t==='away')D.ps[pSN]={type:'away'};else{const d=parseInt(document.getElementById('cdi')?.value)||3;const u=new Date;u.setDate(u.getDate()+d);D.ps[pSN]={type:'conf',until:u.toISOString().slice(0,10)}}sv();cPO();rr()}
+// ═══ WRITING (משימות כתיבה) ═══
+let wT='active';
+function rWr(){const bw=new Date;bw.setDate(bw.getDate()-14);const bwk=bw.toISOString().slice(0,10);
+const st={w:D.wt.filter(t=>t.status==='waiting').length,l:D.wt.filter(t=>t.status==='late'||t.status==='doubled').length,f:D.wt.filter(t=>t.status==='frozen').length,d:D.wt.filter(t=>t.status==='done'&&t.ca&&t.ca.slice(0,10)>=bwk).length};
+let it=[...D.wt].reverse();const srtW=(a,b)=>{if(a.mvb&&!b.mvb)return 1;if(!a.mvb&&b.mvb)return -1;if(a.mvb&&b.mvb)return a.mvb-b.mvb;return sLN(a.nm,b.nm)};if(wT==='active')it=it.filter(t=>t.status==='waiting').sort(srtW);else if(wT==='late')it=it.filter(t=>t.status==='late'||t.status==='doubled').sort(srtW);else if(wT==='frozen')it=it.filter(t=>t.status==='frozen');else if(wT==='done')it=it.filter(t=>t.status==='done'&&t.ca&&t.ca.slice(0,10)>=bwk);
+const pD=t=>{const u=[...new Set(t.pk||[])];const s=u.map(p=>{const c=(t.pk||[]).filter(x=>x===p).length;return p+(c>1?' ×'+c:'')});return(s.length>1?'פרקים: '+s.join(', '):'פרק '+(s[0]||'?'))+(t.x>1?' ×'+t.x:'')};
+const rD=t=>{if(!t.rs)return'';const r=RSN.find(x=>x.k===t.rs);let l=r?r.l:t.rs;if(t.rs==='other'&&t.ro)l=t.ro;if(t.rs==='talk'&&t.rh)l+=' · '+t.rh;return l};
+let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:17px;color:var(--t0)">📝 משימות כתיבה</span><div style="font-size:11px;color:var(--t1)">'+hF(new Date)+'</div></div>';
+h+='<div style="display:flex;gap:7px;padding:8px 12px"><button style="flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--gb);font-size:13px;font-weight:700;cursor:pointer;background:var(--gd);color:var(--go)" onclick="oWW(0)">+ משימה חדשה</button><button style="flex:1;padding:10px 8px;border-radius:10px;border:1px solid rgba(239,68,68,.25);font-size:13px;font-weight:700;cursor:pointer;background:var(--rdd);color:var(--rd)" onclick="oWW(1)">👥 קבוצתי</button></div>';
+h+='<div class="SG">'+[{n:st.w,l:'ממתין',c:'var(--am)'},{n:st.l,l:'איחור',c:'var(--rd)'},{n:st.f,l:'הקפאה',c:'var(--bl)'},{n:st.d,l:'הביא',c:'var(--gr)'}].map(s=>'<div class="sc"><div class="n" style="color:'+s.c+'">'+s.n+'</div><div class="l">'+s.l+'</div></div>').join('')+'</div>';
+h+='<div class="T">'+[['active','פעיל'],['late','איחור'],['frozen','הקפאה'],['all','הכל'],['done','הביא']].map(([k,l])=>'<div class="tb'+(wT===k?' on':'')+'" onclick="wT=\''+k+'\';rr()">'+l+(k==='late'&&st.l>0?' ('+st.l+')':'')+'</div>').join('')+'</div><div class="S" style="padding:8px 12px 100px">';
+if(st.l>0)h+='<div class="al"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:16px">🔔</span><div><div style="font-size:13px;font-weight:700;color:var(--rd)">'+st.l+' משימות באיחור!</div><div style="font-size:11px;color:var(--t1)">עבר הזמן להגשה</div></div></div></div>';
+if(!it.length)h+='<div style="text-align:center;padding:40px 20px;color:var(--t2)"><div style="font-size:36px;opacity:.5">📭</div><div>אין רשומות</div></div>';
+it.forEach(t=>{const sm={waiting:['ממתין','var(--am)','var(--amd)'],late:['לא הביא','var(--rd)','var(--rdd)'],done:['הביא','var(--gr)','var(--grd)'],doubled:['הוכפל','var(--go)','var(--gd)'],frozen:['מוקפא','var(--bl)','var(--bld)'],cancelled:['בוטל','var(--t2)','var(--s3)']};const[sL,sC,sB]=sm[t.status]||sm.waiting;const reason=rD(t);
+h+='<div class="C" style="border-color:'+(t.status==='late'||t.status==='doubled'?'rgba(239,68,68,.18)':'var(--bd)')+'"><div style="display:flex;align-items:center;gap:9px;margin-bottom:4px">'+aH(t.nm,32,11)+'<div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--t0)">'+t.nm+'</div><div style="font-size:11px;color:var(--t2)">'+pD(t)+'</div></div>'+cH(sC,sB,sL)+'</div>'+(reason?'<div style="font-size:10px;color:var(--t2);margin-bottom:4px">סיבה: '+reason+'</div>':'')+'<div style="font-size:10px;color:var(--t2);margin-bottom:4px">עד: '+dll(t.dln)+'</div>'+((t.status==='late'||t.status==='doubled')?(()=>{const dlDate=new Date(t.dl),hrs=Math.floor((Date.now()-dlDate)/36e5);return'<div class="al" style="padding:6px 10px;margin-bottom:4px"><div style="font-size:11px;font-weight:600;color:var(--rd)">⚠️ באיחור'+(hrs<24?' '+hrs+' שעות':' '+Math.floor(hrs/24)+' ימים')+'</div></div>'})():'')+
+((t.status==='waiting'||t.status==='late'||t.status==='doubled')?'<div style="display:flex;gap:4px;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--bd);flex-wrap:wrap"><button class="ab" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.1);color:var(--gr)" onclick="wD(\''+t.id+'\')">✅ הביא</button><button class="ab" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:var(--rd)" onclick="wA(\''+t.id+'\')">❌ לא הביא</button><button class="ab" style="border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.1);color:var(--bl)" onclick="wFz(\''+t.id+'\',3)">❄️</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="wMvB(\''+t.id+'\')">↓</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="wDl(\''+t.id+'\')">🗑</button></div>':'')+(t.status==='frozen'?(()=>{const rm=t.fu?Math.max(0,Math.ceil((new Date(t.fu)-Date.now())/864e5)):0;return'<div style="display:flex;gap:4px;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--bd)"><span style="font-size:10px;color:var(--bl)">נותרו '+rm+' ימים להקפאה</span><button class="ab" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.1);color:var(--am)" onclick="wUfz(\''+t.id+'\')">↩ החזר לפעיל</button></div>'})():'')+'</div>'});
+h+='</div></div>';return h}
+function wD(id){D.wt.forEach(t=>{if(t.id===id)t.status='done'});sv();rr()}
+function wDl(id){D.wt=D.wt.filter(t=>t.id!==id);sv();rr()}
+function wMvB(id){D.wt.forEach(t=>{if(t.id===id)t.mvb=Date.now()});sv();rr()}
+function wFz(id,d){D.wt.forEach(t=>{if(t.id===id){t.status='frozen';const u=new Date;u.setDate(u.getDate()+d);u.setHours(23,59,0,0);t.fu=u.toISOString()}});sv();rr()}
+function wUfz(id){D.wt.forEach(t=>{if(t.id===id){t.status='waiting';delete t.fu;t.dl=dld('te').toISOString();t.dln='te'}});sv();rr()}
+function wDb(id,dln){D.wt.forEach(t=>{if(t.id===id){t.x=(t.x||1)*2;t.status='waiting';t.dln=dln;t.dl=dld(dln).toISOString()}});sv();rr()}
+function wNw(id,dln){const t=D.wt.find(x=>x.id===id);if(!t)return;const nt={id:uid(),nm:t.nm,pk:[...t.pk],dln:dln,dl:dld(dln).toISOString(),status:'waiting',x:1,rs:t.rs,rh:'',ro:t.ro,ca:new Date().toISOString()};D.wt.push(nt);D.wh.push({...nt});D.wt.forEach(x=>{if(x.id===id)x.status='cancelled'});sv();rr()}
+let wAid='',wAmode='';
+function wA(id){wAid=id;wAmode='';wAR(id)}
+function wAR(){const t=D.wt.find(x=>x.id===wAid);if(!t)return;let e=document.getElementById('wov');if(!e){e=document.createElement('div');e.id='wov';document.body.appendChild(e)}
+let bd='';
+if(!wAmode){bd='<div class="ar" onclick="wAmode=\'dbl\';wAR()"><span style="font-size:18px">✖️</span><div style="font-size:13px;font-weight:600;color:var(--t0)">הכפל ×'+(t.x||1)*2+'</div></div><div class="ar" onclick="wAmode=\'new\';wAR()"><span style="font-size:18px">🆕</span><div style="font-size:13px;font-weight:600;color:var(--t0)">תן משימה אחרת במקום</div></div><div class="ar" onclick="wFz(\''+wAid+'\',3);cWO()"><span style="font-size:18px">❄️</span><div style="font-size:13px;font-weight:600;color:var(--t0)">הקפא 3 ימים</div></div><div class="ar" onclick="cWO()"><span style="font-size:18px">🕊️</span><div style="font-size:13px;font-weight:600;color:var(--t0)">השאר</div></div>'}
+else if(wAmode==='dbl'){bd='<div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--t0)">הכפל ×'+(t.x||1)*2+' — עד מתי?</div>'+DLS.map(o=>'<div class="dlo" onclick="wDb(\''+wAid+'\',\''+o.k+'\');cWO()"><span style="font-size:13px;font-weight:600;color:var(--t0)">'+o.l+'</span><span style="font-size:11px;color:var(--t2)">'+o.t+'</span></div>').join('')+'<div style="font-size:11px;color:var(--t2);margin-top:8px;cursor:pointer" onclick="wAmode=\'\';wAR()">← חזור</div>'}
+else if(wAmode==='new'){bd='<div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--t0)">משימה חדשה — עד מתי?</div>'+DLS.map(o=>'<div class="dlo" onclick="wNw(\''+wAid+'\',\''+o.k+'\');cWO()"><span style="font-size:13px;font-weight:600;color:var(--go)">🆕 '+o.l+'</span><span style="font-size:11px;color:var(--t2)">'+o.t+'</span></div>').join('')+'<div style="font-size:11px;color:var(--t2);margin-top:8px;cursor:pointer" onclick="wAmode=\'\';wAR()">← חזור</div>'}
+e.innerHTML='<div class="O" onclick="cWO()"><div class="M" onclick="event.stopPropagation()"><div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div><div style="font-size:15px;font-weight:700;padding:8px 16px">'+t.nm+' — לא הביא</div><div style="padding:8px 16px 20px">'+bd+'</div></div></div>'}
+function cWO(){document.getElementById('wov').innerHTML=''}
+// Wizard
+let wM=0,wSt=1,wNs=[],wNm='',wPk=[],wDln='',wRs='',wRh='',wRo='';
+function oWW(m){wM=m;wSt=1;wNs=[];wNm='';wPk=[];wDln='';wRs='';wRh='';wRo='';rnW()}
+function rnW(){let e=document.getElementById('wwov');if(!e){e=document.createElement('div');e.id='wwov';document.body.appendChild(e)}
+const so=[...D.pb].sort(sLN);let bd='';
+if(wSt===1){bd='<div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--t0)">'+(wM?'בחר משתתפים':'מי קיבל משימה?')+'</div>';if(wM&&wNs.length)bd+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">'+wNs.map(n=>'<span style="background:var(--rdd);color:var(--rd);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600">'+n+'</span>').join('')+'</div>';bd+='<div class="ng">'+so.map(n=>{const sel=wM?wNs.includes(n):wNm===n;return'<div class="ni2'+(sel?' sel':'')+'" onclick="wPN(\''+es(n)+'\')">'+aH(n,24,9)+'<span style="flex:1">'+n+'</span></div>'}).join('')+'</div>';if(wM)bd+='<button style="width:100%;margin-top:10px;padding:10px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14px;font-weight:700;cursor:pointer" '+(wNs.length===0?'disabled':'')+' onclick="wSt=2;rnW()">הבא ← ('+wNs.length+')</button>'}
+if(wSt===2){const pkC=p=>{return wPk.filter(x=>x===p).length};bd='<div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--t0)">בחר פרקים <span style="font-size:10px;color:var(--t2);font-weight:400">(לחץ פעמיים = ×2)</span></div><div style="font-size:10px;font-weight:700;color:var(--go);margin-bottom:4px">★ מומלצים</div><div class="pg">'+PRC.map(p=>{const c=pkC(p);return'<button class="pb'+(c>0?' sel':'')+'" onclick="wTP(\''+p+'\')">'+p+(c>1?' ×'+c:'')+'</button>'}).join('')+'</div><div style="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:4px">כל הפרקים</div><div class="pg">'+PAL.map(p=>{const c=pkC(p);return'<button class="pb'+(c>0?' sel':'')+'" onclick="wTP(\''+p+'\')">'+p+(c>1?' ×'+c:'')+'</button>'}).join('')+'</div>'+(wPk.length?'<div style="font-size:12px;color:var(--go);margin-bottom:6px">נבחרו: '+[...new Set(wPk)].map(p=>{const c=wPk.filter(x=>x===p).length;return p+(c>1?' ×'+c:'')}).join(', ')+'</div>':'')+'<button style="width:100%;padding:10px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14px;font-weight:700;cursor:pointer" '+(wPk.length===0?'disabled':'')+' onclick="wSt=3;rnW()">אישור ←</button><div style="font-size:11px;color:var(--t2);margin-top:8px;cursor:pointer" onclick="wSt=1;rnW()">← חזור</div>'}
+if(wSt===3){bd='<div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--t0)">עד מתי?</div>'+DLS.map(o=>'<div class="dlo'+(wDln===o.k?' sel':'')+'" onclick="wDln=\''+o.k+'\';wSt=4;rnW()"><span style="font-size:13px;font-weight:600;color:var(--t0)">'+o.l+'</span><span style="font-size:11px;color:var(--t2)">'+o.t+'</span></div>').join('')+'<div style="font-size:11px;color:var(--t2);margin-top:8px;cursor:pointer" onclick="wSt=2;rnW()">← חזור</div>'}
+if(wSt===4){bd='<div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--t0)">סיבה</div>'+RSN.map(r=>'<div class="ro'+(wRs===r.k?' sel':'')+'" onclick="wPR(\''+r.k+'\')"><span style="font-size:18px">'+r.i+'</span><span style="font-size:13px;font-weight:600;color:var(--t0)">'+r.l+'</span></div>').join('');if(wRs==='talk')bd+='<div style="margin-top:8px;display:flex;gap:8px"><button style="flex:1;padding:10px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14px;font-weight:700;cursor:pointer" onclick="wSN()">🕐 עכשיו</button><button style="padding:8px 14px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:12px;cursor:pointer" onclick="wSb()">ללא</button></div>';if(wRs==='other')bd+='<div style="margin-top:8px"><input class="inp" id="wwoi" placeholder="תאר..."><button style="width:100%;margin-top:8px;padding:10px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14px;font-weight:700;cursor:pointer" onclick="wRo=document.getElementById(\'wwoi\').value;wSb()">סיום</button></div>';bd+='<div style="font-size:11px;color:var(--t2);margin-top:8px;cursor:pointer" onclick="wSt=3;rnW()">← חזור</div>'}
+e.innerHTML='<div class="O" onclick="cWW()"><div class="M" onclick="event.stopPropagation()"><div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div><div style="font-size:15px;font-weight:700;padding:8px 16px;display:flex;justify-content:space-between"><span>'+(wM?'👥 משימה קבוצתית':'משימה חדשה')+'</span><button style="background:var(--s3);border:1px solid var(--bm);border-radius:7px;width:26px;height:26px;color:var(--t2);cursor:pointer;font-size:14px" onclick="cWW()">✕</button></div><div id="wwsc" style="padding:8px 16px 20px;max-height:70vh;overflow-y:auto">'+bd+'</div></div></div>'}
+function cWW(){document.getElementById('wwov').innerHTML=''}
+function wPN(n){const mb=document.getElementById('wwsc');const sp=mb?mb.scrollTop:0;if(wM){const i=wNs.indexOf(n);if(i===-1)wNs.push(n);else wNs.splice(i,1);rnW();setTimeout(()=>{const m2=document.getElementById('wwsc');if(m2)m2.scrollTop=sp},0)}else{wNm=n;wSt=2;rnW()}}
+function wTP(p){const c=wPk.filter(x=>x===p).length;if(c===0)wPk.push(p);else if(c===1)wPk.push(p);else wPk=wPk.filter(x=>x!==p);rnW()}
+function wPR(k){wRs=k;const r=RSN.find(x=>x.k===k);if(!r.hh&&!r.ho)setTimeout(()=>wSb(),150);else rnW()}
+function wSN(){const n=new Date;wRh=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');wSb()}
+function wSb(){const uPk=[...new Set(wPk)];(wM?wNs:[wNm]).forEach(nm=>{uPk.forEach(p=>{const cnt=wPk.filter(x=>x===p).length;for(let i=0;i<cnt;i++){const t={id:uid(),nm,pk:[p],dln:wDln,dl:dld(wDln).toISOString(),status:'waiting',x:1,rs:wRs,rh:wRh,ro:wRo,ca:new Date().toISOString()};D.wt.push(t);D.wh.push({...t})}})});sv();cWW();rr()}
+// ═══ TASKS (משימות כלליות) ═══
+function rTk(){const op=D.tk.filter(t=>!t.dn),dn2=D.tk.filter(t=>t.dn);
+let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:17px;color:var(--t0)">📋 משימות כלליות</span><button class="B" style="background:var(--gd);color:var(--go);border-color:var(--gb)" onclick="aTk()">+ חדש</button></div><div class="S" style="padding:8px 12px 100px">';
+if(!op.length&&!dn2.length)h+='<div style="text-align:center;padding:40px 20px;color:var(--t2)"><div style="font-size:36px;opacity:.5">📋</div><div>אין משימות</div></div>';
+if(op.length){h+='<div class="sl">פתוחות ('+op.length+')</div>';op.forEach(t=>{h+='<div class="C" style="display:flex;align-items:center;gap:9px"><div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--t0)">'+es(t.tx)+'</div>'+(t.ps?'<div style="font-size:11px;color:var(--t2);margin-top:2px">👤 '+es(t.ps)+'</div>':'')+'<div style="font-size:10px;color:var(--t2);margin-top:2px">'+fm(t.dt)+'</div></div><button class="ab" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.1);color:var(--gr)" onclick="D.tk.forEach(x=>{if(x.id===\''+t.id+'\')x.dn=true});sv();rr()">✓</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="D.tk=D.tk.filter(x=>x.id!==\''+t.id+'\');sv();rr()">🗑</button></div>'})}
+if(dn2.length){h+='<div class="sl" style="margin-top:10px">הושלמו ('+dn2.length+')</div>';dn2.slice(0,10).forEach(t=>{h+='<div class="C" style="opacity:.4"><div style="text-decoration:line-through;font-size:13px;color:var(--t1)">'+es(t.tx)+'</div></div>'})}
+h+='</div></div>';return h}
+function aTk(){const tx=prompt('תוכן המשימה:');if(!tx)return;const ps=prompt('קשור למישהו? (ריק=כללי)');D.tk.push({id:uid(),tx,ps:ps||'',dt:td(),dn:false});sv();rr()}
+
+// ═══ PIN ═══
+let pV='',pE=false,pSh=false;
+function rPn(){return'<div class="P" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:80px"><div style="margin-bottom:30px;text-align:center"><div style="font-size:40px;margin-bottom:8px">🔒</div><div style="font-size:18px;font-weight:700;color:var(--t0)">שיחות</div><div style="font-size:12px;color:var(--t2);margin-top:4px">הכנס קוד</div></div><div class="pd" style="'+(pSh?'animation:shake .5s':'')+'">'+[0,1,2,3].map(i=>'<div class="pdt'+(i<pV.length?(pE?' err':' on'):'')+'"></div>').join('')+'</div><div style="color:var(--rd);font-size:13px;min-height:18px;margin-bottom:12px">'+(pE?'קוד שגוי':'')+'</div><div class="pk">'+[1,2,3,4,5,6,7,8,9,null,0,'⌫'].map(d=>d===null?'<button class="pkb e"></button>':d==='⌫'?'<button class="pkb" style="font-size:20px" onclick="pDl()">⌫</button>':'<button class="pkb" onclick="pDg(\''+d+'\')">'+d+'</button>').join('')+'</div></div>'}
+function pDg(d){if(pV.length>=4)return;pV+=d;pE=false;if(pV.length===4){setTimeout(()=>{if(pV===(D.pin||'1234')){pV='';go('cv')}else{pE=true;pSh=true;rr();setTimeout(()=>{pSh=false;pV='';rr()},600)}},200)}else rr()}
+function pDl(){pV=pV.slice(0,-1);pE=false;rr()}
+// ═══ CONVERSATIONS (LTR, numbers from left) ═══
+let cvI=null,cvV='list',cvTm=0,cvRn=false,cvIn=null,cvPd='day';
+function rCv(){if(cvV==='sess'){const s=D.cs.find(x=>x.id===cvI);if(s)return rCS(s)}if(cvV==='stud'){const s=D.cs.find(x=>x.id===cvI);if(s)return rCSt(s)}return rCL()}
+function cvDash(){const now=new Date;let fd,label;
+if(cvPd==='day'){fd=td();label='היום'}
+else if(cvPd==='week'){const w=new Date(now);w.setDate(w.getDate()-7);fd=w.toISOString().slice(0,10);label='שבוע אחרון'}
+else{const m=new Date(now);m.setDate(m.getDate()-30);fd=m.toISOString().slice(0,10);label='חודש אחרון'}
+const sx=D.cx.filter(s=>s.dt>=fd);const tm=sx.reduce((a,e)=>a+(e.du||0),0);
+const byS={};sx.forEach(s=>{const st=D.cs.find(x=>x.id===s.si);const nm=st?st.name:'?';if(!byS[nm])byS[nm]={c:0,m:0};byS[nm].c++;byS[nm].m+=(s.du||0)});
+const sorted=Object.entries(byS).sort((a,b)=>b[1].m-a[1].m);
+let h='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:12px;margin-bottom:10px">';
+h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:13px;color:var(--t0)">📊 סיכום שיחות</span><div style="display:flex;gap:4px">'+['day','week','month'].map(p=>'<button class="fb'+(cvPd===p?' on':'')+'" style="font-size:10px;padding:3px 8px" onclick="cvPd=\''+p+'\';rr()">'+(p==='day'?'יום':p==='week'?'שבוע':'חודש')+'</button>').join('')+'</div></div>';
+h+='<div style="display:flex;gap:10px;margin-bottom:8px">'+cH('var(--go)','var(--gd)',sx.length+' שיחות')+cH('var(--go)','var(--gd)',tm+' דק׳')+cH('var(--t2)','var(--s3)',label)+'</div>';
+if(sorted.length){const showAll=D._cvDashAll;const sl=showAll?sorted:sorted.slice(0,6);sl.forEach(([nm,d])=>{h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--bd)">'+aH(nm,24,9)+'<div style="flex:1;font-size:12px;color:var(--t0)">'+nm+'</div><span style="font-size:11px;color:var(--t1)">'+d.c+' שיחות</span>'+cH('var(--go)','var(--gd)',d.m+' דק׳')+'</div>'});if(sorted.length>6&&!showAll)h+='<div style="font-size:11px;color:var(--go);margin-top:4px;cursor:pointer;text-align:center" onclick="D._cvDashAll=true;rr()">⬇ הצג עוד '+(sorted.length-6)+' בחורים</div>';if(showAll&&sorted.length>6)h+='<div style="font-size:11px;color:var(--t2);margin-top:4px;cursor:pointer;text-align:center" onclick="D._cvDashAll=false;rr()">⬆ הסתר</div>'}
+else h+='<div style="font-size:12px;color:var(--t2)">אין שיחות בתקופה זו</div>';
+h+='</div>';return h}
+function rCL(){const tc=D.cx.filter(s=>s.dt===td()).length,uc=D.cs.filter(s=>s.urgent).length;
+const u=D.cs.filter(s=>s.urgent),cb=D.cs.filter(s=>!s.urgent&&s.cb&&s.cb<=td()),rs=D.cs.filter(s=>!s.urgent&&!(s.cb&&s.cb<=td())&&!cT(s.id)),dn=D.cs.filter(s=>!s.urgent&&!(s.cb&&s.cb<=td())&&cT(s.id));
+const ord=[...u,...cb,...rs,...dn].sort((a,b)=>{const au=u.includes(a)?0:cb.includes(a)?1:rs.includes(a)?2:3;const bu=u.includes(b)?0:cb.includes(b)?1:rs.includes(b)?2:3;if(au!==bu)return au-bu;return sLN(a.name,b.name)});
+let h='<div class="P" style="direction:ltr"><div class="H" style="direction:rtl"><button class="B" onclick="go(\'phones\')">🔒 נעילה</button><span style="font-weight:800;font-size:17px;color:var(--t0)">שיחות</span><div style="width:60px"></div></div>';
+h+='<div style="display:flex;align-items:center;padding:6px 12px;background:var(--bg);border:1px solid var(--bd);margin:0 12px;border-radius:10px;direction:rtl"><div style="flex:1;text-align:center;font-size:13px;color:var(--t1)"><b>'+tc+'</b> היום</div><div style="width:1px;height:24px;background:var(--bd)"></div><div style="flex:1;text-align:center;font-size:13px;color:'+(uc>0?'var(--rd)':'var(--t1)')+'"><b>'+uc+'</b> דחופים</div><div style="width:1px;height:24px;background:var(--bd)"></div><div style="flex:1;text-align:center;font-size:13px;color:var(--t1)"><b>'+D.cs.length+'</b> בחורים</div></div>';
+h+='<div class="S" style="padding:8px 12px 100px;direction:rtl">';
+h+=cvDash();
+// Dashboard - open tasks
+const openCI=D.ci.filter(i=>i.st==='open').sort((a,b)=>{if(a.mvb&&!b.mvb)return 1;if(!a.mvb&&b.mvb)return -1;if(a.mvb&&b.mvb)return a.mvb-b.mvb;return 0});
+if(openCI.length){const showAllCI=D._ciShowAll;const ciSlice=showAllCI?openCI:openCI.slice(0,8);h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:12px;margin-bottom:10px"><div style="font-size:13px;font-weight:700;color:var(--t0);margin-bottom:8px">📋 משימות פתוחות ('+openCI.length+')</div>';
+ciSlice.forEach(ci=>{h+='<div style="display:flex;align-items:center;gap:5px;padding:5px 0;border-bottom:1px solid var(--bd)"><div style="flex:1"><div style="font-size:12px;color:var(--t0)">'+es(ci.tx)+'</div><div style="font-size:10px;color:var(--t2)">'+es(ci.sn)+' · '+(ci.tp==='task'?'✅ משימה':'❓ שאלה')+' · '+fm(ci.dt)+'</div></div><button style="padding:3px 7px;border-radius:6px;background:var(--grd);border:1px solid rgba(34,197,94,.2);color:var(--gr);font-size:10px;font-weight:600;cursor:pointer" onclick="ciDone(\''+ci.id+'\')">✓</button><button style="padding:3px 5px;border-radius:6px;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:10px;cursor:pointer" onclick="ciMvB(\''+ci.id+'\')">↓</button><button style="padding:3px 5px;border-radius:6px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:10px;cursor:pointer" onclick="ciDel(\''+ci.id+'\')">🗑</button></div>'});
+if(openCI.length>8&&!showAllCI)h+='<div style="font-size:12px;color:var(--go);margin-top:6px;cursor:pointer;text-align:center;padding:6px;background:var(--gd);border-radius:8px" onclick="D._ciShowAll=true;rr()">⬇ הצג עוד '+(openCI.length-8)+' משימות</div>';
+if(showAllCI&&openCI.length>8)h+='<div style="font-size:12px;color:var(--t2);margin-top:6px;cursor:pointer;text-align:center;padding:6px;background:var(--s3);border-radius:8px" onclick="D._ciShowAll=false;rr()">⬆ הסתר</div>';
+h+='</div>'}
+ord.forEach((s,i)=>{const ls2=lS(s.id),dy=ds(ls2&&ls2.dt),id=cT(s.id),iu=s.urgent&&!id,ic=s.cb&&s.cb<=td()&&!id&&!s.urgent,lo=dy!==null&&dy>14&&!id&&!iu,nx=ls2&&ls2.np||[];
+h+='<div class="C" style="border-color:'+(id?'rgba(34,197,94,.2)':iu?'rgba(239,68,68,.3)':ic?'var(--gb)':'var(--bd)')+';opacity:'+(id?.4:1)+';cursor:pointer" onclick="cvI=\''+s.id+'\';cvV=\'stud\';go(\'cv\')"><div style="display:flex;align-items:center;gap:10px"><span style="width:22px;height:22px;border-radius:50%;background:var(--s3);border:1px solid var(--bd);color:var(--t2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;direction:ltr">'+(i+1)+'</span><div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--t0)">'+s.name+'</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">'+(iu?cH('var(--rd)','var(--rdd)','🔴 דחוף'):'')+(ic?cH('var(--am)','var(--amd)','🔔 לחזור'):'')+(id?cH('var(--gr)','var(--grd)','✓ היום'):dy===null?cH('var(--t2)','var(--s3)','טרם'):lo?cH('var(--rd)','var(--rdd)',dy+' יום'):cH('var(--t2)','var(--s3)',dy+' ימים'))+(nx.length>0&&!id?cH('var(--pu)','var(--pud)',nx.length+' נקודות'):'')+'</div></div><div style="display:flex;gap:5px;align-items:center;flex-shrink:0" onclick="event.stopPropagation()"><button style="border:1px solid var(--bm);border-radius:7px;padding:4px 8px;cursor:pointer;font-size:14px;font-weight:700;background:'+(s.urgent?'var(--rdd)':'var(--s3)')+';color:'+(s.urgent?'var(--rd)':'var(--t2)')+'" onclick="D.cs.forEach(x=>{if(x.id===\''+s.id+'\')x.urgent=!x.urgent});sv();rr()">'+(s.urgent?'🔴':'○')+'</button><button style="background:'+(id?'var(--s3)':'var(--go)')+';color:'+(id?'var(--t2)':'#0a0f1c')+';border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:11px;font-weight:700" onclick="cvI=\''+s.id+'\';cvV=\'sess\';cvTm=0;go(\'cv\')">'+(id?'＋':'שיחה →')+'</button></div></div>'+(nx.length>0&&!id?'<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--bd)">'+nx.slice(0,2).map(p=>'<div style="font-size:12px;color:var(--t1);margin-bottom:1px">• '+es(p)+'</div>').join('')+(nx.length>2?'<div style="font-size:11px;color:var(--t2)">ועוד '+(nx.length-2)+'...</div>':'')+'</div>':'')+'</div>'});
+h+='</div></div>';return h}
+
+function rCSt(s){const sx=[...D.cx].filter(x=>x.si===s.id).sort((a,b)=>b.dt.localeCompare(a.dt)),ls2=sx[0]||null,tm=sx.reduce((a,e)=>a+(e.du||0),0);
+let h='<div class="P" style="direction:ltr"><div class="H" style="direction:rtl"><button class="B" onclick="cvV=\'list\';go(\'cv\')">← חזור</button><span style="font-weight:800;font-size:17px;color:var(--t0)">'+s.name+'</span><div style="width:60px"></div></div><div class="S" style="padding:8px 12px 100px;direction:rtl">';
+h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:8px"><div style="width:42px;height:42px;border-radius:50%;background:var(--gd);border:2px solid var(--go);color:var(--go);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center">'+s.name[0]+'</div><div style="flex:1"><div style="font-weight:700;font-size:18px">'+s.name+'</div><div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">'+cH('var(--go)','var(--gd)',sx.length+' שיחות')+cH('var(--go)','var(--gd)',tm+' דק׳')+(ls2?cH('var(--t2)','var(--s3)','אחרון: '+fm(ls2.dt)):'')+'</div></div></div>';
+// Notes
+h+='<div class="C" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-weight:700;font-size:13px;color:var(--t0)">📒 הערות</span><button style="background:none;border:none;color:var(--go);cursor:pointer;font-size:12px;font-weight:600" onclick="var n=prompt(\'הערות:\',\''+es(s.notes).replace(/'/g,"\\'")+'\');if(n!==null){D.cs.forEach(x=>{if(x.id===\''+s.id+'\')x.notes=n});sv();rr()}">ערוך</button></div>'+(s.notes?'<div style="font-size:13px;color:var(--t1)">'+es(s.notes)+'</div>':'<div style="font-size:13px;color:var(--t2)">אין הערות</div>')+'</div>';
+if(ls2&&ls2.np&&ls2.np.length)h+='<div style="background:var(--gd);border:1px solid var(--gb);border-radius:12px;padding:12px;margin-bottom:8px"><div style="font-size:12px;font-weight:700;color:var(--go);margin-bottom:4px">🔍 לשיחה הבאה</div>'+ls2.np.map(p=>'<div style="font-size:13px;color:var(--t0);margin-bottom:2px">• '+es(p)+'</div>').join('')+'</div>';
+h+='<button style="width:100%;height:46px;border-radius:12px;background:var(--go);color:#0a0f1c;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-bottom:10px" onclick="cvV=\'sess\';cvTm=0;go(\'cv\')">＋ תעד שיחה חדשה</button>';
+// Quick add task/question without opening a session
+h+='<div class="C" style="margin-bottom:8px"><div style="font-weight:700;font-size:13px;color:var(--t0);margin-bottom:6px">➕ הוסף משימה / דבר לזכור</div><div style="display:flex;gap:6px"><button style="flex:1;padding:8px;border-radius:8px;background:var(--grd);border:1px solid rgba(34,197,94,.2);color:var(--gr);font-size:12px;font-weight:700;cursor:pointer" onclick="qaCI(\''+s.id+'\',\''+es(s.name).replace(/'/g,"\\'")+'\',\'task\')">✅ משימה</button><button style="flex:1;padding:8px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:12px;font-weight:700;cursor:pointer" onclick="qaCI(\''+s.id+'\',\''+es(s.name).replace(/'/g,"\\'")+'\',\'question\')">❓ שאלה</button></div></div>';
+// Tasks for this student
+const sTks=D.ci.filter(c=>c.si===s.id);const sTksOp=sTks.filter(c=>c.st==='open'),sTksDn=sTks.filter(c=>c.st==='done');
+if(sTks.length){h+='<div class="C" style="margin-bottom:8px"><div style="font-weight:700;font-size:13px;color:var(--t0);margin-bottom:6px">📋 משימות ושאלות ('+sTksOp.length+' פתוחות)</div>';
+sTksOp.forEach(c=>{h+='<div style="display:flex;align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px solid var(--bd)"><span style="font-size:14px">'+(c.tp==='task'?'✅':'❓')+'</span><div style="flex:1;font-size:13px;color:var(--t0);line-height:1.5">'+es(c.tx)+'</div><button style="padding:3px 8px;border-radius:6px;background:var(--grd);border:1px solid rgba(34,197,94,.2);color:var(--gr);font-size:10px;font-weight:600;cursor:pointer" onclick="ciDone(\''+c.id+'\')">✓</button><button style="padding:3px 6px;border-radius:6px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:10px;cursor:pointer" onclick="ciDel(\''+c.id+'\')">🗑</button></div>'});
+if(sTksDn.length)h+='<div style="font-size:10px;font-weight:700;color:var(--t2);margin-top:8px;margin-bottom:4px">הושלמו ('+sTksDn.length+')</div>'+sTksDn.map(c=>'<div style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;opacity:.5"><span style="font-size:12px">'+(c.tp==='task'?'✅':'❓')+'</span><div style="flex:1;font-size:12px;color:var(--t1);text-decoration:line-through">'+es(c.tx)+'</div><button style="padding:2px 6px;border-radius:5px;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:10px;cursor:pointer" onclick="ciReopen(\''+c.id+'\')">↺</button><button style="padding:2px 6px;border-radius:5px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:10px;cursor:pointer" onclick="ciDel(\''+c.id+'\')">🗑</button></div>').join('');
+h+='</div>'}
+h+='<div class="sl">היסטוריה</div>';
+if(!sx.length)h+='<div style="color:var(--t2);text-align:center;padding:20px;font-size:13px">אין שיחות</div>';
+sx.forEach(ss=>{h+='<div class="ss"><div style="display:flex;gap:6px;align-items:center"><span style="font-weight:700;font-size:12px;color:var(--t0)">'+fm(ss.dt)+'</span>'+(ss.du>0?cH('var(--go)','var(--gd)',ss.du+' דק׳'):'')+'<div style="flex:1"></div><button style="padding:2px 6px;border-radius:5px;background:var(--bld);border:1px solid rgba(59,130,246,.2);color:var(--bl);font-size:10px;cursor:pointer" onclick="editSess(\''+ss.id+'\')">✏️ ערוך</button><button style="padding:2px 6px;border-radius:5px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:10px;cursor:pointer" onclick="if(confirm(\'למחוק שיחה זו לצמיתות?\')){D.cx=D.cx.filter(x=>x.id!==\''+ss.id+'\');sv();rr()}">🗑 מחק</button></div>'+(ss.sm?'<div style="font-size:13px;color:var(--t1);margin-top:6px;line-height:1.7;white-space:pre-wrap">'+es(ss.sm)+'</div>':'')+(ss.np&&ss.np.length?'<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--bd)"><div style="font-size:10px;font-weight:700;color:var(--go);margin-bottom:3px">🔍 לשיחה הבאה:</div>'+ss.np.map(p=>'<div style="font-size:12px;color:var(--t1);margin-bottom:2px">• '+es(p)+'</div>').join('')+'</div>':'')+'</div>'});
+// Photos section
+const photos=s.photos||[];
+h+='<div class="sl" style="margin-top:8px">📷 תמונות ('+photos.length+')</div>';
+h+='<div style="margin-bottom:8px"><button style="width:100%;padding:10px;border-radius:10px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:13px;font-weight:700;cursor:pointer" onclick="addPhoto(\''+s.id+'\')">📷 הוסף תמונה</button><input type="file" id="phInput" accept="image/*" style="display:none" onchange="handlePhoto(this,\''+s.id+'\')"></div>';
+if(photos.length){photos.slice().reverse().forEach(p=>{h+='<div class="C" style="margin-bottom:8px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--t0)">'+es(p.name||'ללא שם')+'</div><div style="font-size:10px;color:var(--t2)">'+fm(p.dt)+'</div></div><button style="padding:3px 8px;border-radius:6px;background:var(--bld);border:1px solid rgba(59,130,246,.2);color:var(--bl);font-size:10px;cursor:pointer" onclick="renamePhoto(\''+s.id+'\',\''+p.id+'\')">✏️</button><button style="padding:3px 8px;border-radius:6px;background:var(--grd);border:1px solid rgba(34,197,94,.2);color:var(--gr);font-size:10px;cursor:pointer" onclick="sharePhoto(\''+p.id+'\',\''+s.id+'\')">📤</button><button style="padding:3px 6px;border-radius:6px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:10px;cursor:pointer" onclick="delPhoto(\''+s.id+'\',\''+p.id+'\')">🗑</button></div><img src="'+p.data+'" style="width:100%;border-radius:8px;max-height:300px;object-fit:contain;background:#000" onclick="window.open(this.src)"></div>'})}
+h+='</div></div>';return h}
+
+// Photos are stored in D.cs[].photos = [{id,name,dt,data}]
+function rCS(s){const ls2=lS(s.id),f2=v=>String(Math.floor(v/60)).padStart(2,'0')+':'+String(v%60).padStart(2,'0');
+let h='<div class="P" style="direction:ltr"><div class="H" style="direction:rtl"><button class="B" onclick="cvStp();cvV=\'stud\';go(\'cv\')">← חזור</button><span style="font-weight:800;font-size:16px;color:var(--t0)">שיחה — '+s.name+'</span><div style="width:50px"></div></div><div class="S" style="padding:8px 12px 100px;direction:rtl">';
+if(ls2&&ls2.np&&ls2.np.length)h+='<div style="background:var(--gd);border:1px solid var(--gb);border-radius:12px;padding:12px;margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--go);margin-bottom:4px">📋 קודם — '+fm(ls2.dt)+'</div>'+ls2.np.map(p=>'<div style="font-size:13px;color:var(--t0);margin-bottom:2px">• '+es(p)+'</div>').join('')+'</div>';
+h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:14px;text-align:center;margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px">⏱ זמן שיחה</div><div id="cvt" style="font-size:48px;font-weight:700;color:var(--go);font-variant-numeric:tabular-nums;letter-spacing:4px">'+f2(cvTm)+'</div><div style="display:flex;gap:10px;justify-content:center;margin-top:10px"><button style="padding:8px 24px;border-radius:10px;background:'+(cvRn?'var(--rd)':'var(--s3)')+';border:1px solid '+(cvRn?'rgba(239,68,68,.4)':'var(--bm)')+';color:var(--t0);cursor:pointer;font-size:13px;font-weight:600" onclick="cvTg()">'+(cvRn?'⏸ עצור':'▶ התחל')+'</button><button style="padding:8px 16px;border-radius:10px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);cursor:pointer;font-size:13px" onclick="cvRs()">אפס</button></div><div style="display:flex;gap:10px;justify-content:center;margin-top:10px"><button style="padding:8px 18px;border-radius:10px;background:var(--grd);border:1px solid rgba(34,197,94,.25);color:var(--gr);cursor:pointer;font-size:13px;font-weight:600" onclick="cvAddM(10)">+ 10 דק׳</button><button style="padding:8px 18px;border-radius:10px;background:var(--rdd);border:1px solid rgba(239,68,68,.25);color:var(--rd);cursor:pointer;font-size:13px;font-weight:600" onclick="cvAddM(-10)">- 10 דק׳</button></div></div>';
+[{id:'cs',l:'📝 סיכום',h:'מה עלה',r:4,p:'עיקרי השיחה...'},{id:'ct',l:'✅ משימות',h:'שורה לכל משימה',r:3,p:'משימות...'},{id:'cn',l:'🔍 לשיחה הבאה',h:'מה לא לשכוח',r:3,p:'מה לשאול...'},{id:'cq',l:'❓ שאלות',h:'דורשות בדיקה',r:2,p:'שאלות...'}].forEach(f=>{h+='<div class="C" style="margin-bottom:8px"><div style="font-weight:700;font-size:13px;color:var(--t0);margin-bottom:2px">'+f.l+'</div><div style="font-size:11px;color:var(--t2);margin-bottom:6px">'+f.h+'</div><textarea class="ta" id="'+f.id+'" rows="'+f.r+'" placeholder="'+f.p+'" style="direction:rtl"></textarea></div>'});
+h+='<button style="width:100%;height:48px;border-radius:12px;background:var(--go);color:#0a0f1c;font-size:16px;font-weight:700;border:none;cursor:pointer;margin-top:8px" onclick="cvSv()">שמור שיחה ✓</button></div></div>';return h}
+
+function cvTg(){cvRn=!cvRn;if(cvRn){cvIn=setInterval(()=>{cvTm++;const e=document.getElementById('cvt');if(e)e.textContent=String(Math.floor(cvTm/60)).padStart(2,'0')+':'+String(cvTm%60).padStart(2,'0')},1000)}else clearInterval(cvIn)}
+function cvRs(){cvRn=false;clearInterval(cvIn);cvTm=0;const e=document.getElementById('cvt');if(e)e.textContent='00:00'}
+function cvAddM(m){cvTm=Math.max(0,cvTm+m*60);const e=document.getElementById('cvt');if(e)e.textContent=String(Math.floor(cvTm/60)).padStart(2,'0')+':'+String(cvTm%60).padStart(2,'0')}
+function cvStp(){cvRn=false;clearInterval(cvIn);cvTm=0}
+function cvSv(){const s=D.cs.find(x=>x.id===cvI);if(!s)return;
+const sm=document.getElementById('cs')?.value||'',tk=document.getElementById('ct')?.value||'',np=document.getElementById('cn')?.value||'',oq=document.getElementById('cq')?.value||'';
+const si=uid();D.cx.push({id:si,si:s.id,dt:td(),sm,np:np.split('\n').filter(Boolean),du:Math.round(cvTm/60)});
+tk.split('\n').filter(Boolean).forEach(t=>D.ci.push({id:uid(),si:s.id,sn:s.name,tp:'task',tx:t,dt:td(),st:'open'}));
+oq.split('\n').filter(Boolean).forEach(q=>D.ci.push({id:uid(),si:s.id,sn:s.name,tp:'question',tx:q,dt:td(),st:'open'}));
+cvStp();sv();cvV='stud';go('cv')}
+function _presSc(fn){const sc=document.querySelector('.S');const sp=sc?sc.scrollTop:0;fn();setTimeout(()=>{const s2=document.querySelector('.S');if(s2)s2.scrollTop=sp},0)}
+function ciDone(id){_presSc(()=>{D.ci.forEach(x=>{if(x.id===id)x.st='done'});sv();rr()})}
+function ciReopen(id){_presSc(()=>{D.ci.forEach(x=>{if(x.id===id)x.st='open'});sv();rr()})}
+function ciDel(id){if(!confirm('למחוק משימה זו?'))return;_presSc(()=>{D.ci=D.ci.filter(x=>x.id!==id);sv();rr()})}
+function ciMvB(id){_presSc(()=>{D.ci.forEach(x=>{if(x.id===id)x.mvb=Date.now()});sv();rr()})}
+
+function editSess(id){const ss=D.cx.find(x=>x.id===id);if(!ss)return;
+let e=document.getElementById('edov');if(!e){e=document.createElement('div');e.id='edov';document.body.appendChild(e)}
+const npTxt=(ss.np||[]).join('\n');
+e.innerHTML='<div class="O" onclick="document.getElementById(\'edov\').innerHTML=\'\'"><div class="M" onclick="event.stopPropagation()"><div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div><div style="font-size:15px;font-weight:700;padding:8px 16px">✏️ עריכת שיחה — '+fm(ss.dt)+'</div><div style="padding:8px 16px 20px;max-height:70vh;overflow-y:auto"><div style="font-size:12px;font-weight:600;color:var(--t0);margin-bottom:4px">משך (דקות):</div><input class="inp" id="edDu" type="number" value="'+(ss.du||0)+'" style="width:80px;margin-bottom:10px"><div style="font-size:12px;font-weight:600;color:var(--t0);margin-bottom:4px">סיכום:</div><textarea class="ta" id="edSm" rows="8" style="direction:rtl;margin-bottom:10px">'+(ss.sm||'').replace(/</g,'&lt;')+'</textarea><div style="font-size:12px;font-weight:600;color:var(--t0);margin-bottom:4px">לשיחה הבאה (שורה לכל נקודה):</div><textarea class="ta" id="edNp" rows="4" style="direction:rtl;margin-bottom:10px">'+npTxt.replace(/</g,'&lt;')+'</textarea><button style="width:100%;height:44px;border-radius:10px;background:var(--go);color:#0a0f1c;font-size:14px;font-weight:700;border:none;cursor:pointer" onclick="saveSessEdit(\''+id+'\')">שמור שינויים ✓</button></div></div></div>'}
+function saveSessEdit(id){const ss=D.cx.find(x=>x.id===id);if(!ss)return;
+ss.sm=document.getElementById('edSm').value;ss.du=parseInt(document.getElementById('edDu').value)||0;ss.np=document.getElementById('edNp').value.split('\n').filter(Boolean);
+sv();document.getElementById('edov').innerHTML='';rr()}
+
+function qaCI(si,sn,tp){const tx=prompt(tp==='task'?'הקלד משימה:':'הקלד שאלה / דבר לזכור:');if(!tx)return;
+D.ci.push({id:uid(),si,sn,tp,tx,dt:td(),st:'open'});sv();rr()}
+
+function addPhoto(sid){document.getElementById('phInput').click()}
+function handlePhoto(input,sid){const f=input.files&&input.files[0];if(!f)return;
+const name=prompt('שם לתמונה:',f.name.replace(/\.[^.]+$/,''))||'ללא שם';
+const reader=new FileReader();reader.onload=()=>{
+const s=D.cs.find(x=>x.id===sid);if(!s)return;
+if(!s.photos)s.photos=[];
+// Resize if too large
+const img=new Image();img.onload=()=>{
+let w=img.width,h=img.height;const mx=1200;
+if(w>mx||h>mx){if(w>h){h=Math.round(h*mx/w);w=mx}else{w=Math.round(w*mx/h);h=mx}}
+const c=document.createElement('canvas');c.width=w;c.height=h;
+c.getContext('2d').drawImage(img,0,0,w,h);
+const data=c.toDataURL('image/jpeg',0.7);
+s.photos.push({id:uid(),name,dt:td(),data});sv();rr()};
+img.src=reader.result};reader.readAsDataURL(f);input.value=''}
+
+function renamePhoto(sid,pid){const s=D.cs.find(x=>x.id===sid);if(!s||!s.photos)return;
+const p=s.photos.find(x=>x.id===pid);if(!p)return;
+const n=prompt('שם חדש:',p.name);if(n===null)return;p.name=n;sv();rr()}
+
+function delPhoto(sid,pid){if(!confirm('למחוק תמונה זו?'))return;
+const s=D.cs.find(x=>x.id===sid);if(!s||!s.photos)return;
+s.photos=s.photos.filter(x=>x.id!==pid);sv();rr()}
+
+function sharePhoto(pid,sid){const s=D.cs.find(x=>x.id===sid);if(!s||!s.photos)return;
+const p=s.photos.find(x=>x.id===pid);if(!p)return;
+// Convert to blob and share/download
+try{const arr=atob(p.data.split(',')[1]);const mime=p.data.split(',')[0].match(/:(.*?);/)[1];
+const ab=new Uint8Array(arr.length);for(let i=0;i<arr.length;i++)ab[i]=arr.charCodeAt(i);
+const blob=new Blob([ab],{type:mime});const fn=(p.name||'photo')+'.jpg';
+if(navigator.share&&navigator.canShare){const file=new File([blob],fn,{type:mime});
+if(navigator.canShare({files:[file]})){navigator.share({files:[file],title:p.name});return}}
+// Fallback: download
+const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fn;
+document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url)}catch(e){alert('שגיאה: '+e.message)}}
+
+// ═══ AUTO BACKUP ═══
+let lastBackupDate='';
+function checkAutoBackup(){try{
+const now=new Date;const h=now.getHours(),m=now.getMinutes();
+const today=now.toISOString().slice(0,10);
+if(h===23&&m>=0&&m<5&&lastBackupDate!==today){
+  lastBackupDate=today;
+  const payload={version:1,exportedAt:now.toISOString(),data:D};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download='yeshiva-backup-auto-'+today+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  D._lastAutoBackup=now.toISOString();sv();
+}}catch{}}
+setInterval(checkAutoBackup,60000);
+
+function expPh(period){try{
+let dates=Object.keys(D.ph).sort((a,b)=>b.localeCompare(a));
+if(!dates.length){alert('אין היסטוריית הפקדות לייצוא');return}
+if(period==='month'){const m=new Date;m.setDate(m.getDate()-30);const fd=m.toISOString().slice(0,10);dates=dates.filter(d=>d>=fd)}
+if(typeof period==='object'&&period.from&&period.to){dates=dates.filter(d=>d>=period.from&&d<=period.to)}
+if(!dates.length){alert('אין נתונים בתקופה זו');return}
+const boys=[...D.pb].sort(sLN);
+let csv='\uFEFF';
+csv+='שם';dates.forEach(d=>{const dt=new Date(d);csv+=','+dt.toLocaleDateString('he-IL',{day:'numeric',month:'numeric',year:'2-digit'})});csv+='\n';
+boys.forEach(b=>{
+ csv+='"'+b.replace(/"/g,'""')+'"';
+ dates.forEach(d=>{const hh=D.ph[d];if(!hh){csv+=',';return}
+ const dp=hh.dp&&hh.dp.includes(b),ms=hh.m&&hh.m.includes(b);
+ csv+=','+(dp?'V':ms?'X':'')});csv+='\n'});
+csv+='\n';
+csv+='סה״כ הפקידו';dates.forEach(d=>{const hh=D.ph[d];csv+=','+(hh&&hh.dp?hh.dp.length:0)});csv+='\n';
+csv+='סה״כ חסרים';dates.forEach(d=>{const hh=D.ph[d];csv+=','+(hh&&hh.m?hh.m.length:0)});csv+='\n';
+csv+='שעת רישום';dates.forEach(d=>{const hh=D.ph[d];csv+=','+(hh&&hh.t?hh.t:'')});csv+='\n';
+const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;const dt=new Date().toISOString().slice(0,10);a.download='הפקדות-טלפונים-'+dt+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);alert('הקובץ הורד! '+dates.length+' ימים, '+boys.length+' בחורים')}catch(e){alert('שגיאה: '+e.message)}}
+function oPhMon(){
+// Build list of Hebrew months that have data
+const dates=Object.keys(D.ph).sort();if(!dates.length){alert('אין נתונים');return}
+const months=new Map();dates.forEach(dk=>{try{const d=new Date(dk);const mo=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long',year:'numeric'}).format(d);const mKey=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(!months.has(mo))months.set(mo,{from:dk,to:dk,k:mKey});else months.get(mo).to=dk}catch{}});
+let e=document.getElementById('phmov');if(!e){e=document.createElement('div');e.id='phmov';document.body.appendChild(e)}
+let bd='';months.forEach((v,label)=>{bd+='<button class="so" onclick="expPh({from:\''+v.from+'\',to:\''+v.to+'\'});document.getElementById(\'phmov\').innerHTML=\'\'">📊 '+label+'</button>'});
+e.innerHTML='<div class="O" onclick="document.getElementById(\'phmov\').innerHTML=\'\'"><div class="M" onclick="event.stopPropagation()"><div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div><div style="font-size:15px;font-weight:700;padding:8px 16px;text-align:center">בחר חודש עברי</div><div style="padding:8px 16px 20px">'+bd+'<button style="width:100%;height:38px;border-radius:8px;background:var(--s3);color:var(--t2);font-size:13px;border:1px solid var(--bm);cursor:pointer;margin-top:8px" onclick="document.getElementById(\'phmov\').innerHTML=\'\'">ביטול</button></div></div></div>'}
+
+// ═══ INIT ═══
+ld();rr();
+setInterval(()=>{const e=document.getElementById('hmClk');if(e){const n=new Date;e.textContent=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')}},10000);
+</script></body></html>
