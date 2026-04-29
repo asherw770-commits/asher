@@ -109,7 +109,9 @@ function cpML(){const gm2=(n,d2)=>{let c=0;for(let i=1;i<=d2;i++){const d=new Da
 function es(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 let D;const K='yv9';
 function ld(){try{const s=localStorage.getItem(K);if(s)D={...df(),...JSON.parse(s)};else D=df()}catch{D=df()}}
-function sv(){try{localStorage.setItem(K,JSON.stringify(D))}catch{}}
+function sv(){try{localStorage.setItem(K,JSON.stringify(D))}catch{}if(window.__fbSave)window.__fbSave(D)}
+window.__getCurrentD=()=>D;
+window.__remoteApply=function(remoteD){if(!remoteD||typeof remoteD!=='object')return;D={...df(),...remoteD};try{localStorage.setItem(K,JSON.stringify(D))}catch{}if(typeof rr==='function')rr()};
 function df(){return{pb:[...NM],pt:{},ph:{},ps:{},wt:[],wh:[],cs:NM.map(n=>({id:uid(),name:n,urgent:false,notes:'',friends:'',cb:''})),cx:[],ci:[],tk:[],pin:'1234'}}
 let pg='home';function go(p){pg=p;rr()}
 function gS(n){const s=D.ps[n];if(!s||s.type==='normal')return'normal';if(s.type==='np')return'np';if(s.type==='away')return'away';if(s.type==='conf'){if(s.until&&s.until<td()){D.ps[n]={type:'normal'};sv();return'normal'}return'conf'}return'normal'}
@@ -489,4 +491,90 @@ e.innerHTML='<div class="O" onclick="document.getElementById(\'phmov\').innerHTM
 // ═══ INIT ═══
 ld();rr();
 setInterval(()=>{const e=document.getElementById('hmClk');if(e){const n=new Date;e.textContent=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')}},10000);
-</script></body></html>
+</script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCrbC53oSdWtympmtlLU5QCBioFuRoVOEI",
+  authDomain: "asher-83679.firebaseapp.com",
+  projectId: "asher-83679",
+  storageBucket: "asher-83679.firebasestorage.app",
+  messagingSenderId: "640201884308",
+  appId: "1:640201884308:web:47727a352fdbb6252aaa81",
+  measurementId: "G-M4JFHSCQGL"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const docRef = doc(db, 'app', 'main');
+
+const CLIENT_ID = Math.random().toString(36).slice(2);
+let saveTimer = null;
+let pendingData = null;
+let firstSnapshot = true;
+let lastWriteId = 0;
+let lastEchoId = 0;
+
+async function flushSave() {
+  if (!pendingData || !auth.currentUser) return;
+  const data = pendingData;
+  pendingData = null;
+  lastWriteId++;
+  const writeId = lastWriteId;
+  try {
+    await setDoc(docRef, {
+      data: data,
+      _clientId: CLIENT_ID,
+      _writeId: writeId,
+      _updatedAt: serverTimestamp()
+    });
+    lastEchoId = writeId;
+  } catch (e) {
+    console.error('Firestore save failed:', e);
+    pendingData = data;
+  }
+}
+
+window.__fbSave = function(data) {
+  pendingData = JSON.parse(JSON.stringify(data));
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, 800);
+};
+
+signInAnonymously(auth).catch(e => console.error('Anonymous sign-in failed:', e));
+
+onAuthStateChanged(auth, user => {
+  if (!user) return;
+  onSnapshot(docRef, snap => {
+    if (!snap.exists()) {
+      // First-time setup: push current local data to cloud
+      const d = window.__getCurrentD ? window.__getCurrentD() : null;
+      if (d) {
+        pendingData = JSON.parse(JSON.stringify(d));
+        flushSave();
+      }
+      firstSnapshot = false;
+      return;
+    }
+    const payload = snap.data();
+    // Ignore echoes from this client (writes we just made)
+    if (payload._clientId === CLIENT_ID && payload._writeId === lastEchoId && !firstSnapshot) {
+      return;
+    }
+    if (payload.data && window.__remoteApply) {
+      window.__remoteApply(payload.data);
+    }
+    firstSnapshot = false;
+  }, err => console.error('Firestore snapshot error:', err));
+});
+
+// Flush pending writes before tab closes
+window.addEventListener('beforeunload', () => {
+  if (pendingData) flushSave();
+});
+</script>
+</body></html>
