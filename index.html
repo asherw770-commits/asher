@@ -109,9 +109,10 @@ function cpML(){const gm2=(n,d2)=>{let c=0;for(let i=1;i<=d2;i++){const d=new Da
 function es(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 let D;const K='yv9';
 function ld(){try{const s=localStorage.getItem(K);if(s)D={...df(),...JSON.parse(s)};else D=df()}catch{D=df()}}
-function sv(){try{localStorage.setItem(K,JSON.stringify(D))}catch{}if(window.__fbSave)window.__fbSave(D)}
+function sv(){try{localStorage.setItem(K,JSON.stringify(D))}catch{}if(window.__fbSave&&!window.__isApplyingRemote)window.__fbSave(D)}
 window.__getCurrentD=()=>D;
-window.__remoteApply=function(remoteD){if(!remoteD||typeof remoteD!=='object')return;D={...df(),...remoteD};try{localStorage.setItem(K,JSON.stringify(D))}catch{}if(typeof rr==='function')rr()};
+window.__isApplyingRemote=false;
+window.__remoteApply=function(remoteD){if(!remoteD||typeof remoteD!=='object')return;window.__isApplyingRemote=true;try{D={...df(),...remoteD};try{localStorage.setItem(K,JSON.stringify(D))}catch{}if(typeof rr==='function')rr()}finally{window.__isApplyingRemote=false}};
 function df(){return{pb:[...NM],pt:{},ph:{},ps:{},wt:[],wh:[],cs:NM.map(n=>({id:uid(),name:n,urgent:false,notes:'',friends:'',cb:''})),cx:[],ci:[],tk:[],pin:'1234'}}
 let pg='home';function go(p){pg=p;rr()}
 function gS(n){const s=D.ps[n];if(!s||s.type==='normal')return'normal';if(s.type==='np')return'np';if(s.type==='away')return'away';if(s.type==='conf'){if(s.until&&s.until<td()){D.ps[n]={type:'normal'};sv();return'normal'}return'conf'}return'normal'}
@@ -520,11 +521,12 @@ const docRef = doc(db, 'app', 'main');
 const CLIENT_ID = Math.random().toString(36).slice(2);
 let saveTimer = null;
 let pendingData = null;
+let pendingJson = null;
+let lastSentJson = null;
 let firstSnapshot = true;
-let lastWriteId = 0;
-let lastEchoId = 0;
 let lastError = null;
 let lastSyncedAt = null;
+let saveCount = 0;
 
 function setStatus(state, text) {
   const dot = document.getElementById('syncDot');
@@ -548,47 +550,55 @@ window.__fbStatusClick = function() {
 async function flushSave() {
   if (!pendingData || !auth.currentUser) return;
   const data = pendingData;
+  const json = pendingJson;
   pendingData = null;
-  lastWriteId++;
-  const writeId = lastWriteId;
+  pendingJson = null;
   setStatus('saving', 'שומר...');
   try {
     await setDoc(docRef, {
       data: data,
       _clientId: CLIENT_ID,
-      _writeId: writeId,
       _updatedAt: serverTimestamp()
     });
-    lastEchoId = writeId;
+    lastSentJson = json;
+    saveCount++;
     lastError = null;
     lastSyncedAt = new Date();
     setStatus('synced', 'מסונכרן');
   } catch (e) {
     console.error('Firestore save failed:', e);
     lastError = e.message || String(e);
+    // Restore so we'll retry next change
     pendingData = data;
+    pendingJson = json;
     setStatus('error', 'שגיאה');
   }
 }
 
 window.__fbSave = function(data) {
+  let json;
   try {
-    pendingData = JSON.parse(JSON.stringify(data));
+    json = JSON.stringify(data);
   } catch (e) {
     lastError = 'נתונים לא תקינים: ' + e.message;
     setStatus('error', 'שגיאה');
     return;
   }
+  // Skip if data hasn't actually changed since last successful save
+  if (json === lastSentJson) return;
+  // Skip if we're already going to save the exact same thing
+  if (json === pendingJson) return;
+  pendingJson = json;
+  pendingData = JSON.parse(json);
   // Warn if document is too big (Firestore limit is ~1MB)
-  const size = new Blob([JSON.stringify(pendingData)]).size;
+  const size = new Blob([json]).size;
   if (size > 900000) {
     lastError = 'הנתונים גדולים מ-1MB ('+Math.round(size/1024)+'KB). תמונות שנוספו לאחרונה לא יסתנכרנו. נסה למחוק תמונות ישנות.';
     setStatus('error', 'מסמך גדול מדי');
     console.warn('Document size:', size);
-    // Still try to save — Firestore will reject if truly over limit
   }
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(flushSave, 800);
+  saveTimer = setTimeout(flushSave, 1500);
 };
 
 setStatus('connecting', 'מתחבר...');
@@ -607,7 +617,9 @@ onAuthStateChanged(auth, user => {
       // First-time setup: push current local data to cloud
       const d = window.__getCurrentD ? window.__getCurrentD() : null;
       if (d) {
-        pendingData = JSON.parse(JSON.stringify(d));
+        const json = JSON.stringify(d);
+        pendingJson = json;
+        pendingData = JSON.parse(json);
         flushSave();
       } else {
         setStatus('synced', 'מסונכרן (ריק)');
@@ -617,11 +629,15 @@ onAuthStateChanged(auth, user => {
       return;
     }
     const payload = snap.data();
-    // Ignore echoes from this client (writes we just made)
-    if (payload._clientId === CLIENT_ID && payload._writeId === lastEchoId && !firstSnapshot) {
+    // Always ignore echoes from this client — even stale ones could revert state
+    if (payload._clientId === CLIENT_ID && !firstSnapshot) {
+      lastSyncedAt = new Date();
+      setStatus('synced', 'מסונכרן');
       return;
     }
     if (payload.data && window.__remoteApply) {
+      // Track this as the last known cloud state so we don't write it back
+      lastSentJson = JSON.stringify(payload.data);
       window.__remoteApply(payload.data);
     }
     lastSyncedAt = new Date();
