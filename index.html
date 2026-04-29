@@ -492,6 +492,11 @@ e.innerHTML='<div class="O" onclick="document.getElementById(\'phmov\').innerHTM
 ld();rr();
 setInterval(()=>{const e=document.getElementById('hmClk');if(e){const n=new Date;e.textContent=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')}},10000);
 </script>
+<div id="syncStatus" style="position:fixed;top:8px;left:8px;z-index:9999;background:rgba(15,23,42,.92);border:1px solid rgba(148,163,184,.25);border-radius:999px;padding:4px 10px;font-family:'Heebo',sans-serif;font-size:11px;font-weight:600;color:#9ba8bb;display:flex;align-items:center;gap:6px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s" onclick="window.__fbStatusClick&&window.__fbStatusClick()" title="לחץ לפרטים">
+  <span id="syncDot" style="width:8px;height:8px;border-radius:50%;background:#6b7280;display:inline-block"></span>
+  <span id="syncText">מתחבר...</span>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -518,6 +523,27 @@ let pendingData = null;
 let firstSnapshot = true;
 let lastWriteId = 0;
 let lastEchoId = 0;
+let lastError = null;
+let lastSyncedAt = null;
+
+function setStatus(state, text) {
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  if (!dot || !txt) return;
+  const colors = { connecting:'#f59e0b', synced:'#22c55e', saving:'#3b82f6', error:'#ef4444' };
+  dot.style.background = colors[state] || '#6b7280';
+  txt.textContent = text;
+}
+
+window.__fbStatusClick = function() {
+  if (lastError) {
+    alert('שגיאת סנכרון:\n\n' + lastError + '\n\nוודא ש:\n1. Firestore Database נוצר ב-Firebase Console\n2. Anonymous Auth מופעל\n3. ה-Security Rules פורסמו\n4. הדומיין הזה מורשה ב-Authorized domains');
+  } else if (lastSyncedAt) {
+    alert('הכל מסונכרן ✓\nסנכרון אחרון: ' + lastSyncedAt.toLocaleTimeString('he-IL'));
+  } else {
+    alert('עדיין מתחבר ל-Firebase...');
+  }
+};
 
 async function flushSave() {
   if (!pendingData || !auth.currentUser) return;
@@ -525,6 +551,7 @@ async function flushSave() {
   pendingData = null;
   lastWriteId++;
   const writeId = lastWriteId;
+  setStatus('saving', 'שומר...');
   try {
     await setDoc(docRef, {
       data: data,
@@ -533,22 +560,48 @@ async function flushSave() {
       _updatedAt: serverTimestamp()
     });
     lastEchoId = writeId;
+    lastError = null;
+    lastSyncedAt = new Date();
+    setStatus('synced', 'מסונכרן');
   } catch (e) {
     console.error('Firestore save failed:', e);
+    lastError = e.message || String(e);
     pendingData = data;
+    setStatus('error', 'שגיאה');
   }
 }
 
 window.__fbSave = function(data) {
-  pendingData = JSON.parse(JSON.stringify(data));
+  try {
+    pendingData = JSON.parse(JSON.stringify(data));
+  } catch (e) {
+    lastError = 'נתונים לא תקינים: ' + e.message;
+    setStatus('error', 'שגיאה');
+    return;
+  }
+  // Warn if document is too big (Firestore limit is ~1MB)
+  const size = new Blob([JSON.stringify(pendingData)]).size;
+  if (size > 900000) {
+    lastError = 'הנתונים גדולים מ-1MB ('+Math.round(size/1024)+'KB). תמונות שנוספו לאחרונה לא יסתנכרנו. נסה למחוק תמונות ישנות.';
+    setStatus('error', 'מסמך גדול מדי');
+    console.warn('Document size:', size);
+    // Still try to save — Firestore will reject if truly over limit
+  }
   clearTimeout(saveTimer);
   saveTimer = setTimeout(flushSave, 800);
 };
 
-signInAnonymously(auth).catch(e => console.error('Anonymous sign-in failed:', e));
+setStatus('connecting', 'מתחבר...');
+
+signInAnonymously(auth).catch(e => {
+  console.error('Anonymous sign-in failed:', e);
+  lastError = 'אימות נכשל: ' + (e.message || e.code) + '\n\nוודא ש-Anonymous Authentication מופעל ב-Firebase Console.';
+  setStatus('error', 'אימות נכשל');
+});
 
 onAuthStateChanged(auth, user => {
   if (!user) return;
+  setStatus('connecting', 'טוען נתונים...');
   onSnapshot(docRef, snap => {
     if (!snap.exists()) {
       // First-time setup: push current local data to cloud
@@ -556,6 +609,9 @@ onAuthStateChanged(auth, user => {
       if (d) {
         pendingData = JSON.parse(JSON.stringify(d));
         flushSave();
+      } else {
+        setStatus('synced', 'מסונכרן (ריק)');
+        lastSyncedAt = new Date();
       }
       firstSnapshot = false;
       return;
@@ -568,8 +624,15 @@ onAuthStateChanged(auth, user => {
     if (payload.data && window.__remoteApply) {
       window.__remoteApply(payload.data);
     }
+    lastSyncedAt = new Date();
+    lastError = null;
+    setStatus('synced', 'מסונכרן');
     firstSnapshot = false;
-  }, err => console.error('Firestore snapshot error:', err));
+  }, err => {
+    console.error('Firestore snapshot error:', err);
+    lastError = 'קריאה נכשלה: ' + (err.message || err.code) + '\n\nוודא ש-Firestore Database נוצר וש-Security Rules מאפשרים גישה.';
+    setStatus('error', 'שגיאה');
+  });
 });
 
 // Flush pending writes before tab closes
