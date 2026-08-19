@@ -57,8 +57,6 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script>
-// these placeholder tokens are replaced with real values at Vercel build
-// time (see build.js) - reading env vars there, never committed to git
 var FIREBASE_CONFIG={
   apiKey:"__FIREBASE_API_KEY__",
   authDomain:"__FIREBASE_AUTH_DOMAIN__",
@@ -116,7 +114,7 @@ function hF(dt){try{const d=new Date(dt),dy=parseInt(new Intl.DateTimeFormat('he
 function hS(dt){try{const d=new Date(dt),dy=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{day:'numeric'}).format(d)),mo=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(d);return(HD[dy]||dy)+' '+mo}catch{return''}}
 const NM=[];
 const PRC=['א','ב','יח','קיט','10ש','5ש'],PAL=['ב','ג','ד','ה','ו','ז','ח','ט','י','יא','יב','כ'];
-const RSN=[{k:'talk',i:'💬',l:'דיבורים בחדר',hh:1},{k:'lights',i:'💡',l:'כיבוי אורות'},{k:'late',i:'⏰',l:'איחור בצהריים'},{k:'morningOut',i:'🌅',l:'איחור ביציאה מהקומה בבוקר'},{k:'other',i:'✏️',l:'אחר',ho:1}];
+const RSN=[{k:'talk',i:'💬',l:'דיבורים בחדר',hh:1},{k:'lights',i:'💡',l:'כיבוי אורות'},{k:'late',i:'⏰',l:'איחור בצהריים'},{k:'morningOut',i:'🌅',l:'איחור ביציאה מהקומה בבוקר'},{k:'showerOut',i:'🚿',l:'יציאה מהמקלחת באיחור'},{k:'other',i:'✏️',l:'אחר',ho:1}];
 const DLS=[{k:'today',l:'הערב',t:'21:30',d:0,h:21,m:30},{k:'tl',l:'מחר צהריים',t:'15:30',d:1,h:15,m:30},{k:'te',l:'מחר ערב',t:'21:30',d:1,h:21,m:30},{k:'2l',l:'עוד יומיים צהריים',t:'15:30',d:2,h:15,m:30},{k:'2e',l:'עוד יומיים ערב',t:'21:30',d:2,h:21,m:30}];
 function dld(k){
 // Skip Friday and Shabbat for deadline counting
@@ -212,15 +210,11 @@ let D;const K='yv9';
 function ld(){
  try{const s=localStorage.getItem(K);D=s?{...df(),...JSON.parse(s)}:df();}catch(e){D=df();}
  heal();
- // cloud sync: after the fast local render above, pull the latest from
- // Firestore and keep listening for changes from other devices/tabs. the
- // local D is already showing something on screen immediately either way -
- // this just keeps it in sync going forward.
  if(typeof _fbDb!=='undefined'&&_fbUid&&!window._fbListening){
   window._fbListening=true;
   _fbDb.collection('users').doc(_fbUid).collection('appdata').doc('main')
    .onSnapshot(function(snap){
-    if(!snap.exists){sv();return;} // first ever login - seed Firestore from local/default data
+    if(!snap.exists){sv();return;}
     var remote=snap.data();
     D={...df(),...remote};
     heal();
@@ -237,7 +231,7 @@ function heal(){
  ['pb','wt','wh','cs','cx','ci','tk','archive'].forEach(function(k){
   if(!Array.isArray(D[k])){D[k]=Array.isArray(d[k])?d[k]:[];fixed++;}
  });
- ['pt','ptA','ph','phA','ps','boyRoom','boyBed','rooms','_confiscate','_returnDue','_confCount','phLate','phLateA','bwLate','loOut','_omrGrids','prt','lockStatus','upperLock','sleepTables','_sleepAlerts','cleanStatus','roomClean','floorLateAM','floorLatePM']
+ ['pt','ptA','ph','phA','ps','boyRoom','boyBed','rooms','_confiscate','_returnDue','_confCount','phLate','phLateA','bwLate','loOut','_omrGrids','prt','lockStatus','upperLock','sleepTables','_sleepAlerts','cleanStatus','roomClean','floorLateAM','floorLatePM','dayStatus','reportTalks','_barcodeMap']
   .forEach(function(k){
    if(D[k]===null||D[k]===undefined||typeof D[k]!=='object'||Array.isArray(D[k])){
     D[k]=(d[k]&&typeof d[k]==='object'&&!Array.isArray(d[k]))?d[k]:{};fixed++;}
@@ -419,9 +413,6 @@ if(gdToken)setTimeout(function(){gdCheckForUpdates(true);},2500);
 
 let _fbSaveTimer=null;
 function sv(){try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
- // debounced cloud sync - many sv() calls can fire in quick succession
- // (85 call sites throughout the app), so batch them into one Firestore
- // write instead of hammering it on every single small change
  if(typeof _fbDb!=='undefined'&&_fbUid){
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer=setTimeout(function(){
@@ -440,6 +431,39 @@ function tdEve(){var n=new Date();if(n.getHours()<14){n.setDate(n.getDate()-1);}
 // resets at 8am - anything before 8am still belongs to yesterday's window,
 // so a lateness marked at 1am correctly attributes to the previous day
 function tdFloor(){var n=new Date();if(n.getHours()<8){n.setDate(n.getDate()-1);}return isoLocal(n);}
+// custom width-encoded barcode for the daily report - not a real-world
+// barcode standard (Code39/128), built specifically so a future in-app
+// scanning feature can decode it using this same table. each digit becomes
+// a bar whose width is proportional to its value, framed by start/end
+// markers. the date->pattern mapping is stored in D._barcodeMap so it's
+// always possible to look up which printed page belongs to which day.
+function renderDateBarcode(dateISO){
+ if(!D._barcodeMap)D._barcodeMap={};
+ var digits=dateISO.replace(/-/g,'');
+ D._barcodeMap[dateISO]=digits;
+ var unit=1.6,x=0,bars='';
+ bars+='<rect x="0" y="0" width="'+(unit*2)+'" height="22" fill="#000"/>';x+=unit*3;
+ for(var i=0;i<digits.length;i++){
+  var d=parseInt(digits[i],10);
+  var w=(d+2)*unit;
+  bars+='<rect x="'+x.toFixed(1)+'" y="0" width="'+w.toFixed(1)+'" height="22" fill="#000"/>';
+  x+=w+unit;
+ }
+ bars+='<rect x="'+x.toFixed(1)+'" y="0" width="'+(unit*2)+'" height="22" fill="#000"/>';x+=unit*3;
+ return '<svg width="'+x.toFixed(0)+'" height="28" viewBox="0 0 '+x.toFixed(0)+' 28" xmlns="http://www.w3.org/2000/svg">'+bars+'<text x="'+(x/2).toFixed(0)+'" y="27" font-size="6" text-anchor="middle" font-family="monospace">'+dateISO+'</text></svg>';
+}
+// D.ph/D.phA's dp/m arrays only ever include "active" boys (iA() filters
+// away/np/conf out before either array is built), so history couldn't
+// previously tell "he was away that day" apart from "the app just has no
+// record". This snapshots who was in which status at the moment each
+// deposit round was saved, so the history view can show the real reason.
+function snapDayStatus(day,field){
+ if(!D.dayStatus)D.dayStatus={};
+ if(!D.dayStatus[field])D.dayStatus[field]={};
+ var away=[],np=[],conf=[];
+ D.pb.forEach(function(b){var s=gS(b);if(s==='away')away.push(b);else if(s==='np')np.push(b);else if(s==='conf')conf.push(b);});
+ D.dayStatus[field][day]={away:away,np:np,conf:conf};
+}
 function tdA(){return isoLocal(new Date());}
 function eveOpen(){return true;}
 function aftOpen(){return new Date().getHours()<19;}
@@ -526,6 +550,33 @@ h+='<div style="width:100%;border-radius:6px;background:var(--s1);border:1px sol
 +(cu?'<div style="font-size:13.2px;color:var(--rd);font-weight:600;margin-top:2px">📵 '+friendlyUntil(cu)+'</div>':'')+'</div>'
 +'<button style="padding:8px 16px;border-radius:6px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:13.2px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="returnPhoneNow(\''+jq(nm)+'\')">✅ קיבל בחזרה</button>'
 +'</div></div>';});}}
+// missed a deposit and was never confiscated for it, more than a day later
+// - heuristic based on his most recent known miss vs current status, not a
+// strict per-event link (the app doesn't track "which confiscation was for
+// which specific miss"), but catches the case that matters: something fell
+// through the cracks
+{
+ var staleAlerts=[];
+ var _now=Date.now();
+ D.pb.forEach(function(b){
+  var st=gS(b);if(st==='away'||st==='np'||st==='conf')return;
+  var lastMiss=null;
+  Object.keys(D.ph||{}).forEach(function(dt){if((D.ph[dt].m||[]).indexOf(b)>=0&&(!lastMiss||dt>lastMiss))lastMiss=dt;});
+  Object.keys(D.phA||{}).forEach(function(dt){if((D.phA[dt].m||[]).indexOf(b)>=0&&(!lastMiss||dt>lastMiss))lastMiss=dt;});
+  if(!lastMiss)return;
+  var daysSince=(_now-new Date(lastMiss+'T12:00:00').getTime())/864e5;
+  if(daysSince>=1)staleAlerts.push({nm:b,lastMiss:lastMiss,days:Math.floor(daysSince)});
+ });
+ if(staleAlerts.length){
+  h+='<div class="sl" style="margin-top:4px">⚠️ חיסור הפקדה ללא החרמה</div>';
+  staleAlerts.forEach(function(a){
+   h+='<div style="width:100%;border-radius:6px;background:var(--s1);border:1px solid var(--bd);border-right:4px solid var(--am);padding:10px 14px;margin-bottom:6px">'
+    +'<div style="font-size:16.8px;font-weight:700;color:var(--t0)">'+es(a.nm)+'</div>'
+    +'<div style="font-size:13.2px;color:var(--am);font-weight:600;margin-top:2px">חיסר ב-'+hF(a.lastMiss)+' ('+a.days+' ימים) — לא הוחרם</div>'
+    +'</div>';
+  });
+ }
+}
 // Phones due back - confiscated yesterday, window has now closed
 if(D&&D._returnDue){const rd=Object.entries(D._returnDue);
 if(rd.length){h+='<div class="sl" style="margin-top:4px;color:var(--gr)">📲 להחזיר טלפון</div>';
@@ -1259,7 +1310,7 @@ const homeFromPhones=D.pb.filter(b=>gS(b)==='normal'&&!allPhoned.includes(b));
 if(homeFromPhones.length&&homeFromPhones.length<D.pb.length/2){changes.push('🏠 בבית (לא סומנו): '+homeFromPhones.join(', '));
 actions.push(()=>{homeFromPhones.forEach(b=>{D.ps[b]={type:'away'}})})}}
 // Save phone history
-actions.push(()=>{const ac=D.pb.filter(iA);D.ph[today]={dp:ac.filter(b=>D.pt[b]===true),m:ac.filter(b=>D.pt[b]!==true),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}});
+actions.push(()=>{const ac=D.pb.filter(iA);D.ph[today]={dp:ac.filter(b=>D.pt[b]===true),m:ac.filter(b=>D.pt[b]!==true),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};snapDayStatus(today,'eve');});
 // 2. Writing done
 if(r.writing_done&&r.writing_done.length){const names=r.writing_done.map(id=>{const t=D.wt.find(x=>x.id===id);return t?t.nm:id});changes.push('✅ הביאו פרקים: '+names.join(', '));
 actions.push(()=>{r.writing_done.forEach(id=>{D.wt.forEach(t=>{if(t.id===id){t.status='done';t.doneAt=new Date().toISOString()}});D.wh.forEach(t=>{if(t.id===id){t.status='done';t.doneAt=new Date().toISOString()}})})})}
@@ -1361,6 +1412,7 @@ function applyManual(e,dateISO){
   D.ph[day]={dp:ac.filter(function(b){return D.pt[b]===true;}),
              m:ac.filter(function(b){return D.pt[b]!==true;}),
              t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};
+  snapDayStatus(day,'eve');
  }
  window._manualEdits={};sv();
  showBanner('✅ הנתונים נשמרו'+(dateISO&&dateISO!==td()?' לתאריך '+dateISO:''),3500);
@@ -1865,7 +1917,7 @@ if(ed.phones_deposited)window._rptActions.push(function(){ed.phones_deposited.fo
 if(ed.phones_home)window._rptActions.push(function(){ed.phones_home.forEach(function(n){_mkTask(n,'10ש','אי הפקדת טלפון');});});
 if(ed.lights_10sh)window._rptActions.push(function(){ed.lights_10sh.forEach(function(n){_mkTask(n,'10ש','איחור כיבוי אורות');});});
 if(ed.bowls_5sh)window._rptActions.push(function(){ed.bowls_5sh.forEach(function(n){_mkTask(n,'5ש','איחור קערה וספל');});});
-window._rptActions.push(function(){var ac=D.pb.filter(iA);D.ph[(window._rptDate)||tdEve()]={dp:ac.filter(function(b){return D.pt[b]===true;}),m:ac.filter(function(b){return D.pt[b]!==true;}),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};});
+window._rptActions.push(function(){var ac=D.pb.filter(iA);var _rd=(window._rptDate)||tdEve();D.ph[_rd]={dp:ac.filter(function(b){return D.pt[b]===true;}),m:ac.filter(function(b){return D.pt[b]!==true;}),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};snapDayStatus(_rd,'eve');});
 closeManualEdit();confirmReport();}
 function confirmReport(){if(window._rptActions)window._rptActions.forEach(fn=>fn());sv();rr();const p=document.getElementById('reportPreview');if(p)p.innerHTML='<div class="C" style="margin-top:8px;text-align:center;color:var(--go);font-size:16.8px;font-weight:700">✅ כל הנתונים עודכנו!</div>';const kitTasks=D.wt.filter(t=>t.pk&&t.pk.includes('קיט')&&t.status==='waiting');if(kitTasks.length>0){const kitNames=kitTasks.map(t=>t.nm).filter((v,i,a)=>a.indexOf(v)===i);kitNames.forEach(nm=>{let b=document.createElement('div');b.id='kit_'+nm;b.style.cssText='position:fixed;top:20px;right:12px;background:linear-gradient(135deg,#f59e0b,#f97316);color:white;padding:12px 16px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.25);font-weight:700;font-size:16.8px;z-index:9999;cursor:pointer;max-width:250px;text-align:right;direction:rtl';b.innerHTML='📖 '+nm+' — הוספו קיטים!';b.onclick=()=>{printSleepTable(nm)};document.body.appendChild(b);setTimeout(()=>{if(b.parentNode)b.parentNode.removeChild(b)},8000)})}}
 
@@ -1902,7 +1954,9 @@ e.innerHTML='<div class="O" onclick="closeTalkModal()"><div class="M" onclick="e
 +'<div style="font-size:15.6px;color:var(--t0)">'+sum+'</div></div>'
 +'<div style="font-size:14.4px;font-weight:700;color:var(--t0);margin-bottom:6px">הערות:</div>'
 +'<textarea class="ta" id="talkNotes" rows="7" style="direction:rtl;width:100%">'+es(preNotes)+'</textarea>'
-+'<button style="width:100%;height:44px;margin-top:12px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:16.8px;font-weight:700;cursor:pointer" onclick="saveTalkTask(\''+safe+'\')">שמור למשימות ✓</button>'
++'<div style="font-size:13.2px;color:var(--t2);margin:10px 0 6px">איפה לשמור?</div>'
++'<div style="display:flex;gap:8px"><button style="flex:1;height:44px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="saveTalkTask(\''+safe+'\')">📱 למשימות באפליקציה</button>'
++'<button style="flex:1;height:44px;border-radius:10px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:15.6px;font-weight:700;cursor:pointer" onclick="saveTalkToReport(\''+safe+'\')">🖨 לדוח היומי</button></div>'
 +'</div></div></div>';
 window._talkIssues=sum;}
 function closeTalkModal(){var e=document.getElementById('talkModal');if(e)e.innerHTML='';}
@@ -1911,6 +1965,14 @@ var el=document.getElementById('talkNotes');var notes=el?el.value:'';
 if(!D.tk)D.tk=[];
 D.tk.push({id:uid(),tx:'💬 שיחה עם '+nm,ps:nm,dt:td(),dn:false,issues:window._talkIssues||'',notes:notes});
 sv();closeTalkModal();showBanner('✅ '+nm+' נוסף לרשימה לטיפול',3000);go('tasks');}
+// separate destination: instead of a task in the app, the note prints on
+// today's daily report (below the "לא הפקידו צהריים" column) and only
+// there - nothing is added anywhere if this button is never used
+function saveTalkToReport(nm){
+var el=document.getElementById('talkNotes');var notes=el?el.value:'';
+if(!D.reportTalks)D.reportTalks=[];
+D.reportTalks.push({nm:nm,notes:notes,addedAt:new Date().toISOString()});
+sv();closeTalkModal();showBanner('✅ '+nm+' יתווסף לדוח היומי הבא',3000);}
 
 
 function measureOMR(html,grid){
@@ -2187,6 +2249,15 @@ h+='<div class="col"><div class="tt">\u05dc\u05d0 \u05d4\u05e4\u05e7\u05d9\u05d3
 afM.forEach(function(b){h+='<tr><td>'+es(b)+'</td><td'+OM({type:'af_1y',name:b})+' class="cb">1\u05d9</td></tr>';});
 h+='</table></div>';
 if(afNotUpdated)h+='<div style="font-size:.72em;color:#a34;text-align:center;padding:5px;font-weight:700">\u05dc\u05d0 \u05e2\u05d5\u05d3\u05db\u05df</div>';
+// notes explicitly sent to the report via "קבע שיחה" - nothing here at all
+// if that was never used, exactly as requested
+if(D.reportTalks&&D.reportTalks.length){
+ h+='<div style="margin-top:4px;border-top:1px dashed #999;padding-top:3px">';
+ D.reportTalks.forEach(function(rt){
+  h+='<div style="font-size:.6em;line-height:1.3;margin-bottom:3px"><b>\ud83d\udcac '+es(rt.nm)+':</b> '+es(rt.notes||'').replace(/\n/g,' \u00b7 ')+'</div>';
+ });
+ h+='</div>';
+}
 h+='</div>';COLS.push(h.slice(_cm));h=h.slice(0,_cm);}
 // Col 2: Writing
 {_cm=h.length;
@@ -2200,15 +2271,22 @@ h+='</div></div>';COLS.push(h.slice(_cm));h=h.slice(0,_cm);}
 h+='<div class="col"><div class="tt">\u05d4\u05e4\u05e7\u05d3\u05d5\u05ea \u05d8\u05dc\u05e4\u05d5\u05e0\u05d9\u05dd (\u05e2\u05e8\u05d1)</div><div class="tbox"><table class="big k3"><tr><th style="text-align:right">\u05e9\u05dd</th><th>\u2713</th><th>\u23f0</th><th>1\u05d9</th></tr>';
 const phB=boys;
 phB.forEach(function(b){var _st=gS(b);
-if(_st==='conf'){
+var _cu=confUntil(b);
+// if the confiscation expires sometime TODAY, he'll have the phone back
+// again by/during tonight's check - no point marking him confiscated on
+// a report being filled out this evening
+var _confExpiresToday=_st==='conf'&&_cu&&isoLocal(new Date(_cu))===td();
+if(_st==='conf'&&!_confExpiresToday){
  h+='<tr><td>'+es(b)+'</td><td colspan="3" style="color:#888;font-size:.85em">\u05d4\u05d7\u05e8\u05de\u05d4</td></tr>';
+}else if(_st==='away'||_st==='np'){
+ h+='<tr><td>'+es(b)+'</td><td colspan="3" style="color:#888;font-size:.85em">'+(_st==='away'?'\u05d1\u05d9\u05ea':'\u05d0\u05d9\u05df \u05d8\u05dc\u05e4\u05d5\u05df')+'</td></tr>';
 }else{
  h+='<tr><td>'+es(b)+'</td><td'+OM({type:'phone_ok',name:b})+' class="cb"></td><td'+OM({type:'phone_late',name:b})+' class="cb">\u05d0\u05d9\u05d7\u05e8</td><td'+OM({type:'phone_10sh',name:b})+' class="cb">1\u05d9</td></tr>';
 }});
 h+='</table></div></div>';COLS.push(h.slice(_cm));h=h.slice(0,_cm);}
 // Col 4: Rooms (one table)
 {_cm=h.length;
-h+='<div class="col fillcol"><div class="tt">\u05e7\u05e2\u05e8\u05d4 \u05d5\u05e1\u05e4\u05dc</div><table class="big k3"><tr><th style="text-align:right">\u05e9\u05dd</th><th>\u2713</th><th>\u23f0</th><th>5\u05e9</th></tr>';
+h+='<div class="col fillcol"><div style="text-align:center;padding:1mm 0">'+renderDateBarcode(td())+'</div><div class="tt">\u05e7\u05e2\u05e8\u05d4 \u05d5\u05e1\u05e4\u05dc</div><table class="big k3"><tr><th style="text-align:right">\u05e9\u05dd</th><th>\u2713</th><th>\u23f0</th><th>5\u05e9</th></tr>';
 let bwI=0,firstRoom=true;
 for(let r=1;r<=13;r++){const rm=boys.filter(b=>D.boyRoom[b]==String(r));if(!rm.length)continue;
 h+='<tr><td colspan="4" style="background:#bbb;text-align:center;font-weight:bold;font-size:'+(bigF-2)+'px;-webkit-print-color-adjust:exact;print-color-adjust:exact">\u05d7\u05d3\u05e8 '+r+'</td></tr>';
@@ -2276,6 +2354,7 @@ h+='<script>(function(){var pg=document.getElementById("pg");if(!pg)return;pg.st
  +'var w=pg.scrollWidth,hh=Math.max(pg.scrollHeight,ah);if(!w)return;var s=Math.min(aw/w,ah/hh)*0.995;s=Math.max(0.30,Math.min(s,1));pg.style.transform="scale("+s+")";pg.setAttribute("data-scale",s);})();<\/script>';
 h+='</div></body></html>';
 printHTML(h,'\u05d3\u05d5\u05d7 \u05d9\u05d5\u05de\u05d9');
+if(D.reportTalks&&D.reportTalks.length){D.reportTalks=[];sv();}
 }
 
 function showBoyWr(nm){
@@ -2388,11 +2467,41 @@ const gm=(n,d2)=>{const rd=Object.keys(D.ph).sort((a,b)=>b.localeCompare(a)).sli
 const ml=D.pb.filter(b=>iA(b)&&gm(b,pMF)===pMF);
 h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:12px;margin-bottom:10px"><div style="font-size:14.4px;font-weight:700;color:var(--t0);margin-bottom:8px">מי לא הפקיד?</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">'+[1,2,3,5,7,14].map(n=>'<button class="fb'+(pMF===n?' on':'')+'" style="'+(pMF===n?'background:var(--rdd);color:var(--rd);border-color:rgba(239,68,68,.25)':'')+'" onclick="pMF='+n+';rr()">'+(n===1?'אתמול':n===7?'שבוע':n===14?'שבועיים':n+' ימים')+'</button>').join('')+'</div>'+(ml.length===0?'<div style="font-size:14.4px;color:var(--gr)">✓ כולם הפקידו</div>':'<div style="display:flex;flex-wrap:wrap;gap:4px">'+ml.map(b=>'<span style="background:var(--rdd);color:var(--rd);border:1px solid rgba(239,68,68,.2);border-radius:20px;padding:3px 9px;font-size:13.2px">'+b+' ('+sk(b)+')</span>').join('')+'</div>')+'<button style="width:100%;margin-top:8px;padding:8px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14.4px;font-weight:600;cursor:pointer" onclick="cpML()">📋 העתק שמות חסרים</button>'+'</div>';
 h+='<div style="display:flex;gap:5px;margin-bottom:8px">'+[7,14,30].map(n=>'<button class="fb'+(pHP===n?' on':'')+'" onclick="pHP='+n+';rr()">'+(n===7?'שבוע':n===14?'שבועיים':'חודש')+'</button>').join('')+'</div>';
-// Get last N days that have actual registration data
-const phDates=Object.keys(D.ph).sort((a,b)=>b.localeCompare(a)).slice(0,pHP).reverse();
-h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="ht"><thead><tr><th>שם</th>';
-phDates.forEach(d=>{h+='<th>'+hS(new Date(d)).split(' ')[0]+'</th>'});
-h+='</tr></thead><tbody>';[...D.pb].sort(sLN).forEach(b=>{h+='<tr><td>'+es(b)+'</td>';phDates.forEach(d=>{const hh=(D.ph||{})[d],dp=hh&&hh.dp&&hh.dp.includes(b),ms=hh&&hh.m&&hh.m.includes(b);h+='<td style="color:'+(dp?'var(--gr)':ms?'var(--rd)':'var(--t2)')+';font-weight:'+(dp||ms?'700':'400')+';font-size:14.4px">'+(dp?'V':ms?'X':'')+'</td>'});h+='</tr>'});h+='</tbody></table></div>'}
+// build the last pHP CALENDAR days (not just days that happen to have a
+// D.ph record) so holidays show up as "no session" instead of silently
+// vanishing or looking like an unexplained missed deposit
+var histDates=[];{var _hd=new Date();for(var _i=0;_i<pHP;_i++){histDates.unshift(isoLocal(_hd));_hd.setDate(_hd.getDate()-1);}}
+function _histCell(dt,field,b){
+ if(isSchoolHoliday(dt))return{txt:'—',clr:'var(--t2)',title:'אין ישיבה'};
+ var snap=(D.dayStatus&&D.dayStatus[field]&&D.dayStatus[field][dt])||null;
+ if(snap){
+  if(snap.conf&&snap.conf.indexOf(b)>=0)return{txt:'ה',clr:'var(--pu)',title:'החרמה'};
+  if(snap.away&&snap.away.indexOf(b)>=0)return{txt:'ב',clr:'var(--am)',title:'בבית'};
+  if(snap.np&&snap.np.indexOf(b)>=0)return{txt:'ט',clr:'var(--t2)',title:'אין טלפון'};
+ }
+ var src=field==='eve'?(D.ph||{})[dt]:(D.phA||{})[dt];
+ if(!src)return{txt:'',clr:'var(--t2)',title:'אין נתון'};
+ if(src.dp&&src.dp.indexOf(b)>=0)return{txt:'V',clr:'var(--gr)',title:'הפקיד'};
+ if(src.m&&src.m.indexOf(b)>=0)return{txt:'X',clr:'var(--rd)',title:'לא הפקיד'};
+ return{txt:'',clr:'var(--t2)',title:'אין נתון'};
+}
+h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="ht"><thead><tr><th rowspan="2">שם</th>';
+histDates.forEach(d=>{h+='<th colspan="2">'+hS(new Date(d)).split(' ')[0]+'</th>';});
+h+='</tr><tr>';
+histDates.forEach(()=>{h+='<th style="font-size:10px">צה</th><th style="font-size:10px">ער</th>';});
+h+='</tr></thead><tbody>';
+[...D.pb].sort(sLN).forEach(b=>{
+ h+='<tr><td>'+es(b)+'</td>';
+ histDates.forEach(d=>{
+  var aft=_histCell(d,'aft',b),eve=_histCell(d,'eve',b);
+  h+='<td title="'+aft.title+'" style="color:'+aft.clr+';font-weight:700;font-size:13.2px">'+aft.txt+'</td>';
+  h+='<td title="'+eve.title+'" style="color:'+eve.clr+';font-weight:700;font-size:13.2px">'+eve.txt+'</td>';
+ });
+ h+='</tr>';
+});
+h+='</tbody></table></div>';
+h+='<div style="font-size:11.4px;color:var(--t2);margin-top:6px;line-height:1.6">V הפקיד · X לא הפקיד · ב בבית · ט אין טלפון · ה החרמה · — אין ישיבה</div>';
+}
 if(pT==='boys'){[...D.pb].sort(sLN).forEach(b=>{const st=gS(b);h+='<div class="R" style="background:var(--s1);border:1px solid var(--bd)">'+aH(b,34,12)+'<div style="flex:1"><div style="font-size:15.6px;font-weight:500;color:var(--t0)">'+b+'</div>'+(st==='conf'?cH('var(--pu)','var(--pud)','מוחרם'):st==='np'?cH('var(--t2)','var(--s3)','ללא טלפון'):st==='away'?cH('var(--am)','var(--amd)','לא נמצא'):'')+'</div><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="oPS(\''+jq(b)+'\')">סטטוס</button></div>'})}
 if(pT==='stats'){
  var q=(window._statsSearch||'').trim();
@@ -2450,11 +2559,11 @@ h+='</div></div>';return h}
 
 function tP(n){const sc=document.querySelector('.S');const sp=sc?sc.scrollTop:0;const w=D.pt[n]===true;D.pt[n]=!w;if(!w)D.pt[n+'_t']=new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});else delete D.pt[n+'_t'];sv();rr();setTimeout(()=>{const sc2=document.querySelector('.S');if(sc2)sc2.scrollTop=sp},0)}
 function qSt(n,type){const sc=document.querySelector('.S');const sp=sc?sc.scrollTop:0;const cur=gS(n);if(cur===type){D.ps[n]={type:'normal'}}else{D.ps[n]={type}}sv();rr();setTimeout(()=>{const sc2=document.querySelector('.S');if(sc2)sc2.scrollTop=sp},0)}
-function sPN(){const ac=D.pb.filter(iA);D.ph[tdEve()]={dp:ac.filter(b=>D.pt[b]===true),m:ac.filter(b=>D.pt[b]!==true),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};sv();rr();alert('💾 הפקדות ערב נשמרו!')}
+function sPN(){const ac=D.pb.filter(iA);const _td=tdEve();D.ph[_td]={dp:ac.filter(b=>D.pt[b]===true),m:ac.filter(b=>D.pt[b]!==true),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};snapDayStatus(_td,'eve');sv();rr();alert('💾 הפקדות ערב נשמרו!')}
 function mAM(){D.pb.filter(iA).forEach(b=>{if(D.pt[b]!==true)D.pt[b]=false});sv();rr()}
 // Afternoon phone functions
 function tPA(n){const sc=document.querySelector('.S');const sp=sc?sc.scrollTop:0;if(!D.ptA)D.ptA={};const w=D.ptA[n]===true;D.ptA[n]=!w;sv();rr();setTimeout(()=>{const sc2=document.querySelector('.S');if(sc2)sc2.scrollTop=sp},0)}
-function sPNA(){if(!D.phA)D.phA={};const ac=D.pb.filter(iA);D.phA[tdA()]={dp:ac.filter(b=>D.ptA&&D.ptA[b]===true),m:ac.filter(b=>!D.ptA||D.ptA[b]!==true),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};sv();rr();alert('הפקדות צהריים נשמרו!')}
+function sPNA(){if(!D.phA)D.phA={};const ac=D.pb.filter(iA);const _td=tdA();D.phA[_td]={dp:ac.filter(b=>D.ptA&&D.ptA[b]===true),m:ac.filter(b=>!D.ptA||D.ptA[b]!==true),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};snapDayStatus(_td,'aft');sv();rr();alert('הפקדות צהריים נשמרו!')}
 function addAfPunish(nm){if(!confirm(nm+' — לתת 10ש על אי הפקדה בצהריים?'))return;
 const t={id:uid(),nm,pk:['10ש'],dln:'te',dl:dld('te').toISOString(),status:'waiting',x:1,rs:'late',rh:'',ro:'אי הפקדת טלפון בצהריים',ca:new Date().toISOString()};D.wt.push(t);noteKit(t);D.wh.push({...t});sv();rr();alert('10ש נוסף ל-'+nm)}
 // Alerts
@@ -2617,15 +2726,26 @@ h+='<div class="C"><div style="font-weight:700;font-size:15.6px;color:var(--t0);
 h+='<div style="display:flex;gap:10px;margin-bottom:8px"><div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--am)">'+openT.length+'</div><div style="font-size:11px;color:var(--t2)">פתוחות</div></div>';
 h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--gr)">'+doneT.length+'</div><div style="font-size:11px;color:var(--t2)">הושלמו</div></div>';
 h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--rd)">'+lateT.length+'</div><div style="font-size:11px;color:var(--t2)">באיחור</div></div></div>';
-if(openT.length||lateT.length){
- var toShow=uniqT.filter(function(t){return t.status!=='done';}).sort(function(a,b){return new Date(b.ca||0)-new Date(a.ca||0);});
+if(uniqT.length){
+ function _reasonLabel(t){
+  if(t.rs&&t.rs!=='other'){var r=RSN.find(function(x){return x.k===t.rs;});if(r)return r.i+' '+r.l;}
+  if(t.ro)return '✏️ '+t.ro;
+  return 'לא צוין';
+ }
+ var toShow=uniqT.slice().sort(function(a,b){return new Date(b.ca||0)-new Date(a.ca||0);});
  h+='<div style="border-top:1px solid var(--bd);padding-top:8px">';
- toShow.forEach(function(t){
+ toShow.forEach(function(t,idx){
   var isLate=t.status==='late'||t.status==='doubled';
-  var days=t.ca?Math.floor((Date.now()-new Date(t.ca).getTime())/86400000):null;
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:13.2px">'
-   +'<span style="color:'+(isLate?'var(--rd)':'var(--t1)')+'">'+es((t.pk||[]).join(','))+(isLate&&days!==null?' — '+days+' ימים':'')+'</span>'
-   +'<span style="color:var(--t2);font-size:11.4px">'+(isLate?'באיחור':'ממתין')+'</span></div>';
+  var isDone=t.status==='done';
+  var isCancelled=t.status==='cancelled';
+  var isFrozen=t.status==='frozen';
+  var statusLbl=isCancelled?'🗑 נמחק':isFrozen?'❄️ מוקפא':isDone?'✓ הושלם':isLate?'באיחור':'ממתין';
+  var statusClr=isCancelled?'var(--t2)':isFrozen?'var(--bl)':isDone?'var(--gr)':isLate?'var(--rd)':'var(--am)';
+  var dateStr=t.ca?new Date(t.ca).toLocaleDateString('he-IL',{day:'numeric',month:'numeric',year:'2-digit'}):'?';
+  h+='<div style="padding:6px 0'+(idx?';border-top:1px solid var(--bd)':'')+'">'
+   +'<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:14.4px;font-weight:700;color:var(--t0)">'+es((t.pk||[]).join(', '))+'</span><span style="font-size:12.0px;font-weight:700;color:'+statusClr+'">'+statusLbl+'</span></div>'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px"><span style="font-size:12.0px;color:var(--t2)">'+_reasonLabel(t)+'</span><span style="font-size:11px;color:var(--t2)">'+dateStr+'</span></div>'
+   +'</div>';
  });
  h+='</div>';
 }
@@ -2949,7 +3069,9 @@ function cpWr(){const pending=D.wt.filter(t=>t.status==='waiting'||t.status==='l
 if(!pending.length){alert('אין משימות');return}
 const txt=pending.map(t=>{const pkTxt=t.pk&&t.pk.length?t.pk.join(', '):'?';return t.nm+' — פרק '+pkTxt}).join('\n');
 navigator.clipboard.writeText(txt).then(()=>alert('הועתקו '+pending.length+' משימות!')).catch(()=>{prompt('העתק ידנית:',txt)})}
-function wDl(id){_presSc(()=>{
+function wDl(id){
+if(!confirm('למחוק את המשימה? לא ניתן לשחזר.'))return;
+_presSc(()=>{
 D.wh.forEach(t=>{if(t.id===id)t.status='cancelled'});
 D.wt=D.wt.filter(t=>t.id!==id);sv();rr()})}
 function wMvB(id){_presSc(()=>{D.wt.forEach(t=>{if(t.id===id)t.mvb=Date.now()});sv();rr()})}
@@ -3264,6 +3386,7 @@ let bd='';months.forEach((v,label)=>{bd+='<button class="so" onclick="expPh({fro
 e.innerHTML='<div class="O" onclick="document.getElementById(\'phmov\').innerHTML=\'\'"><div class="M" onclick="event.stopPropagation()"><div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div><div style="font-size:18.0px;font-weight:700;padding:8px 16px;text-align:center">בחר חודש עברי</div><div style="padding:8px 16px 20px">'+bd+'<button style="width:100%;height:38px;border-radius:8px;background:var(--s3);color:var(--t2);font-size:15.6px;border:1px solid var(--bm);cursor:pointer;margin-top:8px" onclick="document.getElementById(\'phmov\').innerHTML=\'\'">ביטול</button></div></div></div>'}
 
 // ═══ INIT ═══
+// ═══ INIT ═══
 window._appBoot=function(){
 ld();
 // Multi-tab sync
@@ -3319,6 +3442,7 @@ if(h>=14&&D._lastAftResetDate!==today){
     const ac=D.pb.filter(iA);
     if(!D.phA)D.phA={};
     D.phA[prevISO]={dp:ac.filter(b=>D.ptA[b]===true),m:ac.filter(b=>D.ptA[b]!==true),t:'\u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9'};
+    snapDayStatus(prevISO,'aft');
   }
   D.ptA={};
   D._lastAftResetDate=today;
@@ -3331,6 +3455,7 @@ if((h>21||(h===21&&m>=30))&&D._lastEveResetDate!==today){
   if(D.pt&&Object.keys(D.pt).length&&(!D.ph||!D.ph[today])){
     const ac=D.pb.filter(iA);
     D.ph[today]={dp:ac.filter(b=>D.pt[b]===true),m:ac.filter(b=>D.pt[b]!==true),t:'\u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9'};
+    snapDayStatus(today,'eve');
   }
   D.pb.forEach(b=>{D.pt[b]=false;delete D.pt[b+'_t'];});
   D._lastEveResetDate=today;

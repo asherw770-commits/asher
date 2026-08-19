@@ -1,47 +1,53 @@
-# ש״ב – ניהול ישיבה
+# אפליקציית פנימייה — הגדרת ענן (Firestore + GitHub + Vercel)
 
-אפליקציית ווב (PWA) לניהול ישיבה: הפקדות טלפונים, משימות כתיבה, שיחות אישיות, ומשימות.
+## מה זה
+האפליקציה עברה משמירה מקומית בלבד (localStorage) לשמירה גם בענן (Firestore),
+עם מסך התחברות. כך אפשר לגשת מהטלפון ומהמחשב לאותם נתונים.
 
-## מבנה
+## שלב 1 — Firestore Security Rules
+ב-Firebase Console → Firestore Database → לשונית **Rules** → הדבק את התוכן
+של הקובץ `firestore.rules` שבתיקייה הזו → **Publish**.
 
-- `index.html` — האפליקציה כולה (HTML + CSS + JS בקובץ אחד).
-- `vercel.json` — הגדרות פריסה ל-Vercel (אתר סטטי).
-- `firebase-config.example.js` — תבנית להגדרות Firebase (להעתיק ל-`firebase-config.js` עם הערכים שלך).
+זו ההגנה האמיתית על הנתונים — לא ה-apiKey (שהוא ממילא גלוי בכל אתר עם Firebase,
+וזה תקין ומוכר).
 
-## פיתוח מקומי
+## שלב 2 — יצירת ריפוזיטורי ב-GitHub
+1. היכנס ל-github.com → **New repository** → תן שם (למשל `yeshiva-app`) → **Private** מומלץ
+2. העלה את **כל הקבצים** מהתיקייה הזו (`src/`, `build.js`, `package.json`,
+   `vercel.json`, `.gitignore`, `firestore.rules`) — **חוץ מ-`dist/`** (זה נוצר אוטומטית)
 
-מספיק לפתוח את `index.html` בדפדפן, או להריץ שרת מקומי:
-
+אפשר להעלות דרך הדפדפן (גרירת קבצים) או עם git:
 ```bash
-python3 -m http.server 8000
-# ואז http://localhost:8000
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/USERNAME/yeshiva-app.git
+git push -u origin main
 ```
 
-## פריסה ל-Vercel
+## שלב 3 — חיבור Vercel
+1. היכנס ל-vercel.com → **Add New Project** → בחר את הריפוזיטורי מ-GitHub
+2. **לפני שלוחצים Deploy** — פתח **Environment Variables** והוסף את שש הערכים
+   מתוך `firebaseConfig` שקיבלת מ-Firebase Console (Project settings → Your apps):
 
-1. דחוף את הריפו ל-GitHub.
-2. ב-[vercel.com](https://vercel.com) → **Add New Project** → ייבוא מ-GitHub.
-3. **Framework Preset:** Other. אין צורך ב-build command.
-4. **Deploy**.
+   | שם המשתנה ב-Vercel | מאיפה |
+   |---|---|
+   | `FIREBASE_API_KEY` | apiKey |
+   | `FIREBASE_AUTH_DOMAIN` | authDomain |
+   | `FIREBASE_PROJECT_ID` | projectId |
+   | `FIREBASE_STORAGE_BUCKET` | storageBucket |
+   | `FIREBASE_MESSAGING_SENDER_ID` | messagingSenderId |
+   | `FIREBASE_APP_ID` | appId |
 
-## חיבור ל-Firestore
+3. **Deploy**. Vercel יריץ אוטומטית את `npm run build`, שמזריק את הערכים
+   האלה לתוך הקובץ הסופי (`build.js` עושה את זה) — הם אף פעם לא נכנסים ל-git.
 
-הקוד הנוכחי מאחסן ב-`localStorage`. כדי להעביר ל-Firestore:
+## שלב 4 — בדיקה
+פתח את הכתובת שVercel נתן. אמור להופיע מסך התחברות. התחבר עם המייל/סיסמה
+שיצרת ב-Firebase Authentication (שלב שכבר עשית קודם) — האפליקציה תיפתח,
+והנתונים יישמרו גם מקומית וגם ב-Firestore, ויתעדכנו אוטומטית בין מכשירים.
 
-1. ב-[Firebase Console](https://console.firebase.google.com) → צור פרויקט → הוסף Web App → קבל את ה-`firebaseConfig`.
-2. ב-Firestore Database → צור Database (Production mode).
-3. העתק את `firebase-config.example.js` ל-`firebase-config.js` והכנס את הערכים.
-4. הוסף את הסקריפטים בתחתית `index.html` (ראה הוראות בקובץ הדוגמה).
-
-### Security Rules בסיסיות (לאחר הוספת אימות)
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /yeshiva/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
-```
+## הערה על סנכרון
+זה סנכרון "מי ששומר אחרון מנצח" — אם שני מכשירים משנים בו-זמנית, השמירה
+המאוחרת יותר גוברת. אין מיזוג חכם של שינויים סותרים.
