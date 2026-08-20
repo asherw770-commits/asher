@@ -51,7 +51,19 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
 .al{background:var(--rdd);border:1px solid rgba(239,68,68,.25);border-radius:14px;padding:11px 14px;margin-bottom:10px}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-
+@media (min-width:1024px){
+ body{padding-right:88px}
+ #app{max-width:1040px}
+ .N{position:fixed;top:0;right:0;bottom:auto;left:auto;transform:none;width:88px;max-width:88px;height:100vh;flex-direction:column;justify-content:flex-start;border-top:none;border-left:1px solid var(--bd);padding:20px 0 20px;gap:2px}
+ .ni{flex:0 0 auto;padding:14px 6px;font-size:12.6px}
+ .ni .bg{top:6px;right:calc(50% - 22px)}
+ .S{padding-bottom:32px}
+ .O{align-items:center;padding-right:88px}
+ .M{max-width:720px;border-radius:16px;max-height:85vh;border-bottom:1px solid var(--bm);padding-bottom:16px}
+ .SG{grid-template-columns:repeat(4,1fr);max-width:none}
+ .ng{max-height:420px;grid-template-columns:repeat(3,1fr)}
+ .pk{grid-template-columns:repeat(3,80px)}
+}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
@@ -550,33 +562,6 @@ h+='<div style="width:100%;border-radius:6px;background:var(--s1);border:1px sol
 +(cu?'<div style="font-size:13.2px;color:var(--rd);font-weight:600;margin-top:2px">📵 '+friendlyUntil(cu)+'</div>':'')+'</div>'
 +'<button style="padding:8px 16px;border-radius:6px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:13.2px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="returnPhoneNow(\''+jq(nm)+'\')">✅ קיבל בחזרה</button>'
 +'</div></div>';});}}
-// missed a deposit and was never confiscated for it, more than a day later
-// - heuristic based on his most recent known miss vs current status, not a
-// strict per-event link (the app doesn't track "which confiscation was for
-// which specific miss"), but catches the case that matters: something fell
-// through the cracks
-{
- var staleAlerts=[];
- var _now=Date.now();
- D.pb.forEach(function(b){
-  var st=gS(b);if(st==='away'||st==='np'||st==='conf')return;
-  var lastMiss=null;
-  Object.keys(D.ph||{}).forEach(function(dt){if((D.ph[dt].m||[]).indexOf(b)>=0&&(!lastMiss||dt>lastMiss))lastMiss=dt;});
-  Object.keys(D.phA||{}).forEach(function(dt){if((D.phA[dt].m||[]).indexOf(b)>=0&&(!lastMiss||dt>lastMiss))lastMiss=dt;});
-  if(!lastMiss)return;
-  var daysSince=(_now-new Date(lastMiss+'T12:00:00').getTime())/864e5;
-  if(daysSince>=1)staleAlerts.push({nm:b,lastMiss:lastMiss,days:Math.floor(daysSince)});
- });
- if(staleAlerts.length){
-  h+='<div class="sl" style="margin-top:4px">⚠️ חיסור הפקדה ללא החרמה</div>';
-  staleAlerts.forEach(function(a){
-   h+='<div style="width:100%;border-radius:6px;background:var(--s1);border:1px solid var(--bd);border-right:4px solid var(--am);padding:10px 14px;margin-bottom:6px">'
-    +'<div style="font-size:16.8px;font-weight:700;color:var(--t0)">'+es(a.nm)+'</div>'
-    +'<div style="font-size:13.2px;color:var(--am);font-weight:600;margin-top:2px">חיסר ב-'+hF(a.lastMiss)+' ('+a.days+' ימים) — לא הוחרם</div>'
-    +'</div>';
-  });
- }
-}
 // Phones due back - confiscated yesterday, window has now closed
 if(D&&D._returnDue){const rd=Object.entries(D._returnDue);
 if(rd.length){h+='<div class="sl" style="margin-top:4px;color:var(--gr)">📲 להחזיר טלפון</div>';
