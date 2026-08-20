@@ -66,7 +66,6 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
 }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script>
 var FIREBASE_CONFIG={
@@ -81,34 +80,11 @@ var FIREBASE_CONFIG={
 </head>
 <body>
 <div id="app"></div>
-<div id="loginGate" style="position:fixed;inset:0;background:#0a0f1c;z-index:999999;display:flex;align-items:center;justify-content:center;font-family:Heebo,Arial;direction:rtl;flex-direction:column;gap:14px">
- <div style="font-size:22px;font-weight:800;color:#fff">🏠 אפליקציית פנימייה</div>
- <div id="loginStatus" style="color:#9ba8bb;font-size:14px">מתחבר…</div>
-</div>
 <script>
 firebase.initializeApp(FIREBASE_CONFIG);
-var _fbAuth=firebase.auth();
 var _fbDb=firebase.firestore();
-var _fbUid=null;
-var _AUTO_EMAIL='__FIREBASE_USER_EMAIL__';
-var _AUTO_PASS='__FIREBASE_USER_PASSWORD__';
-function _autoLogin(){
- _fbAuth.signInWithEmailAndPassword(_AUTO_EMAIL,_AUTO_PASS).catch(function(e){
-  var el=document.getElementById('loginStatus');
-  if(el){el.style.color='#ef4444';
-   el.textContent='שגיאת חיבור אוטומטי: '+(e.code||e.message||'?')+' — בדוק את משתני הסביבה FIREBASE_USER_EMAIL/PASSWORD ב-Vercel';}
- });
-}
-_fbAuth.onAuthStateChanged(function(user){
- if(user){
-  _fbUid=user.uid;
-  document.getElementById('loginGate').style.display='none';
-  if(window._appBoot)window._appBoot();
- }else{
-  _fbUid=null;
-  _autoLogin();
- }
-});
+// no login: one shared doc at /shared/main, world-readable per firestore.rules
+var _fbDocRef=_fbDb.collection('shared').doc('main');
 </script>
 <script>
 const isoLocal=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -216,9 +192,9 @@ let D;const K='yv9';
 function ld(){
  try{const s=localStorage.getItem(K);D=s?{...df(),...JSON.parse(s)}:df();}catch(e){D=df();}
  heal();
- if(typeof _fbDb!=='undefined'&&_fbUid&&!window._fbListening){
+ if(typeof _fbDocRef!=='undefined'&&!window._fbListening){
   window._fbListening=true;
-  _fbDb.collection('users').doc(_fbUid).collection('appdata').doc('main')
+  _fbDocRef
    .onSnapshot(function(snap){
     if(!snap.exists){sv();return;}
     var remote=snap.data();
@@ -429,10 +405,10 @@ if(gdToken)setTimeout(function(){gdCheckForUpdates(true);},2500);
 
 let _fbSaveTimer=null;
 function sv(){D._updatedAt=Date.now();try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
- if(typeof _fbDb!=='undefined'&&_fbUid){
+ if(typeof _fbDocRef!=='undefined'){
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer=setTimeout(function(){
-   _fbDb.collection('users').doc(_fbUid).collection('appdata').doc('main').set(D).catch(function(e){console.error('Firestore save failed',e);});
+   _fbDocRef.set(D).catch(function(e){console.error('Firestore save failed',e);});
   },1500);
  }
 }
@@ -3455,6 +3431,7 @@ setInterval(checkDailyReset,30000);
 checkDailyReset();// run once on load
 setInterval(()=>{const e=document.getElementById('hmClk');if(e){const n=new Date;e.textContent=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')}},10000);
 }; // end window._appBoot
+window._appBoot();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async></script>
