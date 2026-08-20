@@ -228,6 +228,16 @@ function ld(){
    .onSnapshot(function(snap){
     if(!snap.exists){sv();return;}
     var remote=snap.data();
+    var localTs=(D&&D._updatedAt)||0;
+    var remoteTs=remote._updatedAt||0;
+    // remote must be strictly newer to overwrite - protects freshly-imported
+    // local data from being clobbered by a stale server copy on reload, and
+    // silences the write-then-read echo of our own sv() calls
+    if(remoteTs<=localTs){
+     // local is at least as new - push it up so the server reflects reality
+     if(remoteTs<localTs)sv();
+     return;
+    }
     D={...df(),...remote};
     heal();
     rr();
@@ -424,7 +434,7 @@ setInterval(checkTaskAlerts,30000); // check every 30 min
 if(gdToken)setTimeout(function(){gdCheckForUpdates(true);},2500);
 
 let _fbSaveTimer=null;
-function sv(){try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
+function sv(){D._updatedAt=Date.now();try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
  if(typeof _fbDb!=='undefined'&&_fbUid){
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer=setTimeout(function(){
