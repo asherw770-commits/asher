@@ -81,30 +81,24 @@ var FIREBASE_CONFIG={
 </head>
 <body>
 <div id="app"></div>
-<div id="loginGate" style="position:fixed;inset:0;background:#0a0f1c;z-index:999999;display:flex;align-items:center;justify-content:center;font-family:Heebo,Arial;direction:rtl">
- <div style="width:100%;max-width:340px;padding:24px">
-  <div style="text-align:center;margin-bottom:24px;font-size:24px;font-weight:800;color:#fff">🏠 אפליקציית פנימייה</div>
-  <input id="loginEmail" type="email" placeholder="אימייל" style="width:100%;padding:13px;margin-bottom:10px;border-radius:10px;border:1px solid #2a3548;background:#131c2e;color:#fff;font-size:15.6px;box-sizing:border-box">
-  <input id="loginPass" type="password" placeholder="סיסמה" style="width:100%;padding:13px;margin-bottom:14px;border-radius:10px;border:1px solid #2a3548;background:#131c2e;color:#fff;font-size:15.6px;box-sizing:border-box">
-  <button id="loginBtn" style="width:100%;padding:13px;border-radius:10px;background:#eab54a;color:#0a0f1c;border:none;font-size:16.8px;font-weight:700;cursor:pointer">התחברות</button>
-  <div id="loginError" style="color:#ef4444;font-size:13.2px;text-align:center;margin-top:10px;min-height:18px"></div>
- </div>
+<div id="loginGate" style="position:fixed;inset:0;background:#0a0f1c;z-index:999999;display:flex;align-items:center;justify-content:center;font-family:Heebo,Arial;direction:rtl;flex-direction:column;gap:14px">
+ <div style="font-size:22px;font-weight:800;color:#fff">🏠 אפליקציית פנימייה</div>
+ <div id="loginStatus" style="color:#9ba8bb;font-size:14px">מתחבר…</div>
 </div>
 <script>
 firebase.initializeApp(FIREBASE_CONFIG);
 var _fbAuth=firebase.auth();
 var _fbDb=firebase.firestore();
 var _fbUid=null;
-document.getElementById('loginBtn').onclick=function(){
- var email=document.getElementById('loginEmail').value.trim();
- var pass=document.getElementById('loginPass').value;
- var errEl=document.getElementById('loginError');
- errEl.textContent='';
- _fbAuth.signInWithEmailAndPassword(email,pass).catch(function(e){
-  errEl.textContent=e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found'?'אימייל או סיסמה שגויים':'שגיאת התחברות: '+e.message;
+var _AUTO_EMAIL='__FIREBASE_USER_EMAIL__';
+var _AUTO_PASS='__FIREBASE_USER_PASSWORD__';
+function _autoLogin(){
+ _fbAuth.signInWithEmailAndPassword(_AUTO_EMAIL,_AUTO_PASS).catch(function(e){
+  var el=document.getElementById('loginStatus');
+  if(el){el.style.color='#ef4444';
+   el.textContent='שגיאת חיבור אוטומטי: '+(e.code||e.message||'?')+' — בדוק את משתני הסביבה FIREBASE_USER_EMAIL/PASSWORD ב-Vercel';}
  });
-};
-document.getElementById('loginPass').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('loginBtn').click();});
+}
 _fbAuth.onAuthStateChanged(function(user){
  if(user){
   _fbUid=user.uid;
@@ -112,7 +106,7 @@ _fbAuth.onAuthStateChanged(function(user){
   if(window._appBoot)window._appBoot();
  }else{
   _fbUid=null;
-  document.getElementById('loginGate').style.display='flex';
+  _autoLogin();
  }
 });
 </script>

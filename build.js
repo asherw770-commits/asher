@@ -13,6 +13,8 @@ const REQUIRED_VARS = [
   'FIREBASE_STORAGE_BUCKET',
   'FIREBASE_MESSAGING_SENDER_ID',
   'FIREBASE_APP_ID',
+  'FIREBASE_USER_EMAIL',
+  'FIREBASE_USER_PASSWORD',
 ];
 
 const missing = REQUIRED_VARS.filter((k) => !process.env[k]);
@@ -35,6 +37,8 @@ const replacements = {
   __FIREBASE_STORAGE_BUCKET__: process.env.FIREBASE_STORAGE_BUCKET,
   __FIREBASE_MESSAGING_SENDER_ID__: process.env.FIREBASE_MESSAGING_SENDER_ID,
   __FIREBASE_APP_ID__: process.env.FIREBASE_APP_ID,
+  __FIREBASE_USER_EMAIL__: process.env.FIREBASE_USER_EMAIL,
+  __FIREBASE_USER_PASSWORD__: process.env.FIREBASE_USER_PASSWORD,
 };
 
 for (const [token, value] of Object.entries(replacements)) {
