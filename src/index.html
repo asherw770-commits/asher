@@ -52,17 +52,46 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @media (min-width:1024px){
- body{padding-right:88px}
- #app{max-width:1040px}
- .N{position:fixed;top:0;right:0;bottom:auto;left:auto;transform:none;width:88px;max-width:88px;height:100vh;flex-direction:column;justify-content:flex-start;border-top:none;border-left:1px solid var(--bd);padding:20px 0 20px;gap:2px}
- .ni{flex:0 0 auto;padding:14px 6px;font-size:12.6px}
- .ni .bg{top:6px;right:calc(50% - 22px)}
- .S{padding-bottom:32px}
- .O{align-items:center;padding-right:88px}
- .M{max-width:720px;border-radius:16px;max-height:85vh;border-bottom:1px solid var(--bm);padding-bottom:16px}
- .SG{grid-template-columns:repeat(4,1fr);max-width:none}
- .ng{max-height:420px;grid-template-columns:repeat(3,1fr)}
+ /* container + sidebar geometry */
+ body{padding-right:220px}
+ #app{max-width:1200px}
+ .H{padding:14px 22px}
+ .S{padding:18px 24px 40px}
+ /* right-side sidebar nav (replaces bottom nav) */
+ .N{position:fixed;top:0;right:0;bottom:auto;left:auto;transform:none;width:220px;max-width:220px;height:100vh;flex-direction:column;justify-content:flex-start;border-top:none;border-left:1px solid var(--bd);padding:20px 8px;gap:2px;background:var(--s2)}
+ .N .ni{flex:0 0 auto;flex-direction:row!important;align-items:center;justify-content:flex-start;padding:11px 14px!important;font-size:14.4px;border-radius:10px;gap:12px;text-align:right;transition:background .15s,color .15s}
+ .N .ni:hover{background:var(--s3);color:var(--t0)}
+ .N .ni.on{background:var(--gd);color:var(--go)}
+ .N .ni>span:first-child{font-size:19.2px!important;position:relative}
+ .N .ni>span:last-child{font-size:14.4px!important;margin-top:0!important;font-weight:500;letter-spacing:.3px}
+ .N .ni .bg{position:absolute;top:-4px!important;right:-4px!important;font-size:10.2px!important;border-radius:10px;padding:1px 5px;min-width:16px}
+ /* cards + rows */
+ .C{padding:13px 16px;border-radius:14px}
+ .R{padding:11px 13px;transition:background .15s}
+ .R:hover{background:var(--s3);cursor:pointer}
+ /* hover states on interactive controls */
+ .B{transition:background .15s,border-color .15s}
+ .B:hover{background:var(--bm);border-color:var(--bd)}
+ .so,.ro,.dlo,.ni2,.ar,.pb{transition:border-color .15s,background .15s}
+ .so:hover,.ro:hover,.dlo:hover,.ni2:hover:not(.sel),.ar:hover{border-color:var(--gb);background:var(--gd)}
+ .pb:hover:not(.sel){border-color:var(--go);background:var(--gd)}
+ button{cursor:pointer}
+ /* modal → centered popover */
+ .O{align-items:center;padding-right:220px;backdrop-filter:blur(4px)}
+ .M{max-width:760px;border-radius:16px;max-height:85vh;border:1px solid var(--bm);padding-bottom:16px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+ /* wider grids on desktop */
+ .SG{grid-template-columns:repeat(4,1fr);gap:10px}
+ .sc{padding:14px 8px}
+ .sc .n{font-size:32px}
+ .sc .l{font-size:12px}
+ .ng{max-height:480px;grid-template-columns:repeat(3,1fr);gap:8px}
+ .pg{gap:8px}
+ .pb{padding:13px 6px;font-size:17.4px}
  .pk{grid-template-columns:repeat(3,80px)}
+ /* tabs + inputs */
+ .T{padding:0 22px}
+ .tb{padding:10px 16px;font-size:14.8px}
+ .inp,.ta{font-size:15px;padding:11px 14px}
 }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
