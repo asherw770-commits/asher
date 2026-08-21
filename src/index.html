@@ -1589,78 +1589,65 @@ function rSleepBoyDetail(nm){
 function printSleepTableFor(nm){
  var t=D.sleepTables&&D.sleepTables[nm];if(!t){showBanner('אין טבלת שינה לבחור זה',3000);return;}
  var room=(D.boyRoom||{})[nm]||'';
+ // vertical layout: one row per day, with generous width for the signature.
+ // sizing is static and safe for the largest case (10 school days + a few
+ // vacation days interleaved) - no runtime scaling, so no cells clip.
+ var totalRows=t.days.length;
+ // dynamic row height so 12-20 rows all fill the page comfortably without
+ // pushing anything off. picked to leave ~130mm for header/name/note.
+ var rowH=Math.max(8,Math.min(14,Math.floor(150/totalRows)));
+ var signH=Math.max(rowH+2,12); // signature cell a bit taller than others
  var h='<html dir="rtl"><head><meta charset="UTF-8"><style>';
  h+='@page{size:A4 portrait;margin:10mm}';
- h+='*{margin:0;padding:0;box-sizing:border-box}';
+ h+='*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
  h+='body{font-family:"Segoe UI","Heebo",Arial,sans-serif;direction:rtl;color:#000;-webkit-font-smoothing:antialiased}';
- h+='#mmprobe{position:absolute;width:100mm;height:0;visibility:hidden}';
- h+='#rpage{border:0.6mm solid #000;padding:14px 16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='.bh{text-align:center;font-size:11px;color:#000;letter-spacing:3px;margin-bottom:6px}';
- h+='.title{text-align:center;margin-bottom:8px;padding-bottom:8px;border-bottom:0.4mm solid #000}';
- h+='.title h1{font-size:26px;font-weight:900;letter-spacing:2px;color:#000;display:inline-block}';
- h+='.namebox{text-align:center;background:#fff;border:0.5mm solid #000;padding:12px 14px;margin:12px 0 6px;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='.namebox .nm{font-size:24px;font-weight:900;color:#000;letter-spacing:0.5px}';
- h+='.namebox .rm{display:inline-block;font-size:12px;color:#000;border:0.35mm solid #000;padding:2px 12px;margin-top:6px;font-weight:700;letter-spacing:0.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
+ h+='#rpage{border:0.6mm solid #000;padding:12px 14px}';
+ h+='.bh{text-align:center;font-size:11px;letter-spacing:3px;margin-bottom:6px}';
+ h+='.title{text-align:center;margin-bottom:10px;padding-bottom:8px;border-bottom:0.4mm solid #000}';
+ h+='.title h1{font-size:26px;font-weight:900;letter-spacing:2px;display:inline-block}';
+ h+='.namebox{text-align:center;border:0.5mm solid #000;padding:10px 14px;margin:10px 0 6px}';
+ h+='.namebox .nm{font-size:22px;font-weight:900;letter-spacing:0.5px}';
+ h+='.namebox .rm{display:inline-block;font-size:12px;border:0.3mm solid #000;padding:2px 12px;margin-top:6px;font-weight:700;letter-spacing:0.5px}';
  h+='.sub{text-align:center;font-size:11.5px;color:#333;font-style:italic;margin-bottom:12px}';
  h+='table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:12px;border:0.5mm solid #000}';
- h+='td,th{border:0.25mm solid #000;padding:6px 3px;text-align:center;font-size:13px;line-height:1.3;vertical-align:middle}';
- h+='td:first-child,th:first-child{width:16%;font-size:11px!important;background:#e8e8e8;font-weight:700;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='th{background:#000!important;color:#fff!important;font-weight:900;font-size:14px;letter-spacing:0.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='.rDow td{background:#f4f4f4;font-weight:700;font-size:10.5px;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='.rDate td{background:#fff;font-size:9.5px;color:#000}';
- h+='.rSign td{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='.cbx{width:9mm;height:9mm;border:0.4mm dashed #000;background:#fff;display:inline-block;margin-top:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='.vac{background:repeating-linear-gradient(45deg,#000 0,#000 0.4mm,#fff 0.4mm,#fff 2.2mm)!important;color:#000;font-weight:900;font-size:11px;letter-spacing:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='.vac span{background:#fff;padding:1px 5px;display:inline-block;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='.note{background:#fff;border:0.5mm solid #000;padding:10px 12px;font-size:12.5px;line-height:1.7;color:#000;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='.note b{color:#000;font-weight:900}';
+ h+='col.cNum{width:11%}col.cDow{width:16%}col.cDate{width:26%}col.cSign{width:47%}';
+ h+='th,td{border:0.25mm solid #000;padding:4px 6px;text-align:center;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}';
+ h+='th{background:#000;color:#fff;font-weight:900;font-size:14px;padding:6px 4px;letter-spacing:1px}';
+ h+='tbody tr td{height:'+rowH+'mm;font-size:13px}';
+ h+='tbody tr:nth-child(even) td{background:#f5f5f5}';
+ h+='td.num{font-weight:900;font-size:15px;background:#e8e8e8}';
+ h+='tbody tr:nth-child(even) td.num{background:#dadada}';
+ h+='td.dow{font-weight:700;font-size:13px}';
+ h+='td.date{font-size:12px;color:#222}';
+ h+='td.sign{padding:2px;height:'+signH+'mm}';
+ h+='td.sign .line{display:block;height:100%;width:100%;border:0.35mm dashed #666;background:#fff}';
+ h+='tr.vac td{background:#eee;color:#555}';
+ h+='tr.vac td.num{background:#ccc;font-weight:900;color:#000}';
+ h+='tr.vac td.vac{background:repeating-linear-gradient(45deg,#000 0,#000 0.35mm,#fff 0.35mm,#fff 2mm);padding:2px;position:relative}';
+ h+='tr.vac td.vac span{display:inline-block;background:#fff;border:0.3mm solid #000;padding:2px 14px;font-weight:900;letter-spacing:3px;font-size:12px}';
+ h+='.note{border:0.5mm solid #000;padding:9px 12px;font-size:12.5px;line-height:1.6;text-align:center}';
+ h+='.note b{font-weight:900}';
  h+='</style></head><body>';
- h+='<div id="mmprobe"></div><div id="rpage">';
+ h+='<div id="rpage">';
  h+='<div class="bh">בס״ד</div>';
  h+='<div class="title"><h1>טבלת שינה</h1></div>';
  h+='<div class="namebox"><div class="nm">'+es(nm)+'</div>'+(room?'<div class="rm">חדר '+es(room)+'</div>':'')+'</div>';
  h+='<div class="sub">ניתן ב-'+hF(t.startDate)+'</div>';
- h+='<table><tr><th>יום</th>';
- t.days.forEach(function(d,i){h+='<th>'+(d.isSchoolDay?(t.days.slice(0,i+1).filter(function(x){return x.isSchoolDay;}).length):'')+'</th>';});
- h+='</tr><tr class="rDow"><td>יום בשבוע</td>';
- t.days.forEach(function(d){h+='<td>'+es(d.dayName)+'</td>';});
- h+='</tr><tr class="rDate"><td>תאריך</td>';
- t.days.forEach(function(d){h+='<td>'+es(d.hebrewDate)+'</td>';});
- h+='</tr><tr class="rSign"><td>חתימת המדריך</td>';
- t.days.forEach(function(d){h+=d.isSchoolDay?'<td><span class="cbx"></span></td>':'<td class="vac"><span>חופש</span></td>';});
- h+='</tr></table>';
+ h+='<table>';
+ h+='<colgroup><col class="cNum"><col class="cDow"><col class="cDate"><col class="cSign"></colgroup>';
+ h+='<thead><tr><th>יום</th><th>יום בשבוע</th><th>תאריך</th><th>חתימת המדריך</th></tr></thead><tbody>';
+ var schoolNum=0;
+ t.days.forEach(function(d){
+  if(d.isSchoolDay){
+   schoolNum++;
+   h+='<tr><td class="num">'+schoolNum+'</td><td class="dow">'+es(d.dayName)+'</td><td class="date">'+es(d.hebrewDate)+'</td><td class="sign"><span class="line"></span></td></tr>';
+  }else{
+   h+='<tr class="vac"><td class="num">—</td><td class="dow">'+es(d.dayName)+'</td><td class="date">'+es(d.hebrewDate)+'</td><td class="vac"><span>חופש</span></td></tr>';
+  }
+ });
+ h+='</tbody></table>';
  h+='<div class="note"><b>📌 יש לתלות את הטבלה על הארון מבחוץ</b></div>';
- h+='</div>';
- h+='<script>(function(){var mmp=document.getElementById("mmprobe").offsetWidth/100;'
-  +'var pageH=(297-16)*mmp;'
-  +'var targetH=pageH*0.5;' // fill roughly half the page, not just "however small the content naturally is"
-  +'var rpage=document.getElementById("rpage");'
-  +'var cells=document.querySelectorAll("td,th");'
-  +'var cbx=document.querySelectorAll(".cbx");'
-  +'var fs=13,pad=6,cbs=9,guard=0;'
-  +'function apply(){'
-  +' for(var i=0;i<cells.length;i++){cells[i].style.padding=pad+"px "+(pad-2)+"px";cells[i].style.fontSize=fs+"px";}'
-  +' for(var j=0;j<cbx.length;j++){cbx[j].style.width=cbs+"mm";cbx[j].style.height=cbs+"mm";}'
-  +'}'
-  +'function anyOverflow(){'
-  +' for(var i=0;i<cells.length;i++){if(cells[i].scrollWidth>cells[i].clientWidth+0.5)return true;}'
-  // also check each checkbox directly against its own cell bounds - a fixed
-  // mm-sized checkbox growing past its cell can visually spill over the
-  // border without ever registering as text scrollWidth overflow
-  +' for(var k=0;k<cbx.length;k++){var cell=cbx[k].closest("td");if(!cell)continue;'
-  +'  var cr=cell.getBoundingClientRect(),br=cbx[k].getBoundingClientRect();'
-  +'  if(br.width>cr.width-4||br.height>cr.height-4)return true;}'
-  +' return false;}'
-  +'while(guard++<200){'
-  +' var h=rpage.getBoundingClientRect().height;'
-  +' var over=anyOverflow();'
-  +' if((h>pageH||over)&&(pad>1||fs>7)){if(pad>1){pad-=0.4;}else{fs-=0.4;}cbs=Math.max(5,cbs-0.3);}'
-  +' else if(h<targetH-6&&!over&&fs<18){fs+=0.4;pad+=0.25;cbs=Math.min(11,cbs+0.3);apply();if(anyOverflow()){fs-=0.4;pad-=0.25;cbs=Math.max(5,cbs-0.3);apply();break;}continue;}'
-  +' else break;'
-  +' apply();'
-  +'}'
-  +'})();<\/script>';
- h+='</body></html>';
+ h+='</div></body></html>';
  printHTML(h,'טבלת שינה');
 }
 // ===== in-app cleaning update (עדכון ניקיון) - mirrors the printed cleaning
