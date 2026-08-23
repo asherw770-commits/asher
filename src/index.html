@@ -451,15 +451,32 @@ setInterval(checkTaskAlerts,30000); // check every 30 min
 // elsewhere actually show you up-to-date data
 if(gdToken)setTimeout(function(){gdCheckForUpdates(true);},2500);
 
-let _fbSaveTimer=null;
+let _fbSaveTimer=null,_fbPending=false;
 function sv(){D._updatedAt=Date.now();try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
  if(typeof _fbDocRef!=='undefined'){
+  _fbPending=true;
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer=setTimeout(function(){
+   _fbPending=false;
    _fbDocRef.set(D).catch(function(e){console.error('Firestore save failed',e);});
   },1500);
  }
 }
+// cancel any pending debounced write and push immediately. call on nav change,
+// tab hide, and page unload so a change made right before switching or closing
+// is guaranteed to reach the cloud instead of dying with the setTimeout.
+function flushSv(){
+ if(!_fbPending)return;
+ clearTimeout(_fbSaveTimer);_fbSaveTimer=null;_fbPending=false;
+ if(typeof _fbDocRef!=='undefined'){
+  _fbDocRef.set(D).catch(function(e){console.error('Firestore save failed',e);});
+ }
+}
+// tab-visibility + page-hide: push whatever's queued before the tab loses
+// focus (user switches to another app/tab, phone locks, browser closes)
+document.addEventListener('visibilitychange',function(){if(document.hidden)flushSv();});
+window.addEventListener('pagehide',flushSv);
+window.addEventListener('beforeunload',flushSv);
 const YOFF={'2026-08-14':'ערב שבת חופש','2026-08-15':'שבת חופש','2026-08-29':'שבת חופש','2026-09-18':'ערב שבת חופש','2026-09-19':'שבת חופש','2026-09-20':'בין הזמנים','2026-09-21':'יום כיפור','2026-09-22':'בין הזמנים','2026-09-23':'בין הזמנים','2026-09-24':'בין הזמנים','2026-09-25':'ערב שבת חופש','2026-09-26':'סוכות','2026-09-27':'סוכות','2026-09-28':'סוכות','2026-09-29':'סוכות','2026-09-30':'סוכות','2026-10-01':'סוכות','2026-10-02':'סוכות','2026-10-03':'שמחת תורה','2026-10-04':'בין הזמנים','2026-10-05':'בין הזמנים','2026-10-06':'בין הזמנים','2026-10-07':'בין הזמנים','2026-10-17':'שבת חופש','2026-10-31':'שבת חופש','2026-11-14':'שבת חופש','2026-11-28':'שבת חופש','2026-12-08':'חנוכה','2026-12-09':'חנוכה','2026-12-10':'חנוכה','2026-12-11':'חנוכה','2026-12-12':'חנוכה','2026-12-26':'שבת חופש','2027-01-09':'שבת חופש','2027-01-23':'שבת חופש','2027-02-06':'שבת חופש','2027-02-20':'שבת חופש','2027-03-06':'שבת חופש','2027-03-20':'שבת חופש','2027-03-21':'בין הזמנים','2027-03-22':'בין הזמנים','2027-03-23':'פורים','2027-03-24':'שושן פורים','2027-04-08':'בין הזמנים','2027-04-09':'ערב שבת חופש','2027-04-10':'שבת חופש','2027-04-11':'בין הזמנים','2027-04-12':'בין הזמנים','2027-04-13':'בין הזמנים','2027-04-14':'בין הזמנים','2027-04-15':'בין הזמנים','2027-04-16':'ערב שבת חופש','2027-04-17':'שבת חופש','2027-04-18':'בין הזמנים','2027-04-19':'בין הזמנים','2027-04-20':'בין הזמנים','2027-04-21':'ערב פסח','2027-04-22':'פסח','2027-04-23':'פסח','2027-04-24':'פסח','2027-04-25':'פסח','2027-04-26':'פסח','2027-04-27':'פסח','2027-04-28':'פסח','2027-04-29':'בין הזמנים','2027-04-30':'ערב שבת חופש','2027-05-01':'שבת חופש','2027-05-02':'בין הזמנים','2027-05-03':'בין הזמנים','2027-05-15':'שבת חופש','2027-05-29':'שבת חופש','2027-06-10':'בין הזמנים','2027-06-19':'שבת חופש','2027-07-10':'שבת חופש','2027-07-24':'שבת חופש','2027-08-10':'בין הזמנים','2027-08-11':'בין הזמנים','2027-08-12':'תשעה באב','2027-08-13':'ערב שבת חופש','2027-08-14':'שבת חופש','2027-08-15':'בין הזמנים','2027-08-16':'בין הזמנים','2027-08-17':'בין הזמנים','2027-08-18':'בין הזמנים','2027-08-19':'בין הזמנים','2027-08-20':'ערב שבת חופש','2027-08-21':'שבת חופש','2027-08-22':'בין הזמנים','2027-08-23':'בין הזמנים','2027-08-24':'בין הזמנים','2027-08-25':'בין הזמנים','2027-08-26':'בין הזמנים','2027-08-27':'ערב שבת חופש','2027-08-28':'שבת חופש','2027-08-29':'בין הזמנים','2027-08-30':'בין הזמנים','2027-08-31':'בין הזמנים','2027-09-01':'בין הזמנים','2027-09-02':'בין הזמנים'};
 const YMARK={'2026-08-22':'שבת ישיבה','2026-09-05':'שבת ישיבה','2026-09-12':'חג בישיבה','2026-09-13':'חג בישיבה','2026-10-10':'שבת ישיבה','2026-10-24':'שבת ישיבה','2026-11-01':'אסיפת הורים','2026-11-07':'שבת ישיבה','2026-11-21':'שבת ישיבה','2026-12-05':'שבת ישיבה','2026-12-06':'חג בישיבה','2026-12-19':'שבת ישיבה','2027-01-02':'שבת ישיבה','2027-01-16':'שבת ישיבה','2027-01-30':'שבת ישיבה','2027-02-13':'שבת ישיבה','2027-02-27':'שבת ישיבה','2027-03-13':'שבת ישיבה','2027-03-27':'שבת ישיבה','2027-04-03':'שבת ישיבה','2027-05-08':'שבת ישיבה','2027-05-22':'שבת ישיבה','2027-05-25':'חג בישיבה','2027-06-05':'שבת ישיבה','2027-06-11':'חג בישיבה','2027-06-12':'שבת ישיבה','2027-06-20':'אסיפת הורים','2027-06-26':'שבת ישיבה','2027-07-03':'שבת ישיבה','2027-07-17':'שבת ישיבה','2027-07-31':'שבת ישיבה','2027-08-07':'שבת ישיבה'};
 function todayISO(){var n=new Date();return new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10);}
@@ -527,7 +544,7 @@ function df(){return{pb:[...NM],pt:{},ph:{},ps:{},wt:[],wh:[],cs:NM.map(n=>({id:
 let pg='home';var _sp={};
 function _saveScroll(){var s=document.querySelector('.S');if(s)_sp[pg]=s.scrollTop;}
 function _restoreScroll(){var k=pg;setTimeout(function(){var s=document.querySelector('.S');if(s)s.scrollTop=_sp[k]||0;},0);}
-function go(p){_saveScroll();
+function go(p){_saveScroll();flushSv();
  if(p==='phones'&&pg!=='phones'){
   // opening the deposits page fresh - default to whichever tab matches the
   // current time of day, so the person doesn't have to switch tabs every
