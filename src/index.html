@@ -248,6 +248,28 @@ function ld(){
       return;
      }
     }
+    // NEVER let an empty remote clobber a non-empty local, even if remoteTs
+    // is newer. This has happened when a fresh browser session (no localStorage)
+    // wrote its default empty state to the cloud - without this guard, every
+    // other device with real data would silently sync to empty on next reload.
+    var remoteHasData=remote&&(
+     (Array.isArray(remote.pb)&&remote.pb.length>0)||
+     (remote.wt&&Object.keys(remote.wt).length>0)||
+     (remote.ph&&Object.keys(remote.ph).length>0)||
+     (remote.sleepTables&&Object.keys(remote.sleepTables).length>0)
+    );
+    var localHasData=D&&(
+     (Array.isArray(D.pb)&&D.pb.length>0)||
+     (D.wt&&Object.keys(D.wt).length>0)||
+     (D.ph&&Object.keys(D.ph).length>0)||
+     (D.sleepTables&&Object.keys(D.sleepTables).length>0)
+    );
+    if(!remoteHasData&&localHasData){
+     // local wins - push it up regardless of timestamps to overwrite the
+     // empty cloud copy
+     sv();
+     return;
+    }
     // remote must be strictly newer to overwrite - protects freshly-imported
     // local data from being clobbered by a stale server copy on reload, and
     // silences the write-then-read echo of our own sv() calls
