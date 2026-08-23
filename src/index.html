@@ -229,6 +229,25 @@ function ld(){
     var remote=snap.data();
     var localTs=(D&&D._updatedAt)||0;
     var remoteTs=remote._updatedAt||0;
+    // FIRST snapshot: if remote has real data (any user-populated field) and
+    // local hasn't been touched yet by this new-timestamp code, prefer remote
+    // unconditionally. Protects legacy docs (predate _updatedAt) and fresh
+    // devices where localStorage is empty from being silently ignored.
+    if(!window._fbInitApplied){
+     window._fbInitApplied=true;
+     var remoteMeaningful=remote&&(
+      (Array.isArray(remote.pb)&&remote.pb.length>0)||
+      (remote.wt&&Object.keys(remote.wt).length>0)||
+      (remote.ph&&Object.keys(remote.ph).length>0)
+     );
+     if(remoteMeaningful&&localTs===0){
+      D={...df(),...remote};
+      heal();
+      if(!D._updatedAt)D._updatedAt=remoteTs||Date.now();
+      rr();
+      return;
+     }
+    }
     // remote must be strictly newer to overwrite - protects freshly-imported
     // local data from being clobbered by a stale server copy on reload, and
     // silences the write-then-read echo of our own sv() calls
