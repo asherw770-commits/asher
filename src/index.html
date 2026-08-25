@@ -3037,20 +3037,76 @@ if(uniqT.length){
 h+='</div>';
 // Bowls & cup + lights out - combined into one compact card since both are
 // short daily-duty checks, rather than two near-identical boxes in a row
-const bwLateCount=Object.keys(D.bwLate||{}).filter(inRange).filter(dt=>(D.bwLate[dt]||[]).indexOf(nm)>=0).length;
+// helpers: collect dates on which a per-day-array bucket includes this boy,
+// and render them as a compact comma-separated Hebrew-date list. keeps each
+// category self-contained without adding another data pipeline.
+function _datesWith(bucket){
+ return Object.keys(bucket||{}).filter(inRange).filter(function(dt){return(bucket[dt]||[]).indexOf(nm)>=0;}).sort();
+}
+function _renderDates(dates,color){
+ if(!dates||!dates.length)return '';
+ var pretty=dates.map(function(d){var dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'});}).join(' · ');
+ return '<div style="font-size:11.4px;color:'+(color||'var(--t2)')+';line-height:1.55;padding:3px 0 2px;direction:rtl">'+pretty+'</div>';
+}
+// evening & afternoon LATE-deposit dates - now show WHICH days he was late
+// on, not just how many. under the deposit stats card so it's the natural
+// place a reader already looking at deposits will spot it.
+var _lateEveDates=_datesWith(D.phLate);
+var _lateAftDates=_datesWith(D.phLateA);
+var _missEveDates=allDates.filter(function(dt){var e=D.ph[dt];return e&&e.m&&e.m.indexOf(nm)>=0;}).sort();
+var _missAftDates=allDatesA.filter(function(dt){var e=D.phA[dt];return e&&e.m&&e.m.indexOf(nm)>=0;}).sort();
+if(_lateEveDates.length||_missEveDates.length||_lateAftDates.length||_missAftDates.length){
+ h+='<div class="C" style="margin-top:6px"><div style="font-weight:700;font-size:14.4px;color:var(--t0);margin-bottom:6px">📅 תאריכי חוסר/איחור בהפקדות</div>';
+ if(_missEveDates.length)h+='<div style="font-size:12.5px;color:var(--rd);font-weight:600;margin-top:4px">❌ לא הפקיד ערב:</div>'+_renderDates(_missEveDates,'var(--rd)');
+ if(_lateEveDates.length)h+='<div style="font-size:12.5px;color:var(--am);font-weight:600;margin-top:4px">⏰ איחר ערב:</div>'+_renderDates(_lateEveDates,'var(--am)');
+ if(_missAftDates.length)h+='<div style="font-size:12.5px;color:var(--rd);font-weight:600;margin-top:4px">❌ לא הפקיד צהריים:</div>'+_renderDates(_missAftDates,'var(--rd)');
+ if(_lateAftDates.length)h+='<div style="font-size:12.5px;color:var(--am);font-weight:600;margin-top:4px">⏰ איחר צהריים:</div>'+_renderDates(_lateAftDates,'var(--am)');
+ h+='</div>';
+}
+// bowls/cup + lights + morning/afternoon floor-exit lateness - one card per
+// category, count PLUS the actual dates so we know when it happened
+var bwLateDates=_datesWith(D.bwLate);
+var loOutDates=_datesWith(D.loOut);
+var floorAMDates=_datesWith(D.floorLateAM);
+var floorPMDates=_datesWith(D.floorLatePM);
+const bwLateCount=bwLateDates.length;
 const bwPunish=uniqT.filter(t=>(t.pk||[]).includes('5ש')&&t.ro&&t.ro.includes('קערה')).length;
-const loOutCount=Object.keys(D.loOut||{}).filter(inRange).filter(dt=>(D.loOut[dt]||[]).indexOf(nm)>=0).length;
+const loOutCount=loOutDates.length;
 const loPunish=uniqT.filter(t=>(t.pk||[]).includes('10ש')&&t.ro&&t.ro.includes('אורות')).length;
-h+='<div class="C" style="margin-top:6px"><div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span style="font-size:14.4px;color:var(--t1)">🍽 קערה וספל — איחר</span><span style="font-size:15.6px;font-weight:800;color:'+(bwLateCount?'var(--am)':'var(--t2)')+'">'+bwLateCount+'</span></div>'
- +(bwPunish?'<div style="display:flex;justify-content:space-between;padding:2px 0 6px;border-bottom:1px solid var(--bd)"><span style="font-size:12.5px;color:var(--t2)">עונש 5ש</span><span style="font-size:13.2px;font-weight:700;color:var(--rd)">'+bwPunish+'</span></div>':'<div style="padding-bottom:6px;border-bottom:1px solid var(--bd)"></div>')
- +'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 4px"><span style="font-size:14.4px;color:var(--t1)">💡 כיבוי אורות — בחוץ</span><span style="font-size:15.6px;font-weight:800;color:'+(loOutCount?'var(--am)':'var(--t2)')+'">'+loOutCount+'</span></div>'
- +(loPunish?'<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="font-size:12.5px;color:var(--t2)">עונש 10ש</span><span style="font-size:13.2px;font-weight:700;color:var(--rd)">'+loPunish+'</span></div>':'')+'</div>';
-// Floor-exit lateness (morning/afternoon) - respects the selected range too
-const floorAMCount=Object.keys(D.floorLateAM||{}).filter(inRange).filter(dt=>(D.floorLateAM[dt]||[]).indexOf(nm)>=0).length;
-const floorPMCount=Object.keys(D.floorLatePM||{}).filter(inRange).filter(dt=>(D.floorLatePM[dt]||[]).indexOf(nm)>=0).length;
+if(bwLateCount||loOutCount){
+ h+='<div class="C" style="margin-top:6px">';
+ if(bwLateCount){
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span style="font-size:14.4px;color:var(--t1)">🍽 קערה וספל — איחר</span><span style="font-size:15.6px;font-weight:800;color:var(--am)">'+bwLateCount+'</span></div>';
+  h+=_renderDates(bwLateDates,'var(--am)');
+  if(bwPunish)h+='<div style="display:flex;justify-content:space-between;padding:4px 0"><span style="font-size:12.5px;color:var(--t2)">↳ עונש 5ש</span><span style="font-size:13.2px;font-weight:700;color:var(--rd)">'+bwPunish+'</span></div>';
+ }
+ if(loOutCount){
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:'+(bwLateCount?'8px':'4px')+' 0 4px;'+(bwLateCount?'border-top:1px solid var(--bd);margin-top:6px;padding-top:8px':'')+'"><span style="font-size:14.4px;color:var(--t1)">💡 כיבוי אורות — בחוץ</span><span style="font-size:15.6px;font-weight:800;color:var(--am)">'+loOutCount+'</span></div>';
+  h+=_renderDates(loOutDates,'var(--am)');
+  if(loPunish)h+='<div style="display:flex;justify-content:space-between;padding:4px 0"><span style="font-size:12.5px;color:var(--t2)">↳ עונש 10ש</span><span style="font-size:13.2px;font-weight:700;color:var(--rd)">'+loPunish+'</span></div>';
+ }
+ h+='</div>';
+}
+const floorAMCount=floorAMDates.length;
+const floorPMCount=floorPMDates.length;
 if(floorAMCount||floorPMCount){
-h+='<div class="C" style="margin-top:6px"><div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0'+(floorPMCount?';border-bottom:1px solid var(--bd)':'')+'"><span style="font-size:14.4px;color:var(--t1)">🌅 איחור ביציאה מהקומה - בוקר</span><span style="font-size:15.6px;font-weight:800;color:'+(floorAMCount?'var(--am)':'var(--t2)')+'">'+floorAMCount+'</span></div>'
-+(floorPMCount?'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 4px"><span style="font-size:14.4px;color:var(--t1)">🕐 איחור ביציאה מהקומה - צהריים</span><span style="font-size:15.6px;font-weight:800;color:var(--am)">'+floorPMCount+'</span></div>':'')+'</div>';
+ h+='<div class="C" style="margin-top:6px">';
+ if(floorAMCount){
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span style="font-size:14.4px;color:var(--t1)">🌅 איחור ביציאה — בוקר</span><span style="font-size:15.6px;font-weight:800;color:var(--am)">'+floorAMCount+'</span></div>';
+  h+=_renderDates(floorAMDates,'var(--am)');
+ }
+ if(floorPMCount){
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:'+(floorAMCount?'8px':'4px')+' 0 4px;'+(floorAMCount?'border-top:1px solid var(--bd);margin-top:6px;padding-top:8px':'')+'"><span style="font-size:14.4px;color:var(--t1)">🕐 איחור ביציאה — צהריים</span><span style="font-size:15.6px;font-weight:800;color:var(--am)">'+floorPMCount+'</span></div>';
+  h+=_renderDates(floorPMDates,'var(--am)');
+ }
+ h+='</div>';
+}
+// confiscation dates - which specific days a phone was confiscated on
+if(D._confiscate){
+ var _confDates=Object.keys(D._confiscate).filter(function(k){return k.indexOf(nm+'_')===0;}).map(function(k){var t=D._confiscate[k];return t&&t.at?t.at.slice(0,10):null;}).filter(function(d){return d&&inRange(d);}).sort();
+ if(_confDates.length){
+  h+='<div class="C" style="margin-top:6px"><div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span style="font-size:14.4px;color:var(--t1)">📵 החרמות טלפון</span><span style="font-size:15.6px;font-weight:800;color:var(--pu)">'+_confDates.length+'</span></div>'+_renderDates(_confDates,'var(--pu)')+'</div>';
+ }
 }
 // ===== group: general status - compact rows, not big-number cards, since
 // these are mostly binary/status facts rather than counts to emphasize =====
