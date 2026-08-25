@@ -2471,7 +2471,6 @@ h+='#pg{transform-origin:top right;width:291mm;margin:3mm 0 2mm}';
 h+='#hdr{display:flex;align-items:center;justify-content:space-between;margin:0 2.5mm 1.2mm;gap:6mm}';
 h+='#hdr .htxt{font-size:12px;font-weight:700;color:#111}';
 h+='#hdr .hbc{flex-shrink:0}';
-h+='table td.cb,table th.cb{font-size:4.8px;line-height:1;letter-spacing:-.35px;color:#8f96a3;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
 h+='.wrap{display:flex;flex-wrap:nowrap;gap:0;margin:0 2.5mm;height:calc(100% - 20px);position:relative}';
 h+='.col{flex:1 1 0;min-width:0;max-width:100%;display:flex;flex-direction:column;font-size:11px}';
 h+='.gapsp{flex:0 0 0.6mm}';
@@ -2488,7 +2487,12 @@ h+='td:not(:first-child),th:not(:first-child){text-align:center;width:5.4mm;padd
 h+='table td.pkc,table th.pkc{width:8.4mm;font-size:15.2px;line-height:1.2;letter-spacing:-.2px;color:#374151}';
 h+='table.kw td:first-child{font-size:1.14em}';
 h+='table.ke td:first-child{font-size:2.6em}';
-h+='table.ke td.cb,table.ke th.cb{font-size:16px}';
+// .cb rule MUST come after `table.big td{font-size:1em}` so it actually wins
+// the cascade at equal specificity - previously it was defined above and got
+// overridden, letting the tiny "10ש" hint text scale up to the whole column
+// font (e.g. 14px) and overflow the narrow 5.4mm mark cell
+h+='table td.cb,table th.cb{font-size:4.8px!important;line-height:1;letter-spacing:-.35px;color:#8f96a3;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
+h+='table.ke td.cb,table.ke th.cb{font-size:16px!important}';
 h+='.col-ke .tt{font-size:2.3em}';
 h+='td:first-child{white-space:nowrap;overflow:hidden}';
 h+='tbody tr:nth-child(even) td,table tr:nth-child(even) td{background:#eef1f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
