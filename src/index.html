@@ -112,8 +112,11 @@ var FIREBASE_CONFIG={
 <script>
 firebase.initializeApp(FIREBASE_CONFIG);
 var _fbDb=firebase.firestore();
-// no login: one shared doc at /shared/main, world-readable per firestore.rules
+// no login: main state at /shared/main, photos in a separate /photos/{boyId}
+// collection because a single Firestore doc caps at 1MB and per-boy photo
+// arrays can push the whole state past that. world-readable per rules.
 var _fbDocRef=_fbDb.collection('shared').doc('main');
+var _fbPhotosCol=_fbDb.collection('photos');
 // stamped at build time - lets each device show which deploy it's running
 var _BUILD_STAMP='__BUILD_STAMP__';
 </script>
@@ -245,6 +248,7 @@ function ld(){
      if(remoteMeaningful&&localTs===0){
       D={...df(),...remote};
       heal();
+      _mergePhotos();
       if(!D._updatedAt)D._updatedAt=remoteTs||Date.now();
       rr();
       return;
@@ -282,8 +286,22 @@ function ld(){
     }
     D={...df(),...remote};
     heal();
+    _mergePhotos();
     rr();
    },function(err){console.error('Firestore sync error',err);});
+  // photos listener - each doc under /photos is one boy's photo array.
+  // populates window._remotePhotos so _mergePhotos can splice them into
+  // D.cs whenever the main snapshot arrives, and re-renders live when a
+  // photo doc changes on its own
+  _fbPhotosCol.onSnapshot(function(snap){
+   var changed=false;
+   snap.docChanges().forEach(function(ch){
+    var id=ch.doc.id;
+    if(ch.type==='removed'){delete window._remotePhotos[id];changed=true;}
+    else{window._remotePhotos[id]=(ch.doc.data()||{}).photos||[];changed=true;}
+   });
+   if(changed){_mergePhotos();if(typeof pg!=='undefined'&&(pg==='pin'||pg.startsWith('c')))rr();}
+  },function(err){console.error('Firestore photos sync error',err);});
  }
 }
 // a single corrupted field used to blank the whole app; repair instead of crash
@@ -476,13 +494,50 @@ setInterval(checkTaskAlerts,30000); // check every 30 min
 if(gdToken)setTimeout(function(){gdCheckForUpdates(true);},2500);
 
 let _fbSaveTimer=null,_fbPending=false;
+// cache of remote photos (per cs entry id). populated by the photos listener;
+// merged into D.cs whenever the main snapshot arrives so photos land on the
+// same object the UI reads from
+window._remotePhotos=window._remotePhotos||{};
+// strip photos out of D so the main-doc payload stays comfortably under the
+// 1MB Firestore per-document limit. returns {stripped, photos:{[id]:[]}}.
+function _splitPhotos(src){
+ var stripped=Object.assign({},src);
+ var photos={};
+ if(Array.isArray(src.cs)){
+  stripped.cs=src.cs.map(function(e){
+   if(e&&Array.isArray(e.photos)&&e.photos.length){
+    photos[e.id]=e.photos;
+    var copy=Object.assign({},e);copy.photos=[];return copy;
+   }
+   return e;
+  });
+ }
+ return {stripped:stripped,photos:photos};
+}
+// merge remote photos back into D.cs entries in place
+function _mergePhotos(){
+ if(!D||!Array.isArray(D.cs))return;
+ D.cs.forEach(function(e){
+  if(!e)return;
+  var rp=window._remotePhotos[e.id];
+  if(rp&&rp.length&&(!e.photos||!e.photos.length))e.photos=rp;
+ });
+}
 function sv(){D._updatedAt=Date.now();D._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
  if(typeof _fbDocRef!=='undefined'){
   _fbPending=true;
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer=setTimeout(function(){
    _fbPending=false;
-   _fbDocRef.set(D).catch(function(e){console.error('Firestore save failed',e);});
+   var split=_splitPhotos(D);
+   _fbDocRef.set(split.stripped).catch(function(e){console.error('Firestore save failed',e);});
+   // write photos separately, one doc per boy. only for boys who currently
+   // have photos - stale photo docs from boys who lost their photos aren't
+   // cleaned up here (rare, and photos come back on next update anyway)
+   Object.keys(split.photos).forEach(function(id){
+    _fbPhotosCol.doc(id).set({photos:split.photos[id],_updatedAt:D._updatedAt}).catch(function(e){console.error('Firestore photo save failed',id,e);});
+    window._remotePhotos[id]=split.photos[id];
+   });
   },1500);
  }
 }
@@ -493,7 +548,12 @@ function flushSv(){
  if(!_fbPending)return;
  clearTimeout(_fbSaveTimer);_fbSaveTimer=null;_fbPending=false;
  if(typeof _fbDocRef!=='undefined'){
-  _fbDocRef.set(D).catch(function(e){console.error('Firestore save failed',e);});
+  var split=_splitPhotos(D);
+  _fbDocRef.set(split.stripped).catch(function(e){console.error('Firestore save failed',e);});
+  Object.keys(split.photos).forEach(function(id){
+   _fbPhotosCol.doc(id).set({photos:split.photos[id],_updatedAt:D._updatedAt}).catch(function(e){console.error('Firestore photo save failed',id,e);});
+   window._remotePhotos[id]=split.photos[id];
+  });
  }
 }
 // tab-visibility + page-hide: push whatever's queued before the tab loses
@@ -800,7 +860,13 @@ function impData(input){
   // other device sees the change within ~1 second instead of after the
   // debounce timer runs out (which can be lost if the tab closes first)
   if(typeof _fbDocRef!=='undefined'){
-   _fbDocRef.set(D).then(function(){
+   var split=_splitPhotos(D);
+   var writes=[_fbDocRef.set(split.stripped)];
+   Object.keys(split.photos).forEach(function(id){
+    writes.push(_fbPhotosCol.doc(id).set({photos:split.photos[id],_updatedAt:D._updatedAt}));
+    window._remotePhotos[id]=split.photos[id];
+   });
+   Promise.all(writes).then(function(){
     alert('הייבוא הצליח! '+summary+'\n✅ סונכרן לענן — המכשיר השני יראה תוך כמה שניות.');
    }).catch(function(e){
     alert('הייבוא נשמר מקומית ✓\n\n⚠️ אבל הסנכרון לענן נכשל:\n'+(e.code||e.message)+'\n\nהמכשיר השני לא יראה את השינוי עד שתפתור את הבעיה.');

@@ -1,11 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Single-user app with no login. The one doc below is world-readable
-    // and world-writable - security is by URL obscurity only. Anyone who
-    // knows the Firebase project id (visible in the client HTML) can read
-    // and modify it. Do not share the app URL.
+    // Single-user app with no login. World-readable and world-writable -
+    // security is by URL obscurity only. Anyone who knows the Firebase
+    // project id (visible in the client HTML) can read and modify. Do
+    // not share the app URL.
+    // - shared/main: the main D state, minus per-boy photos
+    // - photos/{boyId}: photos for one boy (split out to stay under the
+    //   1MB per-document Firestore limit)
     match /shared/main {
+      allow read, write: if true;
+    }
+    match /photos/{boyId} {
       allow read, write: if true;
     }
   }
