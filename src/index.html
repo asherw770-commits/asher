@@ -114,6 +114,8 @@ firebase.initializeApp(FIREBASE_CONFIG);
 var _fbDb=firebase.firestore();
 // no login: one shared doc at /shared/main, world-readable per firestore.rules
 var _fbDocRef=_fbDb.collection('shared').doc('main');
+// stamped at build time - lets each device show which deploy it's running
+var _BUILD_STAMP='__BUILD_STAMP__';
 </script>
 <script>
 const isoLocal=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -765,6 +767,8 @@ h+='<div class="C" style="margin-top:10px"><div style="font-weight:700;font-size
 // Reset all
 // Reset all
 h+='<div class="C" style="margin-top:10px;border-color:rgba(239,68,68,.25)"><div style="font-weight:700;font-size:16.8px;color:var(--rd);margin-bottom:6px">🗑 איפוס מלא</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:10px">מוחק את כל הנתונים ומתחיל מאפס. הפעולה בלתי הפיכה!</div><button style="width:100%;padding:10px;border-radius:8px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:14.4px;font-weight:700;cursor:pointer" onclick="resetAll()">🗑 אפס הכל</button></div>';
+// build version - lets you check "am I on the latest deploy or a cached copy?"
+h+='<div style="text-align:center;margin-top:14px;font-size:11px;color:var(--t2);opacity:.7">build '+es(_BUILD_STAMP)+'</div>';
 h+='</div></div></div>';return h}
 let _srtBoys=[];
 function rStPreSort(){_srtBoys=[...D.pb].sort(sLN)}
@@ -776,7 +780,39 @@ function rmBoyI(sortIdx){const srt=sortByRoomBed(D.pb);const n=srt[sortIdx];if(!
 function rmBoyByName(n){D.pb=D.pb.filter(b=>b!==n);D.cs=D.cs.filter(s=>s.name!==n);D.wt=D.wt.filter(t=>t.nm!==n);D.wh=D.wh.filter(t=>t.nm!==n);D.ci=D.ci.filter(t=>t.sn!==n);delete D.ps[n];delete D.pt[n];sv();rr()}
 function editRoom(r){if(!D.rooms)D.rooms={};const cur=(D.rooms[r]||[]).join("\n");const v=prompt("חדר "+r+" — שם אחד בכל שורה:",cur);if(v===null)return;D.rooms[r]=v.split("\n").map(s=>s.trim()).filter(Boolean);sv();rr()}
 function expData(){try{const dt=hF(new Date).replace(/\s/g,'-');const payload={version:1,exportedAt:new Date().toISOString(),data:D};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='yeshiva-backup-'+dt+'.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);alert('הגיבוי הורד בהצלחה!')}catch(e){alert('שגיאה: '+e.message)}}
-function impData(input){const f=input.files&&input.files[0];if(!f)return;if(!confirm('ייבוא יחליף את כל הנתונים הקיימים. המשך?')){input.value='';return}const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);const nd=p.data||p;if(!nd.pb||!Array.isArray(nd.pb)){alert('הקובץ לא תקין');return}D=nd;sv();rr();alert('הייבוא הצליח!')}catch(e){alert('שגיאה בקריאת הקובץ: '+e.message)}};r.onerror=()=>alert('שגיאה בקריאת הקובץ');r.readAsText(f);input.value=''}
+function impData(input){
+ const f=input.files&&input.files[0];if(!f)return;
+ if(!confirm('ייבוא יחליף את כל הנתונים הקיימים. המשך?')){input.value='';return}
+ const r=new FileReader();
+ r.onload=()=>{try{
+  const p=JSON.parse(r.result);
+  const nd=p.data||p;
+  if(!nd.pb||!Array.isArray(nd.pb)){alert('הקובץ לא תקין');return}
+  D=nd;
+  // stamp with the current time so the imported data wins over any stale
+  // snapshot that may arrive from the server mid-import
+  D._updatedAt=Date.now();
+  sv();
+  rr();
+  const summary=nd.pb.length+' בחורים';
+  // push directly (not via debounced sv) and await the ack, so the user
+  // gets clear feedback whether the cloud sync actually landed - and any
+  // other device sees the change within ~1 second instead of after the
+  // debounce timer runs out (which can be lost if the tab closes first)
+  if(typeof _fbDocRef!=='undefined'){
+   _fbDocRef.set(D).then(function(){
+    alert('הייבוא הצליח! '+summary+'\n✅ סונכרן לענן — המכשיר השני יראה תוך כמה שניות.');
+   }).catch(function(e){
+    alert('הייבוא נשמר מקומית ✓\n\n⚠️ אבל הסנכרון לענן נכשל:\n'+(e.code||e.message)+'\n\nהמכשיר השני לא יראה את השינוי עד שתפתור את הבעיה.');
+   });
+  }else{
+   alert('הייבוא הצליח! '+summary+' (מקומי בלבד — אין חיבור לענן)');
+  }
+ }catch(e){alert('שגיאה בקריאת הקובץ: '+e.message)}};
+ r.onerror=()=>alert('שגיאה בקריאת הקובץ');
+ r.readAsText(f);
+ input.value=''
+}
 function resetAll(){if(!confirm('האם אתה בטוח? כל הנתונים יימחקו לצמיתות!'))return;if(!confirm('בטוח בטוח? אין דרך חזרה!'))return;localStorage.removeItem(K);D=df();sv();rr();alert('כל הנתונים נמחקו. האפליקציה מתחילה מאפס.')}
 
 // Lights out — auto add 10ש
