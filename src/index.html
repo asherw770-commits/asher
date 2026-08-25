@@ -801,30 +801,11 @@ if(D._lastAutoBackup){h+='<div style="text-align:center;margin-top:10px;font-siz
 
 
 h+='</div></div>';
-// Weekly report
-const wd=new Date().getDay();
-h+='<div class="C" style="margin-top:6px;cursor:pointer" onclick="window._weeklyOpen=!window._weeklyOpen;rr()"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;font-size:15.6px;color:var(--t0)">📊 דוח שבועי</span><span style="font-size:13.2px;color:var(--t2)">'+(window._weeklyOpen?'▲':'▼')+'</span></div></div>';
-if(window._weeklyOpen){
-const wkStart=new Date();wkStart.setDate(wkStart.getDate()-(wd===0?0:wd));wkStart.setHours(0,0,0,0);
-const wkDates=[];for(let d=new Date(wkStart);d<=new Date();d.setDate(d.getDate()+1))wkDates.push(d.toISOString().slice(0,10));
-// Count per student this week
-const boyStats={};D.pb.forEach(b=>{boyStats[b]={miss:0,late:0,tasks:0,conf:0}});
-wkDates.forEach(d=>{const ph=(D.ph||{})[d];if(ph&&ph.m)ph.m.forEach(b=>{if(boyStats[b])boyStats[b].miss++})});
-D.wt.filter(t=>t.status==='late'||t.status==='doubled').forEach(t=>{if(boyStats[t.nm])boyStats[t.nm].tasks++});
-D.wh.filter(t=>{const ca=t.ca||'';return ca>=wkStart.toISOString()}).forEach(t=>{if(t.status==='late'&&boyStats[t.nm])boyStats[t.nm].late++});
-// Sort by issues
-const ranked=Object.entries(boyStats).map(([nm,s])=>({nm,...s,score:s.miss*3+s.tasks*2+s.late+s.conf*4})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
-// Total deposits this week
-let totalDep=0,totalMiss=0;
-wkDates.forEach(d=>{const ph=(D.ph||{})[d];if(ph){totalDep+=(ph.dp?ph.dp.length:0);totalMiss+=(ph.m?ph.m.length:0)}});
-const depPct=totalDep+totalMiss>0?Math.round(totalDep/(totalDep+totalMiss)*100):0;
-h+='<div class="C"><div style="display:flex;gap:12px;margin-bottom:8px"><div style="text-align:center;flex:1"><div style="font-size:24.0px;font-weight:800;color:var(--go)">'+depPct+'%</div><div style="font-size:12.0px;color:var(--t2)">הפקדות</div></div><div style="text-align:center;flex:1"><div style="font-size:24.0px;font-weight:800;color:var(--rd)">'+ranked.length+'</div><div style="font-size:12.0px;color:var(--t2)">בעייתיים</div></div><div style="text-align:center;flex:1"><div style="font-size:24.0px;font-weight:800;color:var(--am)">'+D.wt.filter(t=>t.status!=="done"&&t.status!=="cancelled").length+'</div><div style="font-size:12.0px;color:var(--t2)">משימות פתוחות</div></div></div>';
-if(ranked.length){h+='<div style="font-size:13.2px;font-weight:600;color:var(--t1);margin-bottom:4px">דורשים תשומת לב:</div>';
-ranked.slice(0,8).forEach(r=>{
-h+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bd)"><div style="flex:1;font-size:14.4px;color:var(--t0);font-weight:500">'+r.nm+'</div><div style="font-size:12.0px;color:var(--t2)">'+(r.miss?r.miss+'❌ ':'')+(r.tasks?r.tasks+'📝 ':'')+(r.late?r.late+'⏰':'')+'</div><button style="padding:3px 8px;border-radius:6px;background:var(--bld);border:1px solid rgba(59,130,246,.2);color:var(--bl);font-size:12.0px;cursor:pointer" onclick="schedTalk(\''+es(r.nm)+'\')">💬</button></div>'})}
-h+='</div>'}
-// ═══ Printable documents (pre-made PDFs stored under /assets/) ═══
-h+='<div class="sl" style="margin-top:14px">🖨 מסמכים להדפסה</div>';
+// ═══ Printable documents (pre-made PDFs + roster) — collapsed by default so
+// they don't dominate the dashboard; user opens with a single tap
+h+='<div class="C" style="margin-top:6px;cursor:pointer" onclick="window._printOpen=!window._printOpen;rr()"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;font-size:15.6px;color:var(--t0)">🖨 הדפסות</span><span style="font-size:13.2px;color:var(--t2)">'+(window._printOpen?'▲':'▼')+'</span></div></div>';
+if(window._printOpen){
+h+='<div class="sl" style="margin-top:8px">מסמכים מוכנים</div>';
 h+='<div class="C" style="padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
 var _docs=[
  {u:'assets/pninia_hours.pdf',t:'⏰ זמני פתיחה'},
@@ -839,11 +820,12 @@ _docs.forEach(function(d){
 });
 h+='</div></div>';
 // Roster print - names with empty checkboxes, either grouped by room or A-Z
-h+='<div class="sl" style="margin-top:12px">📋 רשימת שמות עם משבצות</div>';
+h+='<div class="sl" style="margin-top:10px">רשימת שמות עם משבצות</div>';
 h+='<div class="C" style="padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
 h+='<button style="padding:12px;border-radius:10px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:14.4px;font-weight:700;cursor:pointer" onclick="printBoyRoster(\'room\')">🏠 לפי חדרים</button>';
 h+='<button style="padding:12px;border-radius:10px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:14.4px;font-weight:700;cursor:pointer" onclick="printBoyRoster(\'alpha\')">🔤 לפי א״ב</button>';
 h+='</div><div style="font-size:11.4px;color:var(--t2);margin-top:8px;text-align:center">מעודכן לפי הבחורים הפעילים כרגע. כל שם עם משבצת ריקה לסימון.</div></div>';
+}
 return h}
 // ═══ Printable roster (used by the dashboard buttons above) ═══
 // A/B modes: "room" = grouped by room number, one table per room, matching
