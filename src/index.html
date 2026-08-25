@@ -2613,18 +2613,24 @@ h+='<script>(function(){var pg=document.getElementById("pg");if(!pg)return;pg.st
  +'for(var mj=0;mj<badMarks.length;mj++){var mel=badMarks[mj];var mfs=parseFloat(getComputedStyle(mel).fontSize)||5;var mg=0;'
  +' while(mg++<12&&mfs>3.2){mfs=Math.max(3.2,mfs-0.5);mel.style.fontSize=mfs+"px";if(mel.scrollWidth<=mel.clientWidth+0.5)break;}}'
  // per-cell GROW pass across ALL mark cells (.cb) and .ke first-column
- // names: each cell's dimensions are already locked by the outer layout,
- // but the shrink-only safety loop above never grows them. binary-search
- // the biggest font each cell can carry without horizontal overflow AND
- // without pushing the row taller than it already is. setProperty(..,
- // 'important') wins the cascade over the .cb !important rule. margin of
- // 1.5px on the width check leaves room for print-driver rasterization
- // rounding so nothing gets a single pixel clipped at the edge.
+ // names. binary-search the biggest font each cell can carry without
+ // horizontal overflow. two key rules: (1) start the search from the
+ // cell's current computed font size so this pass can only GROW, never
+ // shrink - previously it clobbered names that were already large. (2)
+ // for mark cells (.cb) skip the row-height constraint entirely: their
+ // rows are already sized by the first-column boy name (much taller than
+ // typical mark text), so a mark at 14-20px fits comfortably inside a
+ // row that was already dimensioned for the name. setProperty w/
+ // 'important' wins over the .cb !important rule in the stylesheet.
  +'var keCells=pg.querySelectorAll("td.cb,th.cb,.ke td:first-child");'
  +'for(var kc=0;kc<keCells.length;kc++){'
- +' var kcel=keCells[kc];var maxH=kcel.clientHeight||99;var maxW=kcel.clientWidth;'
- +' if(maxW<3)continue;'
- +' var lo3=4,hi3=44,best3=4;'
+ +' var kcel=keCells[kc];var maxW=kcel.clientWidth;if(maxW<3)continue;'
+ +' var isName=kcel.parentNode&&kcel.cellIndex===0;'
+ +' var maxH=isName?(kcel.clientHeight||99):9999;'
+ +' var curFs=parseFloat(getComputedStyle(kcel).fontSize)||6;'
+ +' var absMax=isName?48:22;'
+ +' if(curFs>=absMax)continue;'
+ +' var lo3=curFs,hi3=absMax,best3=curFs;'
  +' for(var kg=0;kg<9;kg++){var mid3=(lo3+hi3)/2;kcel.style.setProperty("font-size",mid3+"px","important");'
  +'  if(kcel.scrollWidth<=maxW-1.5&&kcel.scrollHeight<=maxH+0.5){best3=mid3;lo3=mid3;}else{hi3=mid3;}}'
  +' kcel.style.setProperty("font-size",best3+"px","important");}'
