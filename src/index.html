@@ -839,9 +839,12 @@ function printBoyRoster(mode){
  var rooms=Object.keys(byRoom).filter(function(r){return r!=='';}).sort(function(a,b){return +a-+b;});
  var unassigned=byRoom['']||[];
  var h='<html dir="rtl"><head><meta charset="UTF-8"><style>';
- h+='@page{size:A4 portrait;margin:8mm}';
+ // @page margin=0 suppresses the browser's default print header/footer
+ // (which would otherwise leak the app URL onto every printout). white
+ // space is added back as body padding instead.
+ h+='@page{size:A4 portrait;margin:0}';
  h+='*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='body{font-family:"Segoe UI","Heebo",Arial,sans-serif;direction:rtl;color:#000;-webkit-font-smoothing:antialiased}';
+ h+='body{font-family:"Segoe UI","Heebo",Arial,sans-serif;direction:rtl;color:#000;-webkit-font-smoothing:antialiased;padding:8mm}';
  h+='h1{text-align:center;font-size:22px;margin-bottom:2px;font-weight:900;letter-spacing:1px}';
  h+='.sub{text-align:center;font-size:12px;color:#444;margin-bottom:12px}';
  h+='.tt{font-size:14px;font-weight:800;background:#1f2937;color:#fff;padding:5px 10px;text-align:center;border-radius:4px 4px 0 0;letter-spacing:1px}';
@@ -1877,9 +1880,11 @@ function printSleepTableFor(nm){
  var rowH=Math.max(8,Math.min(14,Math.floor(150/totalRows)));
  var signH=Math.max(rowH+2,12); // signature cell a bit taller than others
  var h='<html dir="rtl"><head><meta charset="UTF-8"><style>';
- h+='@page{size:A4 portrait;margin:10mm}';
+ // @page margin=0 suppresses the browser's default print header/footer
+ // (URL / date), moved onto body padding instead
+ h+='@page{size:A4 portrait;margin:0}';
  h+='*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
- h+='body{font-family:"Segoe UI","Heebo",Arial,sans-serif;direction:rtl;color:#000;-webkit-font-smoothing:antialiased}';
+ h+='body{font-family:"Segoe UI","Heebo",Arial,sans-serif;direction:rtl;color:#000;-webkit-font-smoothing:antialiased;padding:10mm}';
  h+='#rpage{border:0.6mm solid #000;padding:12px 14px}';
  h+='.bh{text-align:center;font-size:11px;letter-spacing:3px;margin-bottom:6px}';
  h+='.title{text-align:center;margin-bottom:10px;padding-bottom:8px;border-bottom:0.4mm solid #000}';
@@ -2316,8 +2321,10 @@ function kitBanner(nm){
 function noteKit(t){try{if(t&&t.pk&&t.pk.indexOf('\u05e7\u05d9\u05d8')>=0)kitBanner(t.nm);}catch(e){}}
 function printSleepTable(nm){const kitTasks=D.wt.filter(t=>t.nm===nm&&t.pk&&t.pk.includes('קיט')&&(t.status==='waiting'||t.status==='late'||t.status==='doubled'));if(!kitTasks.length){alert('אין קיטים');return}
 const now=new Date();const start=new Date(now);start.setDate(start.getDate());const end=new Date(start);end.setDate(end.getDate()+14);let h='<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>קיטים — '+nm+'</title><style>';
-h+='*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;direction:rtl;color:#000;padding:20px}';
-h+='@page{size:A4;margin:15mm}@media print{body{margin:0;padding:10mm}}';
+h+='*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;direction:rtl;color:#000;padding:15mm}';
+// @page margin=0 suppresses browser print header/footer (URL leak). All
+// margin whitespace comes from body padding instead.
+h+='@page{size:A4;margin:0}@media print{body{padding:15mm}}';
 h+='h1{text-align:center;font-size:24px;margin-bottom:10px}';
 h+='.info{text-align:center;font-size:12px;color:#666;margin-bottom:20px}';
 h+='table{width:100%;border-collapse:collapse;margin:20px 0}';
@@ -2359,9 +2366,10 @@ if(!D.boyRoom)D.boyRoom={};if(!D.boyBed)D.boyBed={};
 var boys=sortByRoomBed(D.pb);
 var rooms=[...new Set(boys.map(function(b){return D.boyRoom[b];}))].filter(function(r){return r!=null&&r!=='';}).sort(function(a,b){return +a-+b;});
 var h='<html dir="rtl"><head><meta charset="UTF-8"><style>';
-h+='@page{size:A4 portrait;margin:5mm}';
+// @page margin=0 suppresses browser print header/footer that would leak URL
+h+='@page{size:A4 portrait;margin:0}';
 h+='*{margin:0;padding:0;box-sizing:border-box}';
-h+='body{font-family:"Segoe UI",Arial,sans-serif;direction:rtl;color:#111;-webkit-font-smoothing:antialiased}';
+h+='body{font-family:"Segoe UI",Arial,sans-serif;direction:rtl;color:#111;-webkit-font-smoothing:antialiased;padding:5mm}';
 h+='h1{text-align:center;font-size:22px;margin-bottom:2px}';
 h+='.sub{text-align:center;font-size:13px;color:#555;margin-bottom:10px}';
 // same header style as the daily report's column titles (.tt): dark
@@ -2462,10 +2470,13 @@ const COLS=[];var _cm=0;
 const grid=[];const OM=function(o){grid.push(o);return ' data-omr="'+(grid.length-1)+'"';};
 const _P=prt();const bigF=_P.base,medF=_P.base,smF=Math.max(7,_P.base-2);
 let h='<html dir="rtl"><head><meta charset="UTF-8"><style>';
-h+='@page{size:A4 portrait;margin:3mm}';
+// @page margin=0 suppresses the browser's default print header/footer that
+// would otherwise leak the app URL onto the printout. body is nudged 3mm
+// off the page edge so no printer physically clips the outer content.
+h+='@page{size:A4 portrait;margin:0}';
 h+='*{margin:0;padding:0;box-sizing:border-box}';
-h+='html,body{width:204mm;height:291mm;overflow:hidden;margin:0;padding:0}';
-h+='#sheet{position:absolute;top:0;left:0;width:291mm;height:204mm;transform-origin:0 0;transform:rotate(90deg) translateY(-204mm)}';
+h+='html,body{width:210mm;height:297mm;overflow:hidden;margin:0;padding:0}';
+h+='#sheet{position:absolute;top:3mm;left:3mm;width:291mm;height:204mm;transform-origin:0 0;transform:rotate(90deg) translateY(-204mm)}';
 h+='body{font-family:"Segoe UI",Arial,sans-serif;direction:rtl;color:#111;position:relative;-webkit-font-smoothing:antialiased}';
 h+='#pg{transform-origin:top right;width:291mm;margin:3mm 0 2mm}';
 h+='#hdr{display:flex;align-items:center;justify-content:space-between;margin:0 2.5mm 1.2mm;gap:6mm}';
