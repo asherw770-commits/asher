@@ -798,7 +798,80 @@ if(ranked.length){h+='<div style="font-size:13.2px;font-weight:600;color:var(--t
 ranked.slice(0,8).forEach(r=>{
 h+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bd)"><div style="flex:1;font-size:14.4px;color:var(--t0);font-weight:500">'+r.nm+'</div><div style="font-size:12.0px;color:var(--t2)">'+(r.miss?r.miss+'❌ ':'')+(r.tasks?r.tasks+'📝 ':'')+(r.late?r.late+'⏰':'')+'</div><button style="padding:3px 8px;border-radius:6px;background:var(--bld);border:1px solid rgba(59,130,246,.2);color:var(--bl);font-size:12.0px;cursor:pointer" onclick="schedTalk(\''+es(r.nm)+'\')">💬</button></div>'})}
 h+='</div>'}
+// ═══ Printable documents (pre-made PDFs stored under /assets/) ═══
+h+='<div class="sl" style="margin-top:14px">🖨 מסמכים להדפסה</div>';
+h+='<div class="C" style="padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+var _docs=[
+ {u:'assets/pninia_hours.pdf',t:'⏰ זמני פתיחה'},
+ {u:'assets/phone_deposits.pdf',t:'📱 זמני הפקדות'},
+ {u:'assets/karteesee_ahraeem.pdf',t:'🎫 כרטיסי אחראים'},
+ {u:'assets/hitchayvut_shmirat_rechush.pdf',t:'📝 התחייבות רכוש'},
+ {u:'assets/heerat_nikayon.pdf',t:'🧹 הערת ניקיון'},
+ {u:'assets/bakasha_maavar_cheder.pdf',t:'🏠 בקשה למעבר חדר'}
+];
+_docs.forEach(function(d){
+ h+='<button style="padding:12px 8px;border-radius:10px;background:var(--s3);border:1px solid var(--bm);color:var(--t0);font-size:13.8px;font-weight:600;cursor:pointer;text-align:right" onclick="window.open(\''+d.u+'\',\'_blank\')">'+d.t+'</button>';
+});
+h+='</div></div>';
+// Roster print - names with empty checkboxes, either grouped by room or A-Z
+h+='<div class="sl" style="margin-top:12px">📋 רשימת שמות עם משבצות</div>';
+h+='<div class="C" style="padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+h+='<button style="padding:12px;border-radius:10px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:14.4px;font-weight:700;cursor:pointer" onclick="printBoyRoster(\'room\')">🏠 לפי חדרים</button>';
+h+='<button style="padding:12px;border-radius:10px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:14.4px;font-weight:700;cursor:pointer" onclick="printBoyRoster(\'alpha\')">🔤 לפי א״ב</button>';
+h+='</div><div style="font-size:11.4px;color:var(--t2);margin-top:8px;text-align:center">מעודכן לפי הבחורים הפעילים כרגע. כל שם עם משבצת ריקה לסימון.</div></div>';
 return h}
+// ═══ Printable roster (used by the dashboard buttons above) ═══
+// A/B modes: "room" = grouped by room number, one table per room, matching
+// the daily/cleaning report look; "alpha" = single alphabetical list by
+// family name. Both include an empty checkbox next to every name.
+function printBoyRoster(mode){
+ var boys=D.pb.filter(iA);
+ if(!boys.length){alert('אין בחורים ברשימה');return;}
+ var byRoom={};
+ boys.forEach(function(b){var r=(D.boyRoom||{})[b]||'';(byRoom[r]=byRoom[r]||[]).push(b);});
+ var rooms=Object.keys(byRoom).filter(function(r){return r!=='';}).sort(function(a,b){return +a-+b;});
+ var unassigned=byRoom['']||[];
+ var h='<html dir="rtl"><head><meta charset="UTF-8"><style>';
+ h+='@page{size:A4 portrait;margin:8mm}';
+ h+='*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
+ h+='body{font-family:"Segoe UI","Heebo",Arial,sans-serif;direction:rtl;color:#000;-webkit-font-smoothing:antialiased}';
+ h+='h1{text-align:center;font-size:22px;margin-bottom:2px;font-weight:900;letter-spacing:1px}';
+ h+='.sub{text-align:center;font-size:12px;color:#444;margin-bottom:12px}';
+ h+='.tt{font-size:14px;font-weight:800;background:#1f2937;color:#fff;padding:5px 10px;text-align:center;border-radius:4px 4px 0 0;letter-spacing:1px}';
+ h+='table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:6px;border:0.4mm solid #333}';
+ h+='td{border:0.3mm solid #666;padding:6px 8px;font-size:13.5px;line-height:1.4;vertical-align:middle}';
+ h+='td.n{width:8%;text-align:center;font-weight:800;background:#f2f2f2;color:#333}';
+ h+='td.name{text-align:right;color:#111}';
+ h+='td.cb{width:12%;text-align:center}';
+ h+='td.cb .box{display:inline-block;width:6mm;height:6mm;border:0.4mm solid #333;border-radius:2px;vertical-align:middle}';
+ h+='tbody tr:nth-child(even) td:not(.n):not(.cb){background:#f7f7f7}';
+ h+='</style></head><body>';
+ h+='<h1>👥 רשימת בחורים</h1>';
+ h+='<div class="sub">'+hF(new Date)+' · '+DN[new Date().getDay()]+' · סה״כ '+boys.length+' פעילים</div>';
+ function _row(idx,name){return '<tr><td class="n">'+idx+'</td><td class="name">'+es(name)+'</td><td class="cb"><span class="box"></span></td></tr>';}
+ function _table(title,list){
+  h+='<div class="tt">'+es(title)+' — '+list.length+'</div>';
+  h+='<table><tbody>';
+  list.forEach(function(nm,i){h+=_row(i+1,nm);});
+  h+='</tbody></table>';
+ }
+ if(mode==='alpha'){
+  var sorted=boys.slice().sort(sLN);
+  _table('לפי סדר א״ב',sorted);
+ }else{
+  rooms.forEach(function(r){
+   var list=byRoom[r].slice().sort(function(a,b){
+    var ba=parseInt((D.boyBed||{})[a],10);ba=isNaN(ba)?9999:ba;
+    var bb=parseInt((D.boyBed||{})[b],10);bb=isNaN(bb)?9999:bb;
+    return ba-bb||sLN(a,b);
+   });
+   _table('חדר '+r,list);
+  });
+  if(unassigned.length)_table('ללא חדר',unassigned.slice().sort(sLN));
+ }
+ h+='</body></html>';
+ printHTML(h,'רשימת בחורים');
+}
 // ═══ SETTINGS ═══
 function rSt(){let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:20.4px;color:var(--t0)">⚙️ הגדרות</span><div style="width:60px"></div></div><div class="S" style="padding:8px 12px 100px">';
 var _gc=!!gdToken,_lb=D._lastGdBackup;

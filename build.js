@@ -51,4 +51,15 @@ for (const [token, value] of Object.entries(replacements)) {
 if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true });
 fs.writeFileSync(distPath, html, 'utf8');
 
+// copy static assets (printable PDFs the app links to from the dashboard)
+const assetsSrc = path.join(__dirname, 'src', 'assets');
+const assetsDist = path.join(distDir, 'assets');
+if (fs.existsSync(assetsSrc)) {
+  if (!fs.existsSync(assetsDist)) fs.mkdirSync(assetsDist, { recursive: true });
+  for (const f of fs.readdirSync(assetsSrc)) {
+    fs.copyFileSync(path.join(assetsSrc, f), path.join(assetsDist, f));
+  }
+  console.log('Copied', fs.readdirSync(assetsSrc).length, 'assets to dist/assets/.');
+}
+
 console.log('Build complete: dist/index.html written with Firebase config injected.');
