@@ -2985,24 +2985,51 @@ h+='<div style="display:flex;gap:10px;margin-bottom:8px"><div style="text-align:
 h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--gr)">'+doneT.length+'</div><div style="font-size:11px;color:var(--t2)">הושלמו</div></div>';
 h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--rd)">'+lateT.length+'</div><div style="font-size:11px;color:var(--t2)">באיחור</div></div></div>';
 if(uniqT.length){
- function _reasonLabel(t){
-  if(t.rs&&t.rs!=='other'){var r=RSN.find(function(x){return x.k===t.rs;});if(r)return r.i+' '+r.l;}
+ // full reason including the "other" free-text - so a punishment tagged as
+ // אחר with a specific note doesn't show up as a blank "אחר" without context
+ function _reasonFull(t){
+  if(t.rs){
+   var r=RSN.find(function(x){return x.k===t.rs;});
+   if(r){
+    if(r.k==='other'&&t.ro)return r.i+' '+t.ro;
+    return r.i+' '+r.l;
+   }
+  }
   if(t.ro)return '✏️ '+t.ro;
-  return 'לא צוין';
+  return '❓ לא צוינה סיבה';
+ }
+ function _fmtDT(iso,withDay){
+  if(!iso)return null;
+  var d=new Date(iso);
+  var opts=withDay?{weekday:'short',day:'numeric',month:'numeric'}:{day:'numeric',month:'numeric'};
+  return d.toLocaleDateString('he-IL',opts);
  }
  var toShow=uniqT.slice().sort(function(a,b){return new Date(b.ca||0)-new Date(a.ca||0);});
- h+='<div style="border-top:1px solid var(--bd);padding-top:8px">';
+ h+='<div style="padding-top:6px">';
  toShow.forEach(function(t,idx){
   var isLate=t.status==='late'||t.status==='doubled';
+  var isDoubled=t.status==='doubled';
   var isDone=t.status==='done';
   var isCancelled=t.status==='cancelled';
   var isFrozen=t.status==='frozen';
-  var statusLbl=isCancelled?'🗑 נמחק':isFrozen?'❄️ מוקפא':isDone?'✓ הושלם':isLate?'באיחור':'ממתין';
+  var statusLbl=isCancelled?'🗑 בוטל':isFrozen?'❄️ מוקפא':isDone?'✓ הביא':isDoubled?'⚠️ הוכפל':isLate?'⚠️ באיחור':'⏳ ממתין';
   var statusClr=isCancelled?'var(--t2)':isFrozen?'var(--bl)':isDone?'var(--gr)':isLate?'var(--rd)':'var(--am)';
-  var dateStr=t.ca?new Date(t.ca).toLocaleDateString('he-IL',{day:'numeric',month:'numeric',year:'2-digit'}):'?';
-  h+='<div style="padding:6px 0'+(idx?';border-top:1px solid var(--bd)':'')+'">'
-   +'<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:14.4px;font-weight:700;color:var(--t0)">'+es((t.pk||[]).join(', '))+'</span><span style="font-size:12.0px;font-weight:700;color:'+statusClr+'">'+statusLbl+'</span></div>'
-   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px"><span style="font-size:12.0px;color:var(--t2)">'+_reasonLabel(t)+'</span><span style="font-size:11px;color:var(--t2)">'+dateStr+'</span></div>'
+  var dateGiven=_fmtDT(t.ca,true);
+  var dateDl=t.dl?new Date(t.dl).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):null;
+  var dateDone=_fmtDT(t.doneAt,false);
+  var daysLate=null;
+  if(isLate&&t.dl){var late=Math.floor((Date.now()-new Date(t.dl).getTime())/86400000);if(late>0)daysLate=late;}
+  h+='<div style="padding:9px 11px;background:var(--s2);border-radius:9px;'+(idx?'margin-top:6px':'margin-top:2px')+';border-right:3px solid '+statusClr+'">'
+   +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;gap:8px">'
+   +'<span style="font-size:14.8px;font-weight:800;color:var(--t0);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📖 '+es((t.pk||[]).join(', '))+'</span>'
+   +'<span style="font-size:11.6px;font-weight:800;color:'+statusClr+';flex-shrink:0">'+statusLbl+'</span></div>'
+   +'<div style="font-size:12.6px;color:var(--t1);line-height:1.55;margin-bottom:4px">'+_reasonFull(t)+'</div>'
+   +'<div style="font-size:11px;color:var(--t2);line-height:1.55">'
+   +(dateGiven?'📅 ניתן: '+dateGiven:'')
+   +(dateDl?' &nbsp;·&nbsp; ⏰ יעד: '+dateDl:'')
+   +(dateDone?' &nbsp;·&nbsp; ✓ הביא: '+dateDone:'')
+   +(daysLate?' &nbsp;·&nbsp; <span style="color:var(--rd);font-weight:700">'+daysLate+' ימים באיחור</span>':'')
+   +'</div>'
    +'</div>';
  });
  h+='</div>';
