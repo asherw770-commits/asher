@@ -2471,6 +2471,7 @@ h+='#pg{transform-origin:top right;width:291mm;margin:3mm 0 2mm}';
 h+='#hdr{display:flex;align-items:center;justify-content:space-between;margin:0 2.5mm 1.2mm;gap:6mm}';
 h+='#hdr .htxt{font-size:12px;font-weight:700;color:#111}';
 h+='#hdr .hbc{flex-shrink:0}';
+h+='table td.cb,table th.cb{font-size:4.8px;line-height:1;letter-spacing:-.35px;color:#8f96a3;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
 h+='.wrap{display:flex;flex-wrap:nowrap;gap:0;margin:0 2.5mm;height:calc(100% - 20px);position:relative}';
 h+='.col{flex:1 1 0;min-width:0;max-width:100%;display:flex;flex-direction:column;font-size:11px}';
 h+='.gapsp{flex:0 0 0.6mm}';
@@ -2487,12 +2488,7 @@ h+='td:not(:first-child),th:not(:first-child){text-align:center;width:5.4mm;padd
 h+='table td.pkc,table th.pkc{width:8.4mm;font-size:15.2px;line-height:1.2;letter-spacing:-.2px;color:#374151}';
 h+='table.kw td:first-child{font-size:1.14em}';
 h+='table.ke td:first-child{font-size:2.6em}';
-// .cb rule MUST come after `table.big td{font-size:1em}` so it actually wins
-// the cascade at equal specificity - previously it was defined above and got
-// overridden, letting the tiny "10ש" hint text scale up to the whole column
-// font (e.g. 14px) and overflow the narrow 5.4mm mark cell
-h+='table td.cb,table th.cb{font-size:4.8px!important;line-height:1;letter-spacing:-.35px;color:#8f96a3;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
-h+='table.ke td.cb,table.ke th.cb{font-size:16px!important}';
+h+='table.ke td.cb,table.ke th.cb{font-size:16px}';
 h+='.col-ke .tt{font-size:2.3em}';
 h+='td:first-child{white-space:nowrap;overflow:hidden}';
 h+='tbody tr:nth-child(even) td,table tr:nth-child(even) td{background:#eef1f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
@@ -2612,34 +2608,12 @@ h+='<script>(function(){var pg=document.getElementById("pg");if(!pg)return;pg.st
  +'for(var mi=0;mi<marks.length;mi++){if(marks[mi].scrollWidth>marks[mi].clientWidth+0.5)badMarks.push(marks[mi]);}'
  +'for(var mj=0;mj<badMarks.length;mj++){var mel=badMarks[mj];var mfs=parseFloat(getComputedStyle(mel).fontSize)||5;var mg=0;'
  +' while(mg++<12&&mfs>3.2){mfs=Math.max(3.2,mfs-0.5);mel.style.fontSize=mfs+"px";if(mel.scrollWidth<=mel.clientWidth+0.5)break;}}'
- // per-cell GROW pass. two flavors:
- //   marks (.cb): grow width-only up to 22px; row grows to fit; the outer
- //     page-scale below absorbs any resulting overall height increase
- //   .ke first-column names: same, up to 44px
- // proportional-scale in one measurement instead of binary search so the
- // result is deterministic even when the cell was already forced small by
- // the earlier column-shrink safety pass. setProperty w/ 'important' beats
- // the .cb!important stylesheet rule; never shrinks below the current size.
- +'function _grow(cel,target){'
- +' var maxW=cel.clientWidth-1.5;if(maxW<3||!cel.textContent.trim())return;'
- +' var curFs=parseFloat(getComputedStyle(cel).fontSize)||6;'
- +' cel.style.setProperty("font-size",target+"px","important");'
- +' var sw=cel.scrollWidth;var newFs=target;'
- +' if(sw>maxW)newFs=Math.max(6,Math.floor(target*maxW/sw*10)/10);'
- +' if(newFs<curFs)newFs=curFs;'
- +' cel.style.setProperty("font-size",newFs+"px","important");'
- +'}'
- +'var _marks=pg.querySelectorAll("td.cb,th.cb");'
- +'for(var _mi=0;_mi<_marks.length;_mi++)_grow(_marks[_mi],22);'
- +'var _keNames=pg.querySelectorAll(".ke td:first-child,.ke th:first-child");'
- +'for(var _ni=0;_ni<_keNames.length;_ni++)_grow(_keNames[_ni],44);'
  +'var fsp=document.querySelector(".foldsp"),fg=document.getElementById("foldGuide");if(fsp&&fg){fg.style.left=(fsp.offsetLeft+fsp.offsetWidth/2)+"px";}'
  +'var w=pg.scrollWidth,hh=Math.max(pg.scrollHeight,ah);if(!w)return;var s=Math.min(aw/w,ah/hh)*0.995;s=Math.max(0.30,Math.min(s,1));pg.style.transform="scale("+s+")";pg.setAttribute("data-scale",s);})();<\/script>';
 h+='</div></body></html>';
 printHTML(h,'\u05d3\u05d5\u05d7 \u05d9\u05d5\u05de\u05d9');
 if(D.reportTalks&&D.reportTalks.length){D.reportTalks=[];sv();}
 }
-
 function showBoyWr(nm){
 let e=document.getElementById('bwov');if(!e){e=document.createElement('div');e.id='bwov';document.body.appendChild(e)}
 const all=[...D.wt,...D.wh].filter(t=>t.nm===nm).sort((a,b)=>(b.ca||'').localeCompare(a.ca||''));
