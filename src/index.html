@@ -119,6 +119,31 @@ var _fbDocRef=_fbDb.collection('shared').doc('main');
 var _fbPhotosCol=_fbDb.collection('photos');
 // stamped at build time - lets each device show which deploy it's running
 var _BUILD_STAMP='__BUILD_STAMP__';
+// iOS PWAs cache the initial HTML in their own webkit container and DO NOT
+// honor Cache-Control headers reliably - once installed to the home screen
+// they can serve a version-frozen bundle for weeks. Fetch the live HTML on
+// boot and on foreground; if the deployed BUILD_STAMP differs from ours,
+// show a prominent banner the user can tap to reload into the new version.
+async function _checkForUpdate(){
+ try{
+  var res=await fetch(location.pathname+'?_v='+Date.now(),{cache:'no-store'});
+  if(!res.ok)return;
+  var text=await res.text();
+  var m=text.match(/_BUILD_STAMP\s*=\s*['"]([^'"]+)['"]/);
+  if(m&&m[1]&&m[1]!==_BUILD_STAMP)_showUpdateBanner(m[1]);
+ }catch(e){/* offline is fine */}
+}
+function _showUpdateBanner(newVer){
+ if(document.getElementById('updBanner'))return;
+ var el=document.createElement('div');
+ el.id='updBanner';
+ el.style.cssText='position:fixed;top:max(env(safe-area-inset-top),8px);left:8px;right:8px;z-index:999998;background:#c9a84c;color:#0a0f1c;padding:12px 16px;border-radius:12px;font-weight:800;font-size:15px;text-align:center;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.55);direction:rtl;font-family:Heebo,Arial,sans-serif';
+ el.innerHTML='🆕 עדכון זמין ('+newVer+') — לחץ לטעון';
+ el.onclick=function(){location.reload();};
+ document.body.appendChild(el);
+}
+setTimeout(_checkForUpdate,2000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)_checkForUpdate();});
 </script>
 <script>
 const isoLocal=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
