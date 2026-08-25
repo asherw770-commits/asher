@@ -476,7 +476,7 @@ setInterval(checkTaskAlerts,30000); // check every 30 min
 if(gdToken)setTimeout(function(){gdCheckForUpdates(true);},2500);
 
 let _fbSaveTimer=null,_fbPending=false;
-function sv(){D._updatedAt=Date.now();try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
+function sv(){D._updatedAt=Date.now();D._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
  if(typeof _fbDocRef!=='undefined'){
   _fbPending=true;
   clearTimeout(_fbSaveTimer);
