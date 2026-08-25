@@ -2612,19 +2612,21 @@ h+='<script>(function(){var pg=document.getElementById("pg");if(!pg)return;pg.st
  +'for(var mi=0;mi<marks.length;mi++){if(marks[mi].scrollWidth>marks[mi].clientWidth+0.5)badMarks.push(marks[mi]);}'
  +'for(var mj=0;mj<badMarks.length;mj++){var mel=badMarks[mj];var mfs=parseFloat(getComputedStyle(mel).fontSize)||5;var mg=0;'
  +' while(mg++<12&&mfs>3.2){mfs=Math.max(3.2,mfs-0.5);mel.style.fontSize=mfs+"px";if(mel.scrollWidth<=mel.clientWidth+0.5)break;}}'
- // per-cell GROW pass for the extra-chapters table only: cell dimensions
- // are already locked by the outer layout, but each cell has plenty of
- // headroom for larger text than the shrink-only safety loop above ever
- // gives it. binary-search the biggest font each cell can carry without
- // horizontal overflow, using setProperty(..,'important') so it wins over
- // the .cb !important rule. bounded to the row's current height so the
- // table's overall size doesn't shift.
- +'var keCells=pg.querySelectorAll(".ke td.cb,.ke th.cb,.ke td:first-child");'
+ // per-cell GROW pass across ALL mark cells (.cb) and .ke first-column
+ // names: each cell's dimensions are already locked by the outer layout,
+ // but the shrink-only safety loop above never grows them. binary-search
+ // the biggest font each cell can carry without horizontal overflow AND
+ // without pushing the row taller than it already is. setProperty(..,
+ // 'important') wins the cascade over the .cb !important rule. margin of
+ // 1.5px on the width check leaves room for print-driver rasterization
+ // rounding so nothing gets a single pixel clipped at the edge.
+ +'var keCells=pg.querySelectorAll("td.cb,th.cb,.ke td:first-child");'
  +'for(var kc=0;kc<keCells.length;kc++){'
- +' var kcel=keCells[kc];var maxH=kcel.clientHeight||99;'
- +' var lo3=6,hi3=44,best3=6;'
- +' for(var kg=0;kg<8;kg++){var mid3=(lo3+hi3)/2;kcel.style.setProperty("font-size",mid3+"px","important");'
- +'  if(kcel.scrollWidth<=kcel.clientWidth+0.5&&kcel.scrollHeight<=maxH+0.5){best3=mid3;lo3=mid3;}else{hi3=mid3;}}'
+ +' var kcel=keCells[kc];var maxH=kcel.clientHeight||99;var maxW=kcel.clientWidth;'
+ +' if(maxW<3)continue;'
+ +' var lo3=4,hi3=44,best3=4;'
+ +' for(var kg=0;kg<9;kg++){var mid3=(lo3+hi3)/2;kcel.style.setProperty("font-size",mid3+"px","important");'
+ +'  if(kcel.scrollWidth<=maxW-1.5&&kcel.scrollHeight<=maxH+0.5){best3=mid3;lo3=mid3;}else{hi3=mid3;}}'
  +' kcel.style.setProperty("font-size",best3+"px","important");}'
  +'var fsp=document.querySelector(".foldsp"),fg=document.getElementById("foldGuide");if(fsp&&fg){fg.style.left=(fsp.offsetLeft+fsp.offsetWidth/2)+"px";}'
  +'var w=pg.scrollWidth,hh=Math.max(pg.scrollHeight,ah);if(!w)return;var s=Math.min(aw/w,ah/hh)*0.995;s=Math.max(0.30,Math.min(s,1));pg.style.transform="scale("+s+")";pg.setAttribute("data-scale",s);})();<\/script>';
