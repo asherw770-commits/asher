@@ -2462,14 +2462,17 @@ const COLS=[];var _cm=0;
 const grid=[];const OM=function(o){grid.push(o);return ' data-omr="'+(grid.length-1)+'"';};
 const _P=prt();const bigF=_P.base,medF=_P.base,smF=Math.max(7,_P.base-2);
 let h='<html dir="rtl"><head><meta charset="UTF-8"><style>';
-h+='@page{size:A4 portrait;margin:4mm}';
+h+='@page{size:A4 portrait;margin:3mm}';
 h+='*{margin:0;padding:0;box-sizing:border-box}';
-h+='html,body{width:202mm;height:289mm;overflow:hidden;margin:0;padding:0}';
-h+='#sheet{position:absolute;top:0;left:0;width:289mm;height:202mm;transform-origin:0 0;transform:rotate(90deg) translateY(-202mm)}';
+h+='html,body{width:204mm;height:291mm;overflow:hidden;margin:0;padding:0}';
+h+='#sheet{position:absolute;top:0;left:0;width:291mm;height:204mm;transform-origin:0 0;transform:rotate(90deg) translateY(-204mm)}';
 h+='body{font-family:"Segoe UI",Arial,sans-serif;direction:rtl;color:#111;position:relative;-webkit-font-smoothing:antialiased}';
-h+='#pg{transform-origin:top right;width:289mm;margin:8mm 0 6mm}';
+h+='#pg{transform-origin:top right;width:291mm;margin:3mm 0 2mm}';
+h+='#hdr{display:flex;align-items:center;justify-content:space-between;margin:0 2.5mm 1.2mm;gap:6mm}';
+h+='#hdr .htxt{font-size:12px;font-weight:700;color:#111}';
+h+='#hdr .hbc{flex-shrink:0}';
 h+='table td.cb,table th.cb{font-size:4.8px;line-height:1;letter-spacing:-.35px;color:#8f96a3;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
-h+='.wrap{display:flex;flex-wrap:nowrap;gap:0;margin:0 3.8mm;height:calc(100% - 20px);position:relative}';
+h+='.wrap{display:flex;flex-wrap:nowrap;gap:0;margin:0 2.5mm;height:calc(100% - 20px);position:relative}';
 h+='.col{flex:1 1 0;min-width:0;max-width:100%;display:flex;flex-direction:column;font-size:11px}';
 h+='.gapsp{flex:0 0 0.6mm}';
 h+='.foldsp{flex:0 0 10.1mm}';
@@ -2494,7 +2497,10 @@ h+='</style></head><body>';
 h+='<div id="sheet">';
 h+='<div id="mmprobe" style="position:absolute;width:100mm;height:0;visibility:hidden"></div>';
 h+='<div id="pg">';
-h+='<div style="text-align:right;margin:0 3.8mm 1.6mm;font-size:12px;font-weight:700;color:#111">'+hF(new Date)+' \u00b7 '+DN[new Date().getDay()]+'</div>';
+// header row: date on the right, barcode above the tables so every column
+// starts at the exact same vertical position (previously the barcode was
+// stuffed inside col 4 and pushed its table down)
+h+='<div id="hdr"><div class="htxt">'+hF(new Date)+' \u00b7 '+DN[new Date().getDay()]+'</div><div class="hbc">'+renderDateBarcode(td())+'</div></div>';
 // Col 1: Afternoon
 {_cm=h.length;
 h+='<div class="col"><div class="tt">\u05dc\u05d0 \u05d4\u05e4\u05e7\u05d9\u05d3\u05d5 \u05e6\u05d4\u05e8\u05d9\u05d9\u05dd</div><div class="tbox"><table class="big k1"><tr><th style="text-align:right">\u05e9\u05dd</th><th>1\u05d9</th></tr>';
@@ -2538,7 +2544,7 @@ if(_st==='conf'&&!_confExpiresToday){
 h+='</table></div></div>';COLS.push(h.slice(_cm));h=h.slice(0,_cm);}
 // Col 4: Rooms (one table)
 {_cm=h.length;
-h+='<div class="col fillcol"><div style="text-align:center;padding:1mm 0">'+renderDateBarcode(td())+'</div><div class="tt">\u05e7\u05e2\u05e8\u05d4 \u05d5\u05e1\u05e4\u05dc</div><table class="big k3"><tr><th style="text-align:right">\u05e9\u05dd</th><th>\u2713</th><th>\u23f0</th><th>5\u05e9</th></tr>';
+h+='<div class="col fillcol"><div class="tt">\u05e7\u05e2\u05e8\u05d4 \u05d5\u05e1\u05e4\u05dc</div><table class="big k3"><tr><th style="text-align:right">\u05e9\u05dd</th><th>\u2713</th><th>\u23f0</th><th>5\u05e9</th></tr>';
 let bwI=0,firstRoom=true;
 for(let r=1;r<=13;r++){const rm=boys.filter(b=>D.boyRoom[b]==String(r));if(!rm.length)continue;
 h+='<tr><td colspan="4" style="background:#bbb;text-align:center;font-weight:bold;font-size:'+(bigF-2)+'px;-webkit-print-color-adjust:exact;print-color-adjust:exact">\u05d7\u05d3\u05e8 '+r+'</td></tr>';
@@ -2560,7 +2566,7 @@ h+='<div class="wrap">'+COLS[0]+'<div class="gapsp"></div>'+COLS[1]+'<div class=
 h+='</div>';
 
 h+='</div>';
-h+='<script>(function(){var pg=document.getElementById("pg");if(!pg)return;pg.style.transform="none";var sheet=document.getElementById("sheet")||document.body;var mmp=document.getElementById("mmprobe").offsetWidth/100;var aw=sheet.clientWidth,ah=sheet.clientHeight-8*mmp-6*mmp;pg.style.height=ah+"px";var MAXF=12.5, MINF=7, MINABS=4.5;'
+h+='<script>(function(){var pg=document.getElementById("pg");if(!pg)return;pg.style.transform="none";var sheet=document.getElementById("sheet")||document.body;var mmp=document.getElementById("mmprobe").offsetWidth/100;var aw=sheet.clientWidth,ah=sheet.clientHeight-3*mmp-2*mmp;pg.style.height=ah+"px";var MAXF=14, MINF=7, MINABS=4.5;'
  // performance: everything below reads/writes to the DOM far less than a
  // naive linear font-size scan would. binary search replaces a ~22-step
  // linear scan with ~6 steps, and the final safety pass reads every mark's
