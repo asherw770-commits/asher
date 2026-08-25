@@ -620,7 +620,17 @@ function isSchoolHoliday(d){
  if(!d)return null;
  if(d<YSTART)return 'בין הזמנים · טרם נפתח הזמן';
  if(d>YEND)return 'מחוץ ללוח השנה';
- return YOFF[d]||null;
+ if(YOFF[d])return YOFF[d];
+ // Thursday/Friday right before a Saturday that's marked as vacation are
+ // treated as vacation too - by then the boys are typically already home
+ var dow=new Date(d+'T12:00:00').getDay(); // 0=Sunday ... 6=Saturday
+ if(dow===4||dow===5){
+  var toSat=dow===4?2:1;
+  var sat=new Date(d+'T12:00:00');sat.setDate(sat.getDate()+toSat);
+  var satISO=isoLocal(sat);
+  if(satISO<=YEND&&YOFF[satISO])return YOFF[satISO];
+ }
+ return null;
 }
 function dayMark(d){return isSchoolHoliday(d)||YMARK[d]||null}
 function isOff(d){return !!isSchoolHoliday(d)}
@@ -1626,7 +1636,7 @@ function setUpperLock(nm,type){if(!D.upperLock)D.upperLock={};
 function buildSleepDays(startDate){
  var days=[];var schoolCount=0;var d=new Date(startDate);d.setHours(12,0,0,0);
  var guard=0;
- while(schoolCount<10&&guard++<60){
+ while(schoolCount<7&&guard++<60){
   var iso=isoLocal(d);
   var isSchool=!isSchoolHoliday(iso);
   if(isSchool)schoolCount++;
@@ -1749,7 +1759,7 @@ function rSleepBoyDetail(nm){
  if(!t){
   h+='<div class="C" style="margin-bottom:10px"><div style="font-size:13.2px;color:var(--t1);line-height:1.7">'
    +'<b>💰 הפקדה:</b> 50₪<br>'
-   +'<b>📅 משך:</b> 10 ימי לימודים רצופים (ימי חופש באמצע מוצגים בטבלה אך לא נספרים)<br>'
+   +'<b>📅 משך:</b> 7 ימי לימודים רצופים (ימי חופש באמצע מוצגים בטבלה אך לא נספרים)<br>'
    +'<b>✅ הצלחה:</b> חתימת מדריך בכל יום — מותר להחסיר יום אחד בלבד לאורך כל התקופה. במקרה הצלחה, הכסף חוזר לבחור<br>'
    +'<b>❌ כישלון:</b> יותר מיום אחד לא חתום — הכסף הולך לצדקה<br>'
    +'<b>📌 תלייה:</b> הטבלה נתלית על הארון מבחוץ עם דבק נייר, כדי שהמדריך יוכל לחתום עליה כל ערב'
@@ -1820,6 +1830,7 @@ function printSleepTableFor(nm){
  h+='<div id="rpage">';
  h+='<div class="bh">בס״ד</div>';
  h+='<div class="title"><h1>טבלת שינה</h1></div>';
+ h+='<div class="sub" style="margin-bottom:2px">'+hF(new Date())+' · '+DN[new Date().getDay()]+'</div>';
  h+='<div class="namebox"><div class="nm">'+es(nm)+'</div>'+(room?'<div class="rm">חדר '+es(room)+'</div>':'')+'</div>';
  h+='<div class="sub">ניתן ב-'+hF(t.startDate)+'</div>';
  h+='<table>';
@@ -1986,7 +1997,7 @@ function rMan(){
    h+='<div onclick="manTogT(\''+t.id+'\')" style="display:flex;align-items:center;gap:10px;padding:11px;margin-bottom:6px;border-radius:10px;background:'+(on?'var(--grd)':'var(--s1)')+';border:1px solid '+(on?'rgba(34,197,94,.4)':'var(--bd)')+';cursor:pointer">'
    +'<div style="width:24px;height:24px;border-radius:6px;border:2px solid '+(on?'var(--gr)':'var(--bm)')+';background:'+(on?'var(--gr)':'transparent')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:16.8px;font-weight:700">'+(on?'✓':'')+'</div>'
    +'<div style="flex:1;min-width:0"><div style="font-size:16.8px;font-weight:600;color:var(--t0)">'+es(t.nm)+'</div>'
-   +'<div style="font-size:13.2px;color:var(--t2)">'+((t.pk||[]).join(', '))+(t.status==='late'?' · <span style="color:var(--rd)">באיחור</span>':'')+'</div></div>'
+   +'<div style="font-size:13.2px;color:var(--t2)">'+((t.pk||[]).join(', '))+' · ניתן '+fmR(t.ca)+(t.status==='late'?' · <span style="color:var(--rd)">באיחור</span>':'')+'</div></div>'
    +'<div style="font-size:13.2px;color:'+(on?'var(--gr)':'var(--t2)')+';font-weight:700">'+(on?'הביא':'טרם')+'</div></div>';});
  }
  else if(manG==='extra'){
@@ -2098,14 +2109,11 @@ e.innerHTML='<div class="O" onclick="closeTalkModal()"><div class="M" onclick="e
 +'<div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div>'
 +'<div style="font-size:19.2px;font-weight:700;padding:8px 16px;text-align:center;color:var(--am)">💬 שיחה עם '+es(nm)+'</div>'
 +'<div style="padding:12px 16px 20px">'
-+'<div style="background:var(--amd);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:12px;margin-bottom:12px">'
-+'<div style="font-size:13.2px;font-weight:700;color:var(--am);margin-bottom:6px">🎯 נושאים לדיון (שבוע אחרון):</div>'
-+'<div style="font-size:15.6px;color:var(--t0)">'+sum+'</div></div>'
 +'<div style="font-size:14.4px;font-weight:700;color:var(--t0);margin-bottom:6px">הערות:</div>'
 +'<textarea class="ta" id="talkNotes" rows="7" style="direction:rtl;width:100%">'+es(preNotes)+'</textarea>'
 +'<div style="font-size:13.2px;color:var(--t2);margin:10px 0 6px">איפה לשמור?</div>'
-+'<div style="display:flex;gap:8px"><button style="flex:1;height:44px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="saveTalkTask(\''+safe+'\')">📱 למשימות באפליקציה</button>'
-+'<button style="flex:1;height:44px;border-radius:10px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:15.6px;font-weight:700;cursor:pointer" onclick="saveTalkToReport(\''+safe+'\')">🖨 לדוח היומי</button></div>'
++'<button style="width:100%;height:44px;margin-bottom:8px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="saveTalkTask(\''+safe+'\')">📱 שמור למשימות</button>'
++'<button style="width:100%;height:44px;border-radius:10px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:15.6px;font-weight:700;cursor:pointer" onclick="saveTalkToReport(\''+safe+'\')">🖨 שמור לדוח</button>'
 +'</div></div></div>';
 window._talkIssues=sum;}
 function closeTalkModal(){var e=document.getElementById('talkModal');if(e)e.innerHTML='';}
@@ -2274,71 +2282,86 @@ var h='<html dir="rtl"><head><meta charset="UTF-8"><style>';
 h+='@page{size:A4 portrait;margin:5mm}';
 h+='*{margin:0;padding:0;box-sizing:border-box}';
 h+='body{font-family:"Segoe UI",Arial,sans-serif;direction:rtl;color:#111;-webkit-font-smoothing:antialiased}';
-h+='h1{text-align:center;font-size:16px;margin-bottom:1px}';
-h+='.sub{text-align:center;font-size:10px;color:#555;margin-bottom:6px}';
-h+='table{width:100%;border-collapse:collapse;table-layout:fixed}';
-h+='td,th{border:0.25mm solid #9aa1a8;padding:2px 3px;text-align:center;font-size:8.5px;line-height:1.15}';
-h+='th{background:#1f2937;color:#fff;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
+h+='h1{text-align:center;font-size:22px;margin-bottom:2px}';
+h+='.sub{text-align:center;font-size:13px;color:#555;margin-bottom:10px}';
+// same header style as the daily report's column titles (.tt): dark
+// rounded-top bar, instead of a plain "room X" row buried inside one long
+// shared table
+h+='.tt{font-size:1em;font-weight:700;letter-spacing:.2px;background:#1f2937;color:#fff;padding:3px 6px;text-align:center;border-radius:3px 3px 0 0;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
+h+='table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:6px}';
+h+='td,th{border:0.28mm solid #9aa1a8;padding:1.6px 4px;text-align:center;font-size:11px;line-height:1.45;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
+h+='th{background:#e2e6ea;color:#0f1621;font-weight:700;letter-spacing:.2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
 h+='td:first-child,th:first-child{text-align:right;width:36%}';
-h+='tr.room td{background:#e2e6ea;font-weight:700;text-align:center;font-size:.85em!important;padding:1.5px 4px!important;line-height:1.1!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
-h+='tr.chores td{background:#fff7e6;font-weight:600;padding-top:1.5px!important;padding-bottom:1.5px!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
+h+='tr.chores td{background:#fff7e6;font-weight:600;padding-top:1.6px!important;padding-bottom:1.6px!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
 h+='tr.chores td:first-child{color:#92600a}';
-h+='tbody tr:nth-child(even):not(.room):not(.chores) td{background:#f4f6f8;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
-h+='.cbx{width:3mm;height:3mm;border:0.3mm solid #444;display:inline-block;border-radius:2px}';
+h+='tbody tr:nth-child(even):not(.chores) td{background:#eef1f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
+h+='.cbx{width:4.2mm;height:4.2mm;border:0.35mm solid #444;display:inline-block;border-radius:2px}';
 h+='</style></head><body>';
 h+='<div id="mmprobe" style="position:absolute;width:100mm;height:0;visibility:hidden"></div>';
 h+='<div id="rpage">';
 h+='<h1>\ud83e\uddf9 \u05d3\u05d5\u05d7 \u05e0\u05d9\u05e7\u05d9\u05d5\u05df</h1>';
 h+='<div class="sub">'+hF(new Date)+' \u00b7 '+DN[new Date().getDay()]+'</div>';
-h+='<table><thead><tr><th>\u05e9\u05dd</th><th>\u05de\u05ea\u05d7\u05ea \u05dc\u05de\u05d9\u05d8\u05d4</th><th>\u05db\u05d5\u05e0\u05e0\u05d9\u05ea</th><th>\u05e9\u05d5\u05dc\u05d7\u05df</th><th>\u05d0\u05d3\u05df \u05d7\u05dc\u05d5\u05df</th><th>\u05de\u05e2\u05dc \u05d4\u05d3\u05dc\u05ea</th></tr></thead><tbody>';
-if(!rooms.length){
- h+='<tr><td colspan="6" style="padding:14px;color:#888">\u05dc\u05d0 \u05e9\u05d5\u05d9\u05db\u05d5 \u05d7\u05d3\u05e8\u05d9\u05dd \u05dc\u05d0\u05e3 \u05d1\u05d7\u05d5\u05e8</td></tr>';
-}
-rooms.forEach(function(r){
- h+='<tr class="room"><td colspan="6">\u05d7\u05d3\u05e8 '+es(r)+'</td></tr>';
- boys.filter(function(b){return D.boyRoom[b]===r;}).forEach(function(b){
+function _roomBlock(title,list){
+ h+='<div class="tt">'+es(title)+'</div>';
+ h+='<table><thead><tr><th>\u05e9\u05dd</th><th>\u05de\u05ea\u05d7\u05ea \u05dc\u05de\u05d9\u05d8\u05d4</th><th>\u05db\u05d5\u05e0\u05e0\u05d9\u05ea</th><th>\u05e9\u05d5\u05dc\u05d7\u05df</th><th>\u05d0\u05d3\u05df \u05d7\u05dc\u05d5\u05df</th><th>\u05de\u05e2\u05dc \u05d4\u05d3\u05dc\u05ea</th></tr></thead><tbody>';
+ list.forEach(function(b){
   h+='<tr><td>'+es(b)+'</td><td><span class="cbx"></span></td><td><span class="cbx"></span></td><td></td><td></td><td></td></tr>';
  });
  h+='<tr class="chores"><td>\u05e0\u05d9\u05e7\u05d9\u05d5\u05df \u05d4\u05d7\u05d3\u05e8</td><td></td><td></td><td><span class="cbx"></span></td><td><span class="cbx"></span></td><td><span class="cbx"></span></td></tr>';
+ h+='</tbody></table>';
+}
+if(!rooms.length){
+ h+='<div style="padding:14px;color:#888;text-align:center">\u05dc\u05d0 \u05e9\u05d5\u05d9\u05db\u05d5 \u05d7\u05d3\u05e8\u05d9\u05dd \u05dc\u05d0\u05e3 \u05d1\u05d7\u05d5\u05e8</div>';
+}
+rooms.forEach(function(r){
+ _roomBlock('\u05d7\u05d3\u05e8 '+r,boys.filter(function(b){return D.boyRoom[b]===r;}));
 });
 var unassigned=boys.filter(function(b){var r=D.boyRoom[b];return r==null||r==='';});
 if(unassigned.length){
- h+='<tr class="room"><td colspan="6">\u05dc\u05dc\u05d0 \u05d7\u05d3\u05e8 \u05de\u05e9\u05d5\u05d9\u05d9\u05da</td></tr>';
- unassigned.forEach(function(b){
-  h+='<tr><td>'+es(b)+'</td><td><span class="cbx"></span></td><td><span class="cbx"></span></td><td></td><td></td><td></td></tr>';
- });
+ _roomBlock('\u05dc\u05dc\u05d0 \u05d7\u05d3\u05e8 \u05de\u05e9\u05d5\u05d9\u05d9\u05da',unassigned);
 }
-h+='</tbody></table>';
 h+='</div>'; // close #rpage
-// shrink to fit a single A4 page - never let the sheet spill onto page 2.
-// purely synchronous (measurement + style loop only) so it finishes before
-// printHTML's document.write/close returns, matching the daily report.
-// measuring #rpage.getBoundingClientRect() (not body.scrollHeight, which
-// gets silently clamped to max(content, iframe viewport) and can mask the
-// true content height whenever the report is shorter than the print iframe).
+// two-directional fit, matching the daily report's base size (11px) and the
+// same philosophy used for the sleep table: grow toward a fuller page when
+// there's room to spare, not just shrink-to-fit when oversized. now spans
+// MULTIPLE tables (one per room) plus their .tt headers, so every table and
+// header on the page is measured/resized together, not just a single table.
 h+='<script>(function(){var mmp=document.getElementById("mmprobe").offsetWidth/100;'
  +'var pageH=(297-10)*mmp;' // A4 height minus 5mm top+bottom @page margin
  +'var rpage=document.getElementById("rpage");if(!rpage)return;'
- +'var t=document.querySelector("table");if(!t)return;'
- +'var cells=t.querySelectorAll("td,th");'
- +'var fs=8.5,pad=2,lh=1.15;'
+ +'var tables=rpage.querySelectorAll("table");if(!tables.length)return;'
+ +'var cells=rpage.querySelectorAll("td,th");'
+ +'var tts=rpage.querySelectorAll(".tt");'
+ +'var cbx=rpage.querySelectorAll(".cbx");'
+ +'var fs=11,pad=1.6,lh=1.45,ttfs=1,ttpad=3;'
+ +'function cs2(){return Math.max(2.6,Math.min(5,fs*0.42));}'
+ +'function apply(){'
+ +' for(var i=0;i<cells.length;i++){cells[i].style.fontSize=fs+"px";cells[i].style.padding=pad+"px "+(pad+2)+"px";cells[i].style.lineHeight=lh;}'
+ +' for(var j=0;j<cbx.length;j++){cbx[j].style.width=cs2()+"mm";cbx[j].style.height=cs2()+"mm";}'
+ +' for(var k=0;k<tts.length;k++){tts[k].style.fontSize=ttfs+"em";tts[k].style.padding=ttpad+"px 6px";}'
+ +'}'
  +'function totalH(){return rpage.getBoundingClientRect().height;}'
  +'var guard=0;'
- // whitespace (line-height, then padding) is squeezed out first since it
- // costs far less readability than shrinking the glyphs themselves - only
- // once that is exhausted does font-size start dropping, and even then it
- // stops at a legible 8px; a genuinely oversized roster spills onto a
- // second page rather than becoming too small to read or write on.
+ // whitespace first when shrinking (line-height, then padding) since it
+ // costs less readability than shrinking the glyphs - font only drops once
+ // that is exhausted, and never below a legible 6px (an oversized roster
+ // spills to a second page instead of becoming unreadable/unwritable)
  +'while(totalH()>pageH&&guard++<150){'
  +' if(lh>1.05){lh-=0.03;}'
  +' else if(pad>1){pad-=0.15;}'
- +' else if(fs>6){fs-=0.25;}'
+ +' else if(fs>6){fs-=0.25;ttfs=Math.max(.75,ttfs-0.02);ttpad=Math.max(1.5,ttpad-0.15);}'
  +' else if(pad>0.3){pad-=0.1;}'
  +' else break;'
- +' for(var i=0;i<cells.length;i++){cells[i].style.fontSize=fs+"px";cells[i].style.padding=pad+"px "+(pad+1)+"px";cells[i].style.lineHeight=lh;}'
- +' var cbx=document.querySelectorAll(".cbx");'
- +' var cs=Math.max(2.6,Math.min(3.6,fs*0.38));'
- +' for(var j=0;j<cbx.length;j++){cbx[j].style.width=cs+"mm";cbx[j].style.height=cs+"mm";}'
+ +' apply();'
+ +'}'
+ // if there is room to spare (small roster), grow back up toward a fuller,
+ // more comfortable page instead of leaving half the sheet blank - capped
+ // well short of anything that would risk column headers wrapping badly
+ +'guard=0;'
+ +'while(totalH()<pageH-4&&guard++<150&&fs<15){'
+ +' fs+=0.3;pad+=0.12;lh=Math.min(1.6,lh+0.01);ttfs=Math.min(1.15,ttfs+0.012);ttpad=Math.min(5,ttpad+0.08);'
+ +' apply();'
+ +' if(totalH()>pageH){fs-=0.3;pad-=0.12;ttfs-=0.012;ttpad-=0.08;apply();break;}'
  +'}'
  +'})();<\/script>';
 h+='</body></html>';
