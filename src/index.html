@@ -2486,20 +2486,13 @@ h+='th{background:#e2e6ea;color:#0f1621;font-weight:700;text-align:center;letter
 h+='td:not(:first-child),th:not(:first-child){text-align:center;width:5.4mm;padding:1.6px 0}';
 h+='table td.pkc,table th.pkc{width:8.4mm;font-size:15.2px;line-height:1.2;letter-spacing:-.2px;color:#374151}';
 h+='table.kw td:first-child{font-size:1.14em}';
-h+='table.ke td:first-child{font-size:3em;letter-spacing:-.4px}';
-// give the extra-chapters column a bit more horizontal room than the other
-// five columns, so both the family name and the enlarged markers below have
-// space to breathe without spilling onto neighbours
-h+='.col-ke{flex:1.25 1 0}';
+h+='table.ke td:first-child{font-size:2.6em}';
 // .cb rule MUST come after `table.big td{font-size:1em}` so it actually wins
 // the cascade at equal specificity - previously it was defined above and got
 // overridden, letting the tiny "10ש" hint text scale up to the whole column
 // font (e.g. 14px) and overflow the narrow 5.4mm mark cell
 h+='table td.cb,table th.cb{font-size:4.8px!important;line-height:1;letter-spacing:-.35px;color:#8f96a3;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
-// .ke overrides: bigger cells, larger marker text. no !important so the
-// runtime safety loop can still trim if it turns out something overflows.
-h+='.ke td:not(:first-child),.ke th:not(:first-child){width:7mm}';
-h+='table.ke td.cb,table.ke th.cb{font-size:22px!important;letter-spacing:0;color:#111;padding:2px 0}';
+h+='table.ke td.cb,table.ke th.cb{font-size:16px!important}';
 h+='.col-ke .tt{font-size:2.3em}';
 h+='td:first-child{white-space:nowrap;overflow:hidden}';
 h+='tbody tr:nth-child(even) td,table tr:nth-child(even) td{background:#eef1f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
