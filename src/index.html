@@ -3038,15 +3038,36 @@ h+='</div>';
 // Bowls & cup + lights out - combined into one compact card since both are
 // short daily-duty checks, rather than two near-identical boxes in a row
 // helpers: collect dates on which a per-day-array bucket includes this boy,
-// and render them as a compact comma-separated Hebrew-date list. keeps each
-// category self-contained without adding another data pipeline.
+// and render each entry as day-of-week + how-long-ago (e.g. "יום ב׳ · לפני
+// שבוע") - matches how the user actually thinks about recent history.
 function _datesWith(bucket){
  return Object.keys(bucket||{}).filter(inRange).filter(function(dt){return(bucket[dt]||[]).indexOf(nm)>=0;}).sort();
 }
+var _DAYLTR=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+function _relDate(iso){
+ var dt=new Date(iso+'T12:00:00');
+ var now=new Date();var today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+ var diff=Math.round((today-new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()))/864e5);
+ var dayLbl=dt.getDay()===6?'שבת':'יום '+_DAYLTR[dt.getDay()];
+ var rel;
+ if(diff===0)rel='היום';
+ else if(diff===1)rel='אתמול';
+ else if(diff===2)rel='שלשום';
+ else if(diff<7)rel='לפני '+diff+' ימים';
+ else if(diff===7)rel='לפני שבוע';
+ else if(diff<14){var d2=diff-7;rel='לפני שבוע ו-'+d2+' '+(d2===1?'יום':'ימים');}
+ else if(diff===14)rel='לפני שבועיים';
+ else if(diff<21){var d3=diff-14;rel='לפני שבועיים ו-'+d3+' '+(d3===1?'יום':'ימים');}
+ else if(diff<30)rel='לפני '+Math.floor(diff/7)+' שבועות';
+ else if(diff<60)rel='לפני חודש';
+ else if(diff<365)rel='לפני '+Math.floor(diff/30)+' חודשים';
+ else rel='לפני '+Math.floor(diff/365)+' שנים';
+ return dayLbl+' · '+rel;
+}
 function _renderDates(dates,color){
  if(!dates||!dates.length)return '';
- var pretty=dates.map(function(d){var dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'});}).join(' · ');
- return '<div style="font-size:11.4px;color:'+(color||'var(--t2)')+';line-height:1.55;padding:3px 0 2px;direction:rtl">'+pretty+'</div>';
+ var lines=dates.slice().sort().reverse().map(function(d){return '<div style="padding:2px 0">'+_relDate(d)+'</div>';}).join('');
+ return '<div style="font-size:11.6px;color:'+(color||'var(--t2)')+';line-height:1.4;padding:3px 0 2px;direction:rtl">'+lines+'</div>';
 }
 // evening & afternoon LATE-deposit dates - now show WHICH days he was late
 // on, not just how many. under the deposit stats card so it's the natural
