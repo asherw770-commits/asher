@@ -2478,7 +2478,10 @@ h+='*{margin:0;padding:0;box-sizing:border-box}';
 h+='html,body{width:210mm;height:297mm;overflow:hidden;margin:0;padding:0}';
 h+='#sheet{position:absolute;top:3mm;left:3mm;width:291mm;height:204mm;transform-origin:0 0;transform:rotate(90deg) translateY(-204mm)}';
 h+='body{font-family:"Segoe UI",Arial,sans-serif;direction:rtl;color:#111;position:relative;-webkit-font-smoothing:antialiased}';
-h+='#pg{transform-origin:top right;width:291mm;margin:3mm 0 2mm}';
+// transform-origin:center so the final scale() step doesn't shift the fold
+// line off-centre. previous "top right" origin caused any scale<1 to drift
+// the wrap centre away from the physical page centre.
+h+='#pg{transform-origin:center center;width:291mm;margin:3mm 0 2mm}';
 h+='#hdr{display:flex;align-items:center;justify-content:space-between;margin:0 2.5mm 1.2mm;gap:6mm}';
 h+='#hdr .htxt{font-size:12px;font-weight:700;color:#111}';
 h+='#hdr .hbc{flex-shrink:0}';
