@@ -2144,11 +2144,13 @@ function _showScanDateFound(dateISO,rawText){
  _setScanStatus(html);
 }
 function _scanEditDate(dateISO){
- // remember which date the user is editing so future phases can pin edits
- // to that day instead of today
+ // remember which date the user is editing so applyManual pins the updates
+ // to that day instead of today. Route to the manual-edit screen (rMan)
+ // which mirrors the printed report's structure category-by-category.
  window._scanDateISO=dateISO;
- go('phones');
+ go('manual');
 }
+function _clearScanDate(){window._scanDateISO=null;rr();}
 function rScan(){
  var h='<div class="P"><div class="H">'
   +'<button class="B" onclick="go(\'home\')">← חזרה</button>'
@@ -2256,9 +2258,19 @@ function rLocks(){
 function rMan(){
  var e=ME();
  var boys=sortByRoomBed(D.pb);
+ var _sd=window._scanDateISO;
  var h='<div class="P"><div class="H"><button class="B" style="background:var(--s3);color:var(--t1);border:1px solid var(--bm)" onclick="go(\'phones\')">← חזרה</button>'
  +'<span style="font-weight:800;font-size:19.2px;color:var(--t0)">✍️ סימון ידני</span>'
- +'<button class="B" style="background:var(--gd);color:var(--go);border:1px solid var(--gb)" onclick="manApply()">שמור ('+manCount()+')</button></div>';
+ +'<button class="B" style="background:var(--gd);color:var(--go);border:1px solid var(--gb)" onclick="manConfirmSave()">שמור ('+manCount()+')</button></div>';
+ if(_sd){
+  // banner: this whole session is editing the scanned report's date, not
+  // today. clicking clear reverts to today's date for future changes.
+  h+='<div style="background:var(--pud);border:1px solid rgba(167,139,250,.35);border-radius:0;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--pu);font-weight:700">'
+   +'<span style="font-size:18px">📅</span>'
+   +'<div style="flex:1">עורך דוח של <b>'+es(hF(_sd))+'</b> ('+es(_sd)+')</div>'
+   +'<button style="padding:5px 10px;border-radius:6px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:12px;cursor:pointer" onclick="_clearScanDate()">חזור להיום</button>'
+   +'</div>';
+ }
  h+='<div style="display:flex;gap:5px;overflow-x:auto;padding:8px 10px;border-bottom:1px solid var(--bd);white-space:nowrap">';
  MANG.forEach(function(g){var on=manG===g.k;
   h+='<button onclick="manGrp(\''+g.k+'\')" style="flex:0 0 auto;padding:7px 12px;border-radius:18px;border:1px solid '+(on?'var(--gb)':'var(--bm)')+';background:'+(on?'var(--gd)':'var(--s3)')+';color:'+(on?'var(--go)':'var(--t2)')+';font-size:14.4px;font-weight:700;cursor:pointer">'+g.t+'</button>';});
@@ -2331,8 +2343,58 @@ function manApply(){
  var e=ME();
  if(e.extra&&e.extra.length){e.extra_chapters=e.extra.map(function(s){var p=s.split('|');return{name:p[0],chapter:p[1]};});}
  if(e.home&&e.home.length){e.phones_away=e.home;}
- applyManual(e);
+ applyManual(e,window._scanDateISO||null);
+ window._scanDateISO=null;
 }
+// summary preview shown BEFORE writing anything - so the user can double
+// check that the scan/manual marks look right before overwriting the day's
+// data. lists count per category, optionally names when small enough.
+function manConfirmSave(){
+ var e=ME();
+ var dateISO=window._scanDateISO;
+ var dateLabel=dateISO?hF(dateISO)+' ('+dateISO+')':'היום';
+ var sections=[
+  {k:'phone_ok',lbl:'📱 הפקידו טלפון',src:e.phone_ok||e.phones_deposited||[]},
+  {k:'phone_late',lbl:'⏰ איחרו הפקדה',src:e.phone_late||e.phones_late||[]},
+  {k:'phone_10sh',lbl:'📵 10ש - לא הפקידו',src:e.phone_10sh||e.phones_home||[]},
+  {k:'af_1y',lbl:'🕐 1י - צהריים',src:e.af_1y||e.afternoon_10sh||[]},
+  {k:'af_late',lbl:'⏰ איחרו צהריים',src:e.af_late||[]},
+  {k:'bw_ok',lbl:'🍽 קערה - סידרו',src:e.bw_ok||[]},
+  {k:'bw_late',lbl:'⏰ קערה - איחרו',src:e.bw_late||e.bowls_late||[]},
+  {k:'bw_5sh',lbl:'5ש - קערה',src:e.bw_5sh||e.bowls_5sh||[]},
+  {k:'lo_out',lbl:'💡 אורות - בחוץ',src:e.lo_out||e.lights_outside||[]},
+  {k:'lo_10sh',lbl:'10ש - אורות',src:e.lo_10sh||e.lights_10sh||[]},
+  {k:'home',lbl:'🏠 בבית / לא נמצא',src:e.home||e.phones_away||[]},
+  {k:'writing_done',lbl:'✍️ עונשי כתיבה שהובאו',src:(e.writing_done||[]).map(function(id){var t=D.wt.find(function(x){return x.id===id;});return t?t.nm+' ('+(t.pk||[]).join(',')+')':id;})},
+  {k:'extra_chapters',lbl:'📖 פרקים נוספים',src:(e.extra_chapters||e.extra||[]).map(function(x){return typeof x==='string'?x.replace('|',' '):(x.name+' '+x.chapter);})}
+ ];
+ var total=sections.reduce(function(a,s){return a+s.src.length;},0);
+ if(!total){
+  alert('אין מה לשמור - לא סומן שום דבר');
+  return;
+ }
+ var el=document.getElementById('manConfirmOv');
+ if(!el){el=document.createElement('div');el.id='manConfirmOv';document.body.appendChild(el);}
+ var body='<div class="O" onclick="closeManConfirm()"><div class="M" onclick="event.stopPropagation()" style="max-width:520px;max-height:85vh;overflow-y:auto">'
+  +'<div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div>'
+  +'<div style="padding:8px 16px"><div style="font-size:19.2px;font-weight:800;color:var(--go);text-align:center">📋 סיכום לפני שמירה</div>'
+  +'<div style="font-size:13.2px;color:var(--t1);text-align:center;margin-top:4px">שומר '+total+' פעולות ל<b style="color:var(--t0)">'+es(dateLabel)+'</b></div></div>'
+  +'<div style="padding:6px 16px 16px">';
+ sections.forEach(function(s){
+  if(!s.src.length)return;
+  body+='<div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--s1);border:1px solid var(--bd)">'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:13.8px;font-weight:700;color:var(--t0)">'+s.lbl+'</span><span style="font-size:14.4px;font-weight:800;color:var(--go)">'+s.src.length+'</span></div>'
+   +'<div style="font-size:12.5px;color:var(--t2);line-height:1.55">'+s.src.slice(0,20).map(function(n){return es(n);}).join(' · ')+(s.src.length>20?' · +'+(s.src.length-20)+' עוד':'')+'</div>'
+   +'</div>';
+ });
+ body+='</div>'
+  +'<div style="display:flex;gap:8px;padding:12px 16px 20px;border-top:1px solid var(--bd);position:sticky;bottom:0;background:var(--s1)">'
+  +'<button style="flex:1;padding:14px;border-radius:10px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:15.6px;font-weight:700;cursor:pointer" onclick="closeManConfirm()">← חזור לעריכה</button>'
+  +'<button style="flex:1;padding:14px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:800;cursor:pointer" onclick="closeManConfirm();manApply()">✅ אישור ושמירה</button>'
+  +'</div></div></div>';
+ el.innerHTML=body;
+}
+function closeManConfirm(){var e=document.getElementById('manConfirmOv');if(e)e.innerHTML='';}
 function editReportManual(){let e=document.getElementById('manualEdit');if(!e){e=document.createElement('div');e.id='manualEdit';document.body.appendChild(e)}
 const names=D.pb.sort(sLN);let h='<div class="O" onclick="closeManualEdit()"><div class="M" onclick="event.stopPropagation()" style="width:90%;max-height:80vh;overflow-y:auto"><div style="padding:12px;font-size:19.2px;font-weight:700;color:var(--t0)">✏️ ערוך ידנית</div>';
 h+='<div style="padding:12px;border-top:1px solid var(--bd)">';

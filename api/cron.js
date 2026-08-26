@@ -48,6 +48,16 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: true, type: 'print' });
     }
 
+    if (t === 'prS') {
+      // motzei shabbat: prep for tomorrow's opening day
+      await sendToAll(
+        '🖨 דוח יומי ליום ראשון',
+        'שבוע טוב! הדפס דוח יומי למחר',
+        { tag: 'print-report-sat', url: '/?action=print-report' }
+      );
+      return res.status(200).json({ ok: true, type: 'print-motzash' });
+    }
+
     if (t === 'af') {
       await sendToAll(
         '📱 הפקדות טלפונים - צהריים',
