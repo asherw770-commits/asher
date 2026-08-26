@@ -2155,27 +2155,8 @@ function cancelSleepTable(nm){
 }
 // once every school day in the sequence has passed, decide success/failure:
 // success needs at most one missed (unsigned) school day
-function showSleepSummaryAlert(nm,t){
- var schoolDays=t.days.filter(function(d){return d.isSchoolDay;});
- var signed=schoolDays.filter(function(d){return t.signed[d.date];}).length;
- var ok=t.status==='success';
- var e=document.getElementById('floatAlert');
- if(!e){e=document.createElement('div');e.id='floatAlert';document.body.appendChild(e);}
- e.innerHTML='<div style="position:fixed;left:8px;right:8px;bottom:78px;z-index:99998;'
- +'background:var(--s1);border:1px solid '+(ok?'var(--gb)':'rgba(239,68,68,.4)')+';border-radius:16px;'
- +'box-shadow:0 10px 30px rgba(0,0,0,.5);padding:12px 14px;direction:rtl;animation:bannerUp .25s ease-out">'
- +'<div style="display:flex;align-items:flex-start;gap:10px">'
- +'<div style="flex:1;min-width:0">'
- +'<div style="font-size:15.6px;font-weight:700;color:'+(ok?'var(--go)':'var(--rd)')+';line-height:1.4">'+(ok?'🎉 ':'❌ ')+'סיכום טבלת שינה — '+es(nm)+'</div>'
- +'<div style="font-size:13.2px;color:var(--t1);margin-top:2px;line-height:1.45">'+signed+' מתוך '+schoolDays.length+' ימים חתומים — '+(ok?'הצליח! מחזיר את ה-50₪':'לא עמד — הכסף הולך לצדקה')+'</div></div>'
- +'<button aria-label="סגור" onclick="closeFloatingAlert()" style="flex:0 0 30px;width:30px;height:30px;'
- +'border-radius:50%;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:17px;line-height:1;cursor:pointer;padding:0">×</button>'
- +'</div>'
- +'<div style="display:flex;gap:8px;margin-top:10px">'
- +'<button style="flex:1;height:42px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14.4px;font-weight:700;cursor:pointer" '
- +'onclick="closeFloatingAlert();dismissSleepAlert(\''+jq(nm)+'\')">הבנתי ✓</button>'
- +'</div></div>';
-}
+// (showSleepSummaryAlert removed — replaced by a push notification triggered
+// straight from checkSleepTableStatus)
 function checkSleepTableStatus(){
  if(!D.sleepTables)return;var changed=false;var now=new Date();
  Object.keys(D.sleepTables).forEach(function(nm){
@@ -2189,14 +2170,15 @@ function checkSleepTableStatus(){
   t.missedCount=missed;
   t.status=missed<=1?'success':'failed';
   changed=true;
-  // a persistent dashboard card, not just a toast that can be missed if
-  // nobody happens to be looking at the exact moment the period ends
+  // a persistent dashboard card - stays until dismissed. and a push
+  // notification so the phone lights up even when the app is closed.
   if(!D._sleepAlerts)D._sleepAlerts={};
   D._sleepAlerts[nm]=t.status;
-  // AND an immediate popup with the summary, right when this is detected -
-  // the dashboard card is a fallback for when nobody is looking at the app
-  // at that exact moment, not the primary way this should be noticed
-  showSleepSummaryAlert(nm,t);
+  var _sSchoolDays=t.days.filter(function(d){return d.isSchoolDay;});
+  var _sSigned=_sSchoolDays.filter(function(d){return t.signed[d.date];}).length;
+  var _sPushTitle=t.status==='success'?'🎉 טבלת שינה הצליחה — '+nm:'❌ טבלת שינה לא עמדה — '+nm;
+  var _sPushBody=_sSigned+' מתוך '+_sSchoolDays.length+' ימים חתומים';
+  try{fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:_sPushTitle,body:_sPushBody,tag:'sleep-'+nm,url:'/?page=sleeptbl'})}).catch(function(){});}catch(e){}
  });
  if(changed)sv();
 }
@@ -3991,7 +3973,18 @@ let h='<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><but
 h+=boyStatsHTML(nm);
 d.innerHTML=h}
 function markTaskDone(id){D.tk.forEach(t=>{if(t.id===id)t.dn=new Date().toISOString()});sv();rr()}
-function checkTaskAlerts(){if(!D||!D.tk)return;D.tk.filter(t=>!t.dn&&t.alertAt).forEach(t=>{const at=new Date(t.alertAt),now=new Date();if(Math.abs(now-at)<60000&&!_alerted['tk_'+t.id]){_alerted['tk_'+t.id]=true;showBanner('🔔 '+t.tx,8000)}})}
+// task-deadline reminders — send as a push instead of an in-app toast so
+// they land even when the app is closed and don't clutter the UI when open
+function checkTaskAlerts(){
+ if(!D||!D.tk)return;
+ D.tk.filter(function(t){return!t.dn&&t.alertAt;}).forEach(function(t){
+  var at=new Date(t.alertAt),now=new Date();
+  if(Math.abs(now-at)<60000&&!_alerted['tk_'+t.id]){
+   _alerted['tk_'+t.id]=true;
+   try{fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'🔔 תזכורת משימה',body:t.tx||'',tag:'task-'+t.id,url:'/?page=tasks'})}).catch(function(){});}catch(e){}
+  }
+ });
+}
 function closeBanner(){var b=document.getElementById('floatBanner');if(b)b.remove();}
 function showBanner(msg,dur){
  var old=document.getElementById('floatBanner');if(old)old.remove();
