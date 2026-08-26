@@ -766,7 +766,7 @@ function sk(n){let s=0;for(let i=1;i<=60;i++){const d=new Date;d.setDate(d.getDa
 function cT(id){return D.cx.some(s=>s.si===id&&s.dt===td())}
 function lS(id){return[...D.cx].filter(s=>s.si===id).sort((a,b)=>b.dt.localeCompare(a.dt))[0]||null}
 // ═══ RENDER + NAV ═══
-function rr(){var _pv=document.querySelector('.S');var _pt=_pv?_pv.scrollTop:null;const now=new Date;var _chg=false;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now){t.status='late';_chg=true;}});var _wl=D.wt.length;D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));if(D.wt.length!==_wl)_chg=true;if(_chg)sv();let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg==='manual')h=rMan();else if(pg==='locks')h=rLocks();else if(pg==='sleeptbl')h=rSleepTbl();else if(pg==='cleanup')h=rCleanUp();else if(pg==='scan')h=rScan();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h;if(_pt!=null){var _nv=document.querySelector('.S');if(_nv)_nv.scrollTop=_pt;}}
+function rr(){var _pv=document.querySelector('.S');var _pt=_pv?_pv.scrollTop:null;const now=new Date;var _chg=false;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now){t.status='late';_chg=true;}});var _wl=D.wt.length;D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));if(D.wt.length!==_wl)_chg=true;if(_chg)sv();let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg==='manual')h=rMan();else if(pg==='locks')h=rLocks();else if(pg==='sleeptbl')h=rSleepTbl();else if(pg==='cleanup')h=rCleanUp();else if(pg==='scan')h=rScan();else if(pg==='scanDetect')h=rScanDetect();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h;if(_pt!=null){var _nv=document.querySelector('.S');if(_nv)_nv.scrollTop=_pt;}}
 function rN(){const lt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length;const ac=D.pb.filter(iA),ms=ac.filter(b=>D.pt[b]!==true).length;const ot=D.tk.filter(t=>!t.dn).length;
 return'<div class="N">'+[{k:'home',i:'🏠',l:'ראשי',b:0},{k:'phones',i:'📱',l:'הפקדות',b:ms||0},{k:'writing',i:'📝',l:'כתיבה',b:lt||0},{k:'tasks',i:'📋',l:'משימות',b:ot||0},{k:'pin',i:'🔒',l:'שיחות',b:0},{k:'settings',i:'⚙️',l:'הגדרות',b:0}].map(t=>{const on=pg===t.k||(t.k==='pin'&&pg.startsWith('c'));return'<div class="ni'+(on?' on':'')+'" onclick="go(\''+t.k+'\')"><span style="font-size:19.2px;position:relative">'+t.i+(t.b?'<span class="bg">'+t.b+'</span>':'')+'</span><span style="font-size:9.6px;margin-top:2px">'+t.l+'</span></div>'}).join('')+'</div>'}
 // ═══ HOME DASHBOARD ═══
@@ -2131,18 +2131,211 @@ function _showScanDateFound(dateISO,rawText){
  var dayName=DN[new Date(dateISO+'T12:00:00').getDay()];
  var isToday=dateISO===td();
  var isFuture=dateISO>td();
+ var hasSnap=!!(D._reportGrid&&D._reportGrid[dateISO]);
  var html='<div class="C" style="border-color:var(--gb)">'
   +'<div style="font-size:15px;font-weight:700;color:var(--go);margin-bottom:8px">✅ תאריך זוהה</div>'
   +'<div style="font-size:20px;font-weight:800;color:var(--t0)">'+es(hebDate)+'</div>'
   +'<div style="font-size:13.2px;color:var(--t1);margin-top:2px">יום '+dayName+' · '+dateISO+'</div>'
   +(isFuture?'<div style="color:var(--rd);font-size:12px;margin-top:6px">⚠️ תאריך עתידי — כנראה זיהוי שגוי</div>':(isToday?'':'<div style="color:var(--am);font-size:12px;margin-top:6px">ℹ️ לא תאריך של היום</div>'))
-  +'<div style="display:flex;gap:6px;margin-top:12px">'
-  +'<button style="flex:1;padding:12px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14.4px;font-weight:700;cursor:pointer" onclick="_scanEditDate(\''+dateISO+'\')">📝 עדכן נתונים לתאריך זה</button>'
+  +(hasSnap?'':'<div style="color:var(--am);font-size:11.6px;margin-top:6px;line-height:1.5">⚠️ אין נתוני מבנה לתאריך זה — יש להדפיס את הדוח קודם דרך האפליקציה כדי לאפשר זיהוי אוטומטי</div>')
+  +'<div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">'
+  +(hasSnap?'<button style="width:100%;padding:12px;border-radius:10px;background:var(--pu);color:#fff;border:none;font-size:14.8px;font-weight:800;cursor:pointer" onclick="_scanStartDetection(\''+dateISO+'\')">🔍 זהה סימונים אוטומטית (חדש)</button>':'')
+  +'<button style="width:100%;padding:12px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14.4px;font-weight:700;cursor:pointer" onclick="_scanEditDate(\''+dateISO+'\')">📝 עדכן ידנית לתאריך זה</button>'
   +'</div>'
-  +'<div style="font-size:11.4px;color:var(--t2);margin-top:8px;line-height:1.5">📌 בגרסה זו — פותח את עמוד הפקדות כדי לעדכן ידנית. שלב הבא (בפיתוח): זיהוי אוטומטי של הסימונים בגריד.</div>'
   +'</div>';
  _setScanStatus(html);
 }
+// ═══ Phase 2: automatic cell detection ═══
+// Uses the layout snapshot saved when the report was printed. User taps
+// the 4 corners of the report as it appears in the scanned photo; a
+// bilinear map then translates each cell's known (u,v) position into a
+// pixel on the image; each pixel window is averaged to detect darkness;
+// dark cells become "checked" entries in ME. Not perfect for skewed
+// scans (no true perspective correction, just bilinear) but good enough
+// when the paper is roughly straight-on.
+function _scanStartDetection(dateISO){
+ window._scanDateISO=dateISO;
+ window._scanCorners=null;
+ window._scanCornerIdx=0;
+ // load the image into a global Image object for canvas drawing
+ var previewImg=document.querySelector('#scanPreview img');
+ if(!previewImg){alert('לא נמצאה תמונה לניתוח');return;}
+ window._scanImgSrc=previewImg.src;
+ pg='scanDetect';rr();
+}
+function rScanDetect(){
+ var dateISO=window._scanDateISO;
+ var hebDate=hF(dateISO);
+ var h='<div class="P"><div class="H">'
+  +'<button class="B" onclick="pg=\'scan\';rr()">← חזרה</button>'
+  +'<span style="font-weight:800;font-size:19.2px;color:var(--t0)">🔍 יישור וזיהוי</span>'
+  +'<div style="width:60px"></div></div>'
+  +'<div class="S" style="padding:12px 14px 100px">';
+ h+='<div class="C" style="margin-bottom:10px"><div style="font-size:14px;color:var(--t1);line-height:1.55">'
+  +'<b style="color:var(--t0)">'+es(hebDate)+'</b><br>'
+  +'סמן 4 פינות של הדוח על התמונה בסדר הזה: <b>ימין-עליון → שמאל-עליון → שמאל-תחתון → ימין-תחתון</b>. אחרי 4 נקודות תוכל ללחוץ "בצע ניתוח".'
+  +'</div></div>';
+ h+='<div class="C" style="padding:8px"><canvas id="scanCanvas" style="width:100%;display:block;border-radius:6px;cursor:crosshair;touch-action:none"></canvas>'
+  +'<div id="scanCornerStatus" style="font-size:12.5px;color:var(--t2);margin-top:8px;text-align:center">טוען תמונה...</div></div>';
+ h+='<div style="display:flex;gap:6px;margin-top:10px">'
+  +'<button style="flex:1;padding:12px;border-radius:10px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14.4px;font-weight:700;cursor:pointer" onclick="_scanClearCorners()">🔄 אפס נקודות</button>'
+  +'<button id="scanAnalyzeBtn" style="flex:2;padding:12px;border-radius:10px;background:var(--gr);color:#0a0f1c;border:none;font-size:14.4px;font-weight:800;cursor:pointer;opacity:.5" disabled onclick="_scanAnalyze()">🧪 בצע ניתוח</button>'
+  +'</div>';
+ h+='</div></div>';
+ // schedule canvas draw after DOM mount
+ setTimeout(_scanInitCanvas,50);
+ return h;
+}
+function _scanInitCanvas(){
+ var canvas=document.getElementById('scanCanvas');
+ if(!canvas||!window._scanImgSrc)return;
+ var img=new Image();
+ img.onload=function(){
+  window._scanCanvasImg=img;
+  // fit to screen width, keep aspect
+  var maxW=Math.min(window.innerWidth-50,800);
+  var scale=maxW/img.width;
+  canvas.width=maxW;
+  canvas.height=Math.round(img.height*scale);
+  window._scanImgScale=scale;
+  window._scanCorners=[];
+  window._scanCornerIdx=0;
+  _scanDrawCanvas();
+  _scanUpdateStatus();
+ };
+ img.src=window._scanImgSrc;
+ canvas.onclick=null;
+ canvas.addEventListener('pointerdown',_scanCanvasTap);
+}
+function _scanCanvasTap(e){
+ var canvas=e.currentTarget;
+ var rect=canvas.getBoundingClientRect();
+ var x=(e.clientX-rect.left)*(canvas.width/rect.width);
+ var y=(e.clientY-rect.top)*(canvas.height/rect.height);
+ if(!window._scanCorners)window._scanCorners=[];
+ if(window._scanCorners.length<4){
+  window._scanCorners.push({x:x,y:y});
+ }else{
+  // move nearest existing corner
+  var bestI=0,bestD=Infinity;
+  window._scanCorners.forEach(function(c,i){var d=(c.x-x)*(c.x-x)+(c.y-y)*(c.y-y);if(d<bestD){bestD=d;bestI=i;}});
+  window._scanCorners[bestI]={x:x,y:y};
+ }
+ _scanDrawCanvas();
+ _scanUpdateStatus();
+}
+function _scanClearCorners(){window._scanCorners=[];_scanDrawCanvas();_scanUpdateStatus();}
+function _scanDrawCanvas(){
+ var canvas=document.getElementById('scanCanvas');if(!canvas)return;
+ var ctx=canvas.getContext('2d');
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ if(window._scanCanvasImg)ctx.drawImage(window._scanCanvasImg,0,0,canvas.width,canvas.height);
+ var pts=window._scanCorners||[];
+ // draw quadrilateral
+ if(pts.length>=2){
+  ctx.strokeStyle='rgba(167,139,250,.9)';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+  for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+  if(pts.length===4)ctx.closePath();
+  ctx.stroke();
+ }
+ var labels=['1','2','3','4'];
+ pts.forEach(function(p,i){
+  ctx.fillStyle='rgba(167,139,250,.95)';
+  ctx.beginPath();ctx.arc(p.x,p.y,14,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(labels[i],p.x,p.y);
+ });
+}
+function _scanUpdateStatus(){
+ var el=document.getElementById('scanCornerStatus');
+ var btn=document.getElementById('scanAnalyzeBtn');
+ var n=(window._scanCorners||[]).length;
+ var stages=['סמן פינה ימנית-עליונה','סמן פינה שמאלית-עליונה','סמן פינה שמאלית-תחתונה','סמן פינה ימנית-תחתונה'];
+ if(el)el.textContent=n<4?('נקודה '+(n+1)+' מ-4: '+stages[n]):'✅ 4 נקודות סומנו · אפשר ללחוץ בצע ניתוח (או ללחוץ שוב על נקודה כדי לזוז אותה)';
+ if(btn){btn.disabled=n<4;btn.style.opacity=n<4?.5:1;}
+}
+function _bilinearMap(corners,u,v){
+ // corners in order: [TR, TL, BL, BR] as tapped by the user
+ var TR=corners[0],TL=corners[1],BL=corners[2],BR=corners[3];
+ var x=(1-u)*(1-v)*TL.x+u*(1-v)*TR.x+u*v*BR.x+(1-u)*v*BL.x;
+ var y=(1-u)*(1-v)*TL.y+u*(1-v)*TR.y+u*v*BR.y+(1-u)*v*BL.y;
+ return {x:x,y:y};
+}
+function _sampleDarkness(imgData,cx,cy,radius){
+ var w=imgData.width,h=imgData.height,d=imgData.data;
+ var minX=Math.max(0,Math.floor(cx-radius)),maxX=Math.min(w-1,Math.ceil(cx+radius));
+ var minY=Math.max(0,Math.floor(cy-radius)),maxY=Math.min(h-1,Math.ceil(cy+radius));
+ var total=0,count=0;
+ for(var y=minY;y<=maxY;y++){
+  for(var x=minX;x<=maxX;x++){
+   var idx=(y*w+x)*4;
+   total+=(d[idx]+d[idx+1]+d[idx+2])/3/255;
+   count++;
+  }
+ }
+ return count?1-(total/count):0;
+}
+function _getRowsForCol(colIdx,layout){
+ if(colIdx===0)return (layout.col0_afternoon_missed||[]).map(function(nm){return{boy:nm,markTypes:[{type:'af_1y',name:nm}]};});
+ if(colIdx===1)return (layout.col1_writing_pending||[]).map(function(t){return{boy:t.nm,markTypes:[{type:'writing_done',id:t.id}]};});
+ if(colIdx===2)return (layout.col2_phones_boys||[]).map(function(nm){return{boy:nm,markTypes:[{type:'phone_ok',name:nm},{type:'phone_late',name:nm},{type:'phone_10sh',name:nm}]};});
+ if(colIdx===3){var rows=[];var rooms=layout.col3_rooms||{};for(var r=1;r<=13;r++){if(!rooms[r])continue;rows.push({isHeader:true});rooms[r].forEach(function(nm){rows.push({boy:nm,markTypes:[{type:'bw_ok',name:nm},{type:'bw_late',name:nm},{type:'bw_5sh',name:nm}]});});}return rows;}
+ if(colIdx===4)return (layout.col4_lights_boys||[]).map(function(nm){return{boy:nm,markTypes:[{type:'lo_out',name:nm},{type:'lo_10sh',name:nm}]};});
+ if(colIdx===5){var chars=['א','ב','יח','קיט','5ש','10ש'];return (layout.col5_extra_boys||[]).map(function(nm){return{boy:nm,markTypes:chars.map(function(ch){return{type:'ex_ch',name:nm,ch:ch};})};});}
+ return [];
+}
+function _scanAnalyze(){
+ var dateISO=window._scanDateISO;
+ var snap=D._reportGrid&&D._reportGrid[dateISO];
+ if(!snap){alert('אין נתוני מבנה לתאריך זה');return;}
+ var canvas=document.getElementById('scanCanvas');
+ if(!canvas)return;
+ var ctx=canvas.getContext('2d');
+ var imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+ var corners=window._scanCorners;
+ if(!corners||corners.length!==4){alert('סמן 4 פינות קודם');return;}
+ var THRESHOLD=0.35;
+ var RADIUS=Math.max(4,Math.round(canvas.width*0.006));
+ var edits={phone_ok:[],phone_late:[],phone_10sh:[],af_1y:[],af_late:[],bw_ok:[],bw_late:[],bw_5sh:[],lo_out:[],lo_10sh:[],writing_done:[],extra_chapters:[],home:[]};
+ var samplesLog=[];
+ // strip 0 (top) = COLS[5] extra chapters ... strip 5 (bottom) = COLS[0] afternoon
+ for(var s=0;s<6;s++){
+  var portraitCol=5-s;
+  var vStart=s/6, vEnd=(s+1)/6;
+  var rows=_getRowsForCol(portraitCol,snap.layout);
+  var nonHeaderCount=rows.filter(function(r){return !r.isHeader;}).length;
+  if(!rows.length||!nonHeaderCount)continue;
+  for(var r=0;r<rows.length;r++){
+   var row=rows[r];
+   if(row.isHeader||!row.markTypes||!row.markTypes.length)continue;
+   // u range: RTL layout puts header on right (u=1). Row r visual u = 1 - r/total
+   var uStart=1-(r+1)/rows.length, uEnd=1-r/rows.length;
+   var nameH=0.5, marksH=1-nameH;
+   var perMark=marksH/row.markTypes.length;
+   for(var c=0;c<row.markTypes.length;c++){
+    var vFrac=nameH+perMark*(c+0.5); // 0..1 within the strip
+    var vCenter=vStart+(vEnd-vStart)*vFrac;
+    var uCenter=(uStart+uEnd)/2;
+    var pt=_bilinearMap(corners,uCenter,vCenter);
+    var dark=_sampleDarkness(imgData,pt.x,pt.y,RADIUS);
+    if(dark>=THRESHOLD){
+     var m=row.markTypes[c];
+     if(m.type==='ex_ch'){edits.extra_chapters.push({name:m.name,chapter:m.ch});}
+     else if(m.type==='writing_done'){edits.writing_done.push(m.id);}
+     else if(edits[m.type]){edits[m.type].push(m.name);}
+    }
+    samplesLog.push({s:s,r:r,c:c,dark:dark});
+   }
+  }
+ }
+ // stash into ME and go to manual edit with the summary preview
+ window._manualEdits=edits;
+ window._scanDateISO=dateISO;
+ showBanner('✅ ניתוח הסתיים · '+_countME(edits)+' סימונים זוהו',3000);
+ pg='manual';rr();
+}
+function _countME(e){var n=0;['phone_ok','phone_late','phone_10sh','af_1y','af_late','bw_ok','bw_late','bw_5sh','lo_out','lo_10sh','home'].forEach(function(k){n+=(e[k]||[]).length;});n+=(e.writing_done||[]).length;n+=(e.extra_chapters||[]).length;return n;}
 function _scanEditDate(dateISO){
  // remember which date the user is editing so applyManual pins the updates
  // to that day instead of today. Route to the manual-edit screen (rMan)
