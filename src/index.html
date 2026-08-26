@@ -110,12 +110,16 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
  .homeHero>*{margin:0!important}
  /* row items: make the room list breathe more */
  .R{padding:12px 15px}
- /* dashboard: masonry-like 2-column layout using CSS multi-column so all
-    dashboard cards flow naturally into two columns instead of stretching
-    across the full desktop width */
- .S.home-dash{column-count:2;column-gap:14px;padding-bottom:60px}
- .S.home-dash > *{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin-bottom:10px;display:block}
- .S.home-dash .sl{margin-top:16px}
+ /* dashboard: proper CSS-grid layout — cards flow into 2–3 equal columns
+    depending on viewport width, all aligning to the top so tall cards
+    don't stretch their neighbours. Group headings (.sl) always span the
+    whole grid so lists that belong under them stay under them. */
+ .S.home-dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;align-items:start;padding-bottom:60px}
+ .S.home-dash > *{margin-bottom:0!important}
+ .S.home-dash > .sl{grid-column:1/-1;margin-top:14px;margin-bottom:2px}
+ /* wide items (that build their own inner grid) span the full row so their
+    layout doesn't compete with the outer grid */
+ .S.home-dash > [data-wide]{grid-column:1/-1}
 }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -3759,10 +3763,13 @@ const seen2=new Set();const uniqT=allTasks.filter(t=>{if(seen2.has(t.id))return 
 const openT=uniqT.filter(t=>t.status==='waiting'||t.status==='late'||t.status==='doubled');
 const doneT=uniqT.filter(t=>t.status==='done');
 const lateT=uniqT.filter(t=>t.status==='late'||t.status==='doubled');
-h+='<div class="C"><div style="font-weight:700;font-size:15.6px;color:var(--t0);margin-bottom:8px">✍️ משימות כתיבה</div>';
-h+='<div style="display:flex;gap:10px;margin-bottom:8px"><div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--am)">'+openT.length+'</div><div style="font-size:11px;color:var(--t2)">פתוחות</div></div>';
-h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--gr)">'+doneT.length+'</div><div style="font-size:11px;color:var(--t2)">הושלמו</div></div>';
-h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--rd)">'+lateT.length+'</div><div style="font-size:11px;color:var(--t2)">באיחור</div></div></div>';
+h+='<div class="C"><div style="font-weight:700;font-size:15.6px;color:var(--t0);margin-bottom:4px">✍️ משימות כתיבה — סה״כ '+uniqT.length+'</div>';
+h+='<div style="font-size:12.4px;color:var(--t2);line-height:1.5;margin-bottom:10px">מספר עונשי הכתיבה שקיבל בתקופה — כמה עדיין פתוחים, כמה הביא, כמה עברו את הדדליין בלי שהביא בזמן.</div>';
+h+='<div style="display:flex;gap:10px;margin-bottom:8px">'
+ +'<div style="text-align:center;flex:1;background:var(--amd);padding:9px 4px;border-radius:9px"><div style="font-size:26px;font-weight:800;color:var(--am);line-height:1">'+openT.length+'</div><div style="font-size:11.4px;color:var(--am);font-weight:700;margin-top:3px">⏳ עדיין פתוחות</div></div>'
+ +'<div style="text-align:center;flex:1;background:var(--grd);padding:9px 4px;border-radius:9px"><div style="font-size:26px;font-weight:800;color:var(--gr);line-height:1">'+doneT.length+'</div><div style="font-size:11.4px;color:var(--gr);font-weight:700;margin-top:3px">✅ הביא</div></div>'
+ +'<div style="text-align:center;flex:1;background:var(--rdd);padding:9px 4px;border-radius:9px"><div style="font-size:26px;font-weight:800;color:var(--rd);line-height:1">'+lateT.length+'</div><div style="font-size:11.4px;color:var(--rd);font-weight:700;margin-top:3px">⚠️ באיחור</div></div>'
+ +'</div>';
 if(uniqT.length){
  // full reason including the "other" free-text - so a punishment tagged as
  // אחר with a specific note doesn't show up as a blank "אחר" without context
@@ -3873,17 +3880,21 @@ const bwLateCount=bwLateDates.length;
 const bwPunish=uniqT.filter(t=>(t.pk||[]).includes('5ש')&&t.ro&&t.ro.includes('קערה')).length;
 const loOutCount=loOutDates.length;
 const loPunish=uniqT.filter(t=>(t.pk||[]).includes('10ש')&&t.ro&&t.ro.includes('אורות')).length;
+// mini renderer for each "how many times X happened" section with a short
+// explanation line so a stat by itself doesn't need translating in your head
+function _statSection(icon,label,count,dates,expl,punishLabel,punishCount){
+ var s='<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 0"><span style="font-size:14.6px;font-weight:700;color:var(--t0)">'+icon+' '+label+'</span><span style="font-size:22px;font-weight:800;color:'+(count?'var(--am)':'var(--t2)')+'">'+count+'</span></div>'
+  +'<div style="font-size:11.6px;color:var(--t2);line-height:1.5;margin-bottom:'+(count?'4px':'0')+'">'+expl+'</div>';
+ if(count)s+=_renderDates(dates,'var(--am)');
+ if(punishCount)s+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;margin-top:5px;border-radius:6px;background:var(--rdd)"><span style="font-size:12px;color:var(--rd);font-weight:600">↳ '+punishLabel+'</span><span style="font-size:13px;font-weight:800;color:var(--rd)">'+punishCount+'</span></div>';
+ return s;
+}
 if(bwLateCount||loOutCount){
  h+='<div class="C" style="margin-top:6px">';
- if(bwLateCount){
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span style="font-size:14.4px;color:var(--t1)">🍽 קערה וספל — איחר</span><span style="font-size:15.6px;font-weight:800;color:var(--am)">'+bwLateCount+'</span></div>';
-  h+=_renderDates(bwLateDates,'var(--am)');
-  if(bwPunish)h+='<div style="display:flex;justify-content:space-between;padding:4px 0"><span style="font-size:12.5px;color:var(--t2)">↳ עונש 5ש</span><span style="font-size:13.2px;font-weight:700;color:var(--rd)">'+bwPunish+'</span></div>';
- }
+ if(bwLateCount)h+=_statSection('🍽','קערה וספל — איחר',bwLateCount,bwLateDates,'כמה פעמים איחר להוריד את הקערה והספל למקלחות בבוקר',bwPunish?'עונש 5ש שנרשם על זה':null,bwPunish);
  if(loOutCount){
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:'+(bwLateCount?'8px':'4px')+' 0 4px;'+(bwLateCount?'border-top:1px solid var(--bd);margin-top:6px;padding-top:8px':'')+'"><span style="font-size:14.4px;color:var(--t1)">💡 כיבוי אורות — בחוץ</span><span style="font-size:15.6px;font-weight:800;color:var(--am)">'+loOutCount+'</span></div>';
-  h+=_renderDates(loOutDates,'var(--am)');
-  if(loPunish)h+='<div style="display:flex;justify-content:space-between;padding:4px 0"><span style="font-size:12.5px;color:var(--t2)">↳ עונש 10ש</span><span style="font-size:13.2px;font-weight:700;color:var(--rd)">'+loPunish+'</span></div>';
+  h+='<div style="'+(bwLateCount?'border-top:1px solid var(--bd);margin-top:8px;padding-top:8px':'')+'"></div>';
+  h+=_statSection('💡','כיבוי אורות — היה בחוץ',loOutCount,loOutDates,'כמה פעמים לא היה במיטתו/בחדר בזמן כיבוי אורות',loPunish?'עונש 10ש שנרשם על זה':null,loPunish);
  }
  h+='</div>';
 }
@@ -3891,22 +3902,27 @@ const floorAMCount=floorAMDates.length;
 const floorPMCount=floorPMDates.length;
 if(floorAMCount||floorPMCount){
  h+='<div class="C" style="margin-top:6px">';
- if(floorAMCount){
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span style="font-size:14.4px;color:var(--t1)">🌅 איחור ביציאה — בוקר</span><span style="font-size:15.6px;font-weight:800;color:var(--am)">'+floorAMCount+'</span></div>';
-  h+=_renderDates(floorAMDates,'var(--am)');
- }
+ if(floorAMCount)h+=_statSection('🌅','איחור ביציאה מהקומה — בוקר',floorAMCount,floorAMDates,'כמה פעמים איחר לצאת מהקומה בבוקר לתפילה/לימודים');
  if(floorPMCount){
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:'+(floorAMCount?'8px':'4px')+' 0 4px;'+(floorAMCount?'border-top:1px solid var(--bd);margin-top:6px;padding-top:8px':'')+'"><span style="font-size:14.4px;color:var(--t1)">🕐 איחור ביציאה — צהריים</span><span style="font-size:15.6px;font-weight:800;color:var(--am)">'+floorPMCount+'</span></div>';
-  h+=_renderDates(floorPMDates,'var(--am)');
+  h+='<div style="'+(floorAMCount?'border-top:1px solid var(--bd);margin-top:8px;padding-top:8px':'')+'"></div>';
+  h+=_statSection('🕐','איחור ביציאה מהקומה — צהריים',floorPMCount,floorPMDates,'כמה פעמים איחר לצאת מהקומה בצהריים אחרי ההפסקה');
  }
- h+='</div>';
 }
-// confiscation dates - which specific days a phone was confiscated on
-if(D._confiscate){
- var _confDates=Object.keys(D._confiscate).filter(function(k){return k.indexOf(nm+'_')===0;}).map(function(k){var t=D._confiscate[k];return t&&t.at?t.at.slice(0,10):null;}).filter(function(d){return d&&inRange(d);}).sort();
- if(_confDates.length){
-  h+='<div class="C" style="margin-top:6px"><div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span style="font-size:14.4px;color:var(--t1)">📵 החרמות טלפון</span><span style="font-size:15.6px;font-weight:800;color:var(--pu)">'+_confDates.length+'</span></div>'+_renderDates(_confDates,'var(--pu)')+'</div>';
- }
+// confiscation dates - which specific days a phone was confiscated on.
+// dayStatus[eve][date].conf is the ground truth (snapshot at the moment
+// each evening's deposit report was saved), used both here and further
+// down in the deposit-history grid so a confiscation day shows 📵 instead
+// of ✕.
+var _confDaysSet={};
+if(D.dayStatus&&D.dayStatus.eve){
+ Object.keys(D.dayStatus.eve).filter(inRange).forEach(function(dt){
+  var s=D.dayStatus.eve[dt];
+  if(s&&s.conf&&s.conf.indexOf(nm)>=0)_confDaysSet[dt]=true;
+ });
+}
+var _confDates=Object.keys(_confDaysSet).sort();
+if(_confDates.length){
+ h+='<div class="C" style="margin-top:6px"><div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span style="font-size:14.4px;color:var(--t1)">📵 החרמות טלפון</span><span style="font-size:15.6px;font-weight:800;color:var(--pu)">'+_confDates.length+'</span></div><div style="font-size:11.4px;color:var(--t2);margin-bottom:4px">ימים שבהם היה מוחרם — לא נדרש להפקיד</div>'+_renderDates(_confDates,'var(--pu)')+'</div>';
 }
 // ===== group: general status - compact rows, not big-number cards, since
 // these are mostly binary/status facts rather than counts to emphasize =====
@@ -3938,9 +3954,31 @@ if(confAllCount||lockT||upperT||sleepT||isArchB||starEntries.length){
 // range is selected above instead of a hardcoded "last 14 days" that ignored
 // the "הכל" (all) choice and silently hid older history
 var gridLabel=range==='week'?'השבוע האחרון':range==='month'?'החודש האחרון':'כל ההיסטוריה ('+allDates.length+' ימים)';
-h+='<div class="C"><div style="font-weight:600;font-size:15.6px;color:var(--t0);margin-bottom:8px">📅 '+gridLabel+' — הפקדות ערב</div><div style="display:flex;gap:2px;flex-wrap:wrap">';
-allDates.slice().reverse().forEach(dt=>{const ph=(D.ph||{})[dt];const dep=ph&&ph.dp&&ph.dp.includes(nm);const miss2=ph&&ph.m&&ph.m.includes(nm);
-h+='<div style="width:20px;height:20px;border-radius:4px;background:'+(dep?'var(--gr)':miss2?'var(--rd)':'var(--s3)')+';display:flex;align-items:center;justify-content:center;font-size:9.6px;color:#fff" title="'+dt+'">'+(dep?'✓':miss2?'✕':'·')+'</div>'});
+h+='<div class="C"><div style="font-weight:600;font-size:15.6px;color:var(--t0);margin-bottom:8px">📅 '+gridLabel+' — הפקדות ערב</div>';
+// legend so the coloured squares actually mean something at a glance
+h+='<div style="display:flex;gap:10px;font-size:11px;color:var(--t2);margin-bottom:8px;flex-wrap:wrap">'
+ +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:var(--gr)"></span>הפקיד</span>'
+ +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:var(--rd)"></span>לא הפקיד</span>'
+ +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:var(--pu)"></span>מוחרם</span>'
+ +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:var(--am)"></span>בבית</span>'
+ +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:var(--s3)"></span>לא נרשם</span>'
+ +'</div>';
+h+='<div style="display:flex;gap:2px;flex-wrap:wrap">';
+allDates.slice().reverse().forEach(function(dt){
+ var ph=(D.ph||{})[dt];
+ var snap=D.dayStatus&&D.dayStatus.eve&&D.dayStatus.eve[dt];
+ var isConf=snap&&snap.conf&&snap.conf.indexOf(nm)>=0;
+ var isAway=snap&&snap.away&&snap.away.indexOf(nm)>=0;
+ var dep=ph&&ph.dp&&ph.dp.includes(nm);
+ var miss2=ph&&ph.m&&ph.m.includes(nm);
+ var bg,icon,titleExtra='';
+ if(isConf){bg='var(--pu)';icon='📵';titleExtra=' (מוחרם)';}
+ else if(isAway){bg='var(--am)';icon='🏠';titleExtra=' (בבית)';}
+ else if(dep){bg='var(--gr)';icon='✓';}
+ else if(miss2){bg='var(--rd)';icon='✕';}
+ else {bg='var(--s3)';icon='·';}
+ h+='<div style="width:22px;height:22px;border-radius:4px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff" title="'+dt+titleExtra+'">'+icon+'</div>';
+});
 h+='</div></div>';
 return _scopedStyle+'<div class="boystat-wrap">'+h+'</div>';
 }
