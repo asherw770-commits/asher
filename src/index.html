@@ -121,10 +121,11 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
     layout doesn't compete with the outer grid */
  .S.home-dash > [data-wide]{grid-column:1/-1}
  /* generic list→grid on desktop for any container marked .dcolgrid;
-    2 columns by default, 3 with .dcolgrid3. Direct children flow into
-    the grid so a per-page list of boys/tasks etc uses the full width. */
- .dcolgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px;align-items:start}
- .dcolgrid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;align-items:start}
+    2 columns by default, 3 with .dcolgrid3. direction:rtl on the grid
+    makes items flow right-to-left first, then wrap down — matching the
+    natural Hebrew reading order. */
+ .dcolgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px;align-items:start;direction:rtl}
+ .dcolgrid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;align-items:start;direction:rtl}
  .dcolgrid > *,.dcolgrid3 > *{margin-bottom:0!important}
  /* boy stats: chips wrap 6-across on desktop instead of 2, and the two
     deposit-summary boxes (evening + afternoon) sit side by side */
@@ -571,7 +572,7 @@ function ld(){
       heal();
       _mergePhotos();
       if(!D._updatedAt)D._updatedAt=remoteTs||Date.now();
-      rr();
+      rr({external:true});
       return;
      }
     }
@@ -626,7 +627,7 @@ function ld(){
     D={...df(),...remote};
     heal();
     _mergePhotos();
-    rr();
+    rr({external:true});
    },function(err){console.error('Firestore sync error',err);});
   // photos listener - each doc under /photos is one boy's photo array.
   // populates window._remotePhotos so _mergePhotos can splice them into
@@ -639,7 +640,7 @@ function ld(){
     if(ch.type==='removed'){delete window._remotePhotos[id];changed=true;}
     else{window._remotePhotos[id]=(ch.doc.data()||{}).photos||[];changed=true;}
    });
-   if(changed){_mergePhotos();if(typeof pg!=='undefined'&&(pg==='pin'||pg.startsWith('c')))rr();}
+   if(changed){_mergePhotos();if(typeof pg!=='undefined'&&(pg==='pin'||pg.startsWith('c')))rr({external:true});}
   },function(err){console.error('Firestore photos sync error',err);});
  }
 }
@@ -1025,13 +1026,32 @@ function sk(n){let s=0;for(let i=1;i<=60;i++){const d=new Date;d.setDate(d.getDa
 function cT(id){return D.cx.some(s=>s.si===id&&s.dt===td())}
 function lS(id){return[...D.cx].filter(s=>s.si===id).sort((a,b)=>b.dt.localeCompare(a.dt))[0]||null}
 // ═══ RENDER + NAV ═══
-function rr(){
+function rr(opts){
+ opts=opts||{};
  // device gate: after the initial 3-second bootstrap window, unapproved
  // devices see only the lock screen. skipped until _deviceCheckReady so
  // fresh installs don't false-negative before the first snapshot lands.
  if(window._deviceCheckReady&&!_deviceApproved()){
   document.getElementById('app').innerHTML=_renderDeviceBlock();
   return;
+ }
+ // Editing-protection: if this render was triggered by an EXTERNAL event
+ // (a Firestore snapshot from another device) AND the user is currently
+ // typing/editing an input, textarea, or contenteditable element, DEFER
+ // the render until they finish. Otherwise mid-edit input silently vanishes
+ // when the tab is rewritten and any typed-but-unsent text is lost.
+ if(opts.external){
+  var _ae=document.activeElement;
+  var _editing=_ae&&(_ae.tagName==='INPUT'||_ae.tagName==='TEXTAREA'||_ae.isContentEditable);
+  if(_editing){
+   if(!window._rrPending){
+    window._rrPending=true;
+    var _resume=function(){window._rrPending=false;_ae.removeEventListener('blur',_resume);clearTimeout(_to);rr({external:true});};
+    _ae.addEventListener('blur',_resume,{once:true});
+    var _to=setTimeout(_resume,90000);
+   }
+   return;
+  }
  }
  var _pv=document.querySelector('.S');var _pt=_pv?_pv.scrollTop:null;const now=new Date;var _chg=false;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now){t.status='late';_chg=true;}});var _wl=D.wt.length;D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));if(D.wt.length!==_wl)_chg=true;if(_chg)sv();let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg==='manual')h=rMan();else if(pg==='locks')h=rLocks();else if(pg==='sleeptbl')h=rSleepTbl();else if(pg==='cleanup')h=rCleanUp();else if(pg==='scan')h=rScan();else if(pg==='scanDetect')h=rScanDetect();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h;if(_pt!=null){var _nv=document.querySelector('.S');if(_nv)_nv.scrollTop=_pt;}}
 function rN(){const lt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length;const ac=D.pb.filter(iA),ms=ac.filter(b=>D.pt[b]!==true).length;const ot=D.tk.filter(t=>!t.dn).length;
@@ -4183,9 +4203,11 @@ h+='</div></div>';return h}
 if(wT==='done')h+='<div style="margin-bottom:8px"><input class="inp" placeholder="🔍 חיפוש לפי שם..." id="wrSrch" value="'+es(wSrch)+'" oninput="wSrch=this.value;clearTimeout(window._wrSt);window._wrSt=setTimeout(()=>{const el=document.getElementById(\'wrSrch\');const cp=el?el.selectionStart:0;rr();setTimeout(()=>{const e2=document.getElementById(\'wrSrch\');if(e2){e2.focus();e2.selectionStart=e2.selectionEnd=cp}},0)},300)" style="width:100%;font-size:16.8px"></div>';
 if(st.l>0&&wT==='active')h+='<div class="al"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:19.2px">🔔</span><div><div style="font-size:15.6px;font-weight:700;color:var(--rd)">'+st.l+' משימות באיחור!</div><div style="font-size:13.2px;color:var(--t1)">עבר הזמן להגשה</div></div></div></div>';
 if(!it.length)h+='<div style="text-align:center;padding:40px 20px;color:var(--t2)"><div style="font-size:43.2px;opacity:.5">📭</div><div>אין רשומות</div></div>';
+h+='<div class="dcolgrid">';
 it.forEach(t=>{const sm={waiting:['ממתין','var(--am)','var(--amd)'],late:['לא הביא','var(--rd)','var(--rdd)'],done:['הביא','var(--gr)','var(--grd)'],doubled:['הוכפל','var(--go)','var(--gd)'],frozen:['מוקפא','var(--bl)','var(--bld)'],cancelled:['בוטל','var(--t2)','var(--s3)']};const[sL,sC,sB]=sm[t.status]||sm.waiting;const reason=rD(t);
 h+='<div class="C" style="border-color:'+(t.status==='late'||t.status==='doubled'?'rgba(239,68,68,.18)':'var(--bd)')+'"><div style="display:flex;align-items:center;gap:9px;margin-bottom:4px">'+aH(t.nm,32,11)+'<div style="flex:1"><div style="font-size:16.8px;font-weight:600;color:var(--t0)">'+es(t.nm)+'</div><div style="font-size:13.2px;color:var(--t2)">'+pD(t)+'</div></div>'+cH(sC,sB,sL)+'</div>'+(reason?'<div style="font-size:12.0px;color:var(--t2);margin-bottom:4px">סיבה: '+reason+'</div>':'')+'<div style="font-size:12.0px;color:var(--t2);margin-bottom:4px">ניתן: '+fmR(t.ca)+(t.status==='done'&&t.doneAt?' · הביא: '+fmR(t.doneAt):t.status!=='done'?' · עד: '+dll(t.dln):'')+'</div>'+((t.status==='late'||t.status==='doubled')?(()=>{const dlDate=new Date(t.dl),hrs=Math.floor((Date.now()-dlDate)/36e5);return'<div class="al" style="padding:6px 10px;margin-bottom:4px"><div style="font-size:13.2px;font-weight:600;color:var(--rd)">⚠️ באיחור'+(hrs<24?' '+hrs+' שעות':' '+Math.floor(hrs/24)+' ימים')+'</div></div>'})():'')+
 ((t.status==='waiting'||t.status==='late'||t.status==='doubled')?'<div style="display:flex;gap:4px;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--bd);flex-wrap:wrap"><button class="ab" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.1);color:var(--gr)" onclick="wD(\''+t.id+'\')">✅ הביא</button><button class="ab" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:var(--rd)" onclick="wA(\''+t.id+'\')">❌ לא הביא</button><button class="ab" style="border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.1);color:var(--bl)" onclick="wFz(\''+t.id+'\',3)">❄️</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="wMvB(\''+t.id+'\')">↓</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="wDl(\''+t.id+'\')">🗑</button></div>':'')+(t.status==='frozen'?(()=>{const rm=t.fu?Math.max(0,Math.ceil((new Date(t.fu)-Date.now())/864e5)):0;return'<div style="display:flex;gap:4px;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--bd)"><span style="font-size:12.0px;color:var(--bl)">נותרו '+rm+' ימים להקפאה</span><button class="ab" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.1);color:var(--am)" onclick="wUfz(\''+t.id+'\')">↩ החזר לפעיל</button></div>'})():'')+'</div>'});
+h+='</div>'; // close dcolgrid (writing)
 h+='</div></div>';return h}
 function wD(id){_presSc(()=>{D.wt.forEach(t=>{if(t.id===id){t.status='done';t.doneAt=new Date().toISOString()}});D.wh.forEach(t=>{if(t.id===id){t.status='done';t.doneAt=new Date().toISOString()}});sv();rr()})}
 function cpWr(){const pending=D.wt.filter(t=>t.status==='waiting'||t.status==='late'||t.status==='doubled').sort((a,b)=>sLN(a.nm,b.nm));
