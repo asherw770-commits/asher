@@ -3835,6 +3835,19 @@ e.innerHTML='<div class="O" onclick="document.getElementById(\'phmov\').innerHTM
 // ═══ INIT ═══
 window._appBoot=function(){
 ld();
+// deep-link handling from notification taps: /?page=phones&t=tonight and
+// /?snooze=1 are the URLs the push payload embeds. Snooze runs a POST to
+// /api/snooze (fallback for iOS where the notification action button may
+// not show).
+try{
+ var _u=new URL(location.href);
+ var _pg=_u.searchParams.get('page');
+ var _pTab=_u.searchParams.get('t');
+ var _sn=_u.searchParams.get('snooze');
+ if(_pg==='phones'){pg='phones';if(_pTab==='afternoon'||_pTab==='tonight')pT=_pTab;}
+ if(_sn==='1'){fetch('/api/snooze',{method:'POST'}).catch(function(){});}
+ if(_pg||_sn){_u.search='';history.replaceState({},'',_u.pathname);}
+}catch(e){}
 // Multi-tab sync
 window.addEventListener('storage',e=>{if(e.key===K){try{D=JSON.parse(e.newValue)}catch(ex){};rr()}});
 // Request persistent storage
