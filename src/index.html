@@ -766,7 +766,7 @@ function sk(n){let s=0;for(let i=1;i<=60;i++){const d=new Date;d.setDate(d.getDa
 function cT(id){return D.cx.some(s=>s.si===id&&s.dt===td())}
 function lS(id){return[...D.cx].filter(s=>s.si===id).sort((a,b)=>b.dt.localeCompare(a.dt))[0]||null}
 // ═══ RENDER + NAV ═══
-function rr(){var _pv=document.querySelector('.S');var _pt=_pv?_pv.scrollTop:null;const now=new Date;var _chg=false;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now){t.status='late';_chg=true;}});var _wl=D.wt.length;D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));if(D.wt.length!==_wl)_chg=true;if(_chg)sv();let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg==='manual')h=rMan();else if(pg==='locks')h=rLocks();else if(pg==='sleeptbl')h=rSleepTbl();else if(pg==='cleanup')h=rCleanUp();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h;if(_pt!=null){var _nv=document.querySelector('.S');if(_nv)_nv.scrollTop=_pt;}}
+function rr(){var _pv=document.querySelector('.S');var _pt=_pv?_pv.scrollTop:null;const now=new Date;var _chg=false;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now){t.status='late';_chg=true;}});var _wl=D.wt.length;D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));if(D.wt.length!==_wl)_chg=true;if(_chg)sv();let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg==='manual')h=rMan();else if(pg==='locks')h=rLocks();else if(pg==='sleeptbl')h=rSleepTbl();else if(pg==='cleanup')h=rCleanUp();else if(pg==='scan')h=rScan();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h;if(_pt!=null){var _nv=document.querySelector('.S');if(_nv)_nv.scrollTop=_pt;}}
 function rN(){const lt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length;const ac=D.pb.filter(iA),ms=ac.filter(b=>D.pt[b]!==true).length;const ot=D.tk.filter(t=>!t.dn).length;
 return'<div class="N">'+[{k:'home',i:'🏠',l:'ראשי',b:0},{k:'phones',i:'📱',l:'הפקדות',b:ms||0},{k:'writing',i:'📝',l:'כתיבה',b:lt||0},{k:'tasks',i:'📋',l:'משימות',b:ot||0},{k:'pin',i:'🔒',l:'שיחות',b:0},{k:'settings',i:'⚙️',l:'הגדרות',b:0}].map(t=>{const on=pg===t.k||(t.k==='pin'&&pg.startsWith('c'));return'<div class="ni'+(on?' on':'')+'" onclick="go(\''+t.k+'\')"><span style="font-size:19.2px;position:relative">'+t.i+(t.b?'<span class="bg">'+t.b+'</span>':'')+'</span><span style="font-size:9.6px;margin-top:2px">'+t.l+'</span></div>'}).join('')+'</div>'}
 // ═══ HOME DASHBOARD ═══
@@ -880,6 +880,14 @@ if(D._lastAutoBackup){h+='<div style="text-align:center;margin-top:10px;font-siz
 
 
 h+='</div></div>';
+// dedicated scan entry point - most important daily action, so front and
+// centre rather than buried in the printouts drawer
+h+='<div class="C" style="margin-top:8px;cursor:pointer;background:var(--pud);border-color:rgba(167,139,250,.35)" onclick="go(\'scan\')">'
+ +'<div style="display:flex;align-items:center;gap:12px">'
+ +'<div style="font-size:28px">📷</div>'
+ +'<div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--pu)">סרוק דוח יומי</div>'
+ +'<div style="font-size:12.4px;color:var(--t1)">צלם את הדף המודפס — האפליקציה תזהה את התאריך</div></div>'
+ +'<div style="color:var(--pu);font-size:20px">›</div></div></div>';
 // ═══ Printable documents (pre-made PDFs + roster) — collapsed by default so
 // they don't dominate the dashboard; user opens with a single tap
 h+='<div class="C" style="margin-top:6px;cursor:pointer" onclick="window._printOpen=!window._printOpen;rr()"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;font-size:15.6px;color:var(--t0)">🖨 הדפסות</span><span style="font-size:13.2px;color:var(--t2)">'+(window._printOpen?'▲':'▼')+'</span></div></div>';
@@ -2077,6 +2085,97 @@ function showFloorLateModal(period){
 }
 function resetCleanAll(){if(!confirm('לאפס את כל סימוני הניקיון?'))return;
  D.cleanStatus={};D.roomClean={};sv();rr();}
+// ═══ Scan printed daily report (phase 1: capture + date detection) ═══
+// Tesseract.js is loaded lazily (~2MB) only on first scan so it doesn't
+// weigh down initial app load. Phase 2 (automatic cell OMR to update the
+// state without manual entry) will layer on top of the same capture UX.
+function _loadTesseract(){
+ if(window.Tesseract)return Promise.resolve(window.Tesseract);
+ return new Promise(function(resolve,reject){
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+  s.onload=function(){resolve(window.Tesseract);};
+  s.onerror=function(){reject(new Error('לא הצלחתי לטעון את מנוע הזיהוי (Tesseract)'));};
+  document.head.appendChild(s);
+ });
+}
+function _setScanStatus(html){var e=document.getElementById('scanResult');if(e)e.innerHTML=html;}
+async function handleScanImage(input){
+ var f=input.files&&input.files[0];if(!f)return;
+ var url=URL.createObjectURL(f);
+ var prev=document.getElementById('scanPreview');
+ if(prev)prev.innerHTML='<div class="C" style="padding:8px"><img src="'+url+'" style="width:100%;border-radius:8px;display:block"></div>';
+ _setScanStatus('<div class="C" style="text-align:center;padding:14px;color:var(--t1)">⏳ טוען מנוע זיהוי...</div>');
+ try{
+  var T=await _loadTesseract();
+  _setScanStatus('<div class="C" style="text-align:center;padding:14px;color:var(--t1)">⏳ מזהה טקסט בתמונה... 0%</div>');
+  var res=await T.recognize(url,'eng',{logger:function(m){
+   if(m.status==='recognizing text'){_setScanStatus('<div class="C" style="text-align:center;padding:14px;color:var(--t1)">⏳ מזהה טקסט... '+Math.round(m.progress*100)+'%</div>');}
+  }});
+  var text=(res&&res.data&&res.data.text)||'';
+  var m=text.match(/(20\d{2})-?(0\d|1[0-2])-?(\d{2})/);
+  if(m){
+   var dateISO=m[1]+'-'+m[2]+'-'+m[3];
+   _showScanDateFound(dateISO,text);
+  }else{
+   _setScanStatus('<div class="C" style="border-color:rgba(239,68,68,.35)"><div style="font-size:15px;font-weight:700;color:var(--rd);margin-bottom:6px">לא זוהה תאריך</div>'
+    +'<div style="font-size:13px;color:var(--t1);line-height:1.6">התמונה לא הייתה מספיק ברורה, או שהמצלמה לא תפסה את שורת התאריך שמעל הטבלאות. נסה שוב עם תמונה חדה יותר של החלק העליון של הדף.</div>'
+    +'<details style="margin-top:8px;font-size:12px;color:var(--t2)"><summary>מה נקרא בתמונה</summary><pre style="white-space:pre-wrap;font-size:11px;margin-top:6px;max-height:120px;overflow-y:auto">'+es(text.slice(0,500))+'</pre></details></div>');
+  }
+ }catch(e){
+  _setScanStatus('<div class="C" style="border-color:rgba(239,68,68,.35);color:var(--rd)">שגיאה: '+es(e.message||String(e))+'</div>');
+ }
+}
+function _showScanDateFound(dateISO,rawText){
+ var hebDate=hF(dateISO);
+ var dayName=DN[new Date(dateISO+'T12:00:00').getDay()];
+ var isToday=dateISO===td();
+ var isFuture=dateISO>td();
+ var html='<div class="C" style="border-color:var(--gb)">'
+  +'<div style="font-size:15px;font-weight:700;color:var(--go);margin-bottom:8px">✅ תאריך זוהה</div>'
+  +'<div style="font-size:20px;font-weight:800;color:var(--t0)">'+es(hebDate)+'</div>'
+  +'<div style="font-size:13.2px;color:var(--t1);margin-top:2px">יום '+dayName+' · '+dateISO+'</div>'
+  +(isFuture?'<div style="color:var(--rd);font-size:12px;margin-top:6px">⚠️ תאריך עתידי — כנראה זיהוי שגוי</div>':(isToday?'':'<div style="color:var(--am);font-size:12px;margin-top:6px">ℹ️ לא תאריך של היום</div>'))
+  +'<div style="display:flex;gap:6px;margin-top:12px">'
+  +'<button style="flex:1;padding:12px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14.4px;font-weight:700;cursor:pointer" onclick="_scanEditDate(\''+dateISO+'\')">📝 עדכן נתונים לתאריך זה</button>'
+  +'</div>'
+  +'<div style="font-size:11.4px;color:var(--t2);margin-top:8px;line-height:1.5">📌 בגרסה זו — פותח את עמוד הפקדות כדי לעדכן ידנית. שלב הבא (בפיתוח): זיהוי אוטומטי של הסימונים בגריד.</div>'
+  +'</div>';
+ _setScanStatus(html);
+}
+function _scanEditDate(dateISO){
+ // remember which date the user is editing so future phases can pin edits
+ // to that day instead of today
+ window._scanDateISO=dateISO;
+ go('phones');
+}
+function rScan(){
+ var h='<div class="P"><div class="H">'
+  +'<button class="B" onclick="go(\'home\')">← חזרה</button>'
+  +'<span style="font-weight:800;font-size:20.4px;color:var(--t0)">📷 סריקת דוח יומי</span>'
+  +'<div style="width:60px"></div></div>'
+  +'<div class="S" style="padding:12px 14px 100px">';
+ h+='<div class="C" style="margin-bottom:12px">'
+  +'<div style="font-size:14.4px;color:var(--t1);line-height:1.65;margin-bottom:12px">'
+  +'צלם את הדוח היומי המודפס לאחר שמלאת אותו. האפליקציה תזהה את התאריך מהברקוד/כותרת ותפתח את הנתונים לעדכון.'
+  +'</div>'
+  +'<label style="display:block">'
+  +'<input type="file" accept="image/*" capture="environment" onchange="handleScanImage(this);this.value=null" style="display:none">'
+  +'<div style="width:100%;padding:18px;border-radius:12px;background:var(--pu);color:#fff;font-size:17.6px;font-weight:800;text-align:center;cursor:pointer">📷 צלם או בחר תמונה</div>'
+  +'</label>'
+  +'<div style="font-size:12.4px;color:var(--t2);margin-top:8px;text-align:center;line-height:1.5">💡 טיפ: וודא שהתאריך בראש הדף (מעל הטבלאות) גלוי וחד</div>'
+  +'</div>';
+ h+='<div id="scanPreview"></div>';
+ h+='<div id="scanResult" style="margin-top:12px"></div>';
+ h+='<div class="C" style="margin-top:12px;background:var(--s2);border-color:var(--bd)">'
+  +'<div style="font-size:13px;color:var(--t2);line-height:1.65">'
+  +'<b style="color:var(--t1)">🔬 שלבי הפיתוח:</b><br>'
+  +'✅ <b>שלב 1</b> (עכשיו) — זיהוי התאריך מהתמונה + פתיחת עמוד עדכון<br>'
+  +'⏳ <b>שלב 2</b> (בהמשך) — זיהוי אוטומטי של תאי הסימון (מסומן/ריק) ועדכון הנתונים לפי הדוח המודפס<br>'
+  +'</div></div>';
+ h+='</div></div>';
+ return h;
+}
 function rCleanUp(){
  if(!D.boyRoom)D.boyRoom={};if(!D.boyBed)D.boyBed={};
  if(!D.cleanStatus)D.cleanStatus={};if(!D.roomClean)D.roomClean={};
