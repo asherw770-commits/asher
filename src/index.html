@@ -92,6 +92,30 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
  .T{padding:0 22px}
  .tb{padding:10px 16px;font-size:14.8px}
  .inp,.ta{font-size:15px;padding:11px 14px}
+ /* ═══ multi-column layouts on desktop ═══
+    Cards wrapped in .dgrid become 2- or 3-column grids on desktop while
+    still stacking on mobile. Individual cards keep their sizing and the
+    grid handles the horizontal distribution. */
+ .dgrid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+ .dgrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:start}
+ .dgrid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:start}
+ .dgrid2>*,.dgrid3>*,.dgrid4>*{margin-bottom:0}
+ /* boy stats: allow the chip strip to expand to 6 columns instead of 2 */
+ .boystat-wrap div[style*="flex:1 1 calc(50%"] {flex:1 1 calc(33.33% - 7px)!important}
+ /* deposit stats side-by-side */
+ .boystat-wrap .depGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+ .boystat-wrap .depGrid>*{margin:0!important}
+ /* home dashboard hero grid — stats + status cards balance in 3 cols */
+ .homeHero{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+ .homeHero>*{margin:0!important}
+ /* row items: make the room list breathe more */
+ .R{padding:12px 15px}
+ /* dashboard: masonry-like 2-column layout using CSS multi-column so all
+    dashboard cards flow naturally into two columns instead of stretching
+    across the full desktop width */
+ .S.home-dash{column-count:2;column-gap:14px;padding-bottom:60px}
+ .S.home-dash > *{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin-bottom:10px;display:block}
+ .S.home-dash .sl{margin-top:16px}
 }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -468,12 +492,9 @@ function _renderDeviceBlock(){
  var id=_getDeviceId();
  var name=_getDeviceName();
  return '<div style="position:fixed;inset:0;background:#0a0f1c;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;direction:rtl;font-family:Heebo,Arial,sans-serif;color:#e8edf5;overflow-y:auto">'
-  +'<div style="font-size:56px;font-weight:900;color:#ef4444;margin-bottom:14px;letter-spacing:1px">נחסמת יבן אלף !</div>'
-  // image slot: real photo drops in when /assets/blocked.jpg is present,
-  // otherwise the emoji fallback keeps the vibe intact
-  +'<img id="blkImg" src="/assets/blocked.jpg" alt="" style="max-width:280px;width:80%;border-radius:14px;margin:6px 0 18px;box-shadow:0 8px 30px rgba(0,0,0,.6);display:none" onload="this.style.display=\'block\';document.getElementById(\'blkFallback\').style.display=\'none\'">'
-  +'<div id="blkFallback" style="font-size:110px;line-height:1;margin:0 0 20px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))">🦍🖕</div>'
-  +'<div style="font-size:14px;color:#9ba8bb;line-height:1.6;max-width:340px;margin-bottom:16px">בקשה נשלחה למכשירים המאושרים. אם ראוי — יאשרו לך. אם לא — לך לישון.</div>'
+  +'<div style="font-size:56px;margin-bottom:18px">🔒</div>'
+  +'<div style="font-size:24px;font-weight:800;color:#eab54a;margin-bottom:10px">המכשיר לא מאושר</div>'
+  +'<div style="font-size:15px;color:#9ba8bb;line-height:1.6;max-width:340px;margin-bottom:16px">בקשת חיבור נשלחה למכשירים המאושרים. פתח שם את האפליקציה כדי לאשר את המכשיר הזה.</div>'
   +'<div style="background:#131926;border:1px solid rgba(148,163,184,.18);border-radius:12px;padding:14px 18px;margin-bottom:20px;text-align:right;min-width:240px">'
   +'<div style="font-size:12px;color:#5e6e85;margin-bottom:4px">שם המכשיר</div>'
   +'<div style="font-size:16px;font-weight:700;color:#e8edf5;margin-bottom:8px">'+es(name)+'</div>'
@@ -1005,7 +1026,7 @@ const wLt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length,wWt=D.w
 const otk=D.tk.filter(t=>!t.dn).length;
 const now=new Date,dy=DN[now.getDay()],tm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
 const hol=getHol(td()),yesh=isYD(now);
-let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:20.4px;color:var(--t0)">🏠 דשבורד</span><div style="width:60px"></div></div><div class="S" style="padding:8px 12px 100px">';
+let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:20.4px;color:var(--t0)">🏠 דשבורד</span><div style="width:60px"></div></div><div class="S home-dash" style="padding:8px 12px 100px">';
 // Big clock
 h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:16px;margin-bottom:8px;text-align:center"><div id="hmClk" style="font-size:50.4px;font-weight:700;color:var(--go);font-variant-numeric:tabular-nums;letter-spacing:4px">'+tm+'</div></div>';
 // Date & yeshiva status
