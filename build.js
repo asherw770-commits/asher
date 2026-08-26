@@ -15,9 +15,6 @@ const REQUIRED_VARS = [
   'FIREBASE_APP_ID',
 ];
 
-// optional - required only if push notifications are used
-const OPTIONAL_VARS = ['FIREBASE_VAPID_KEY'];
-
 const missing = REQUIRED_VARS.filter((k) => !process.env[k]);
 if (missing.length) {
   console.error('Missing required environment variables:', missing.join(', '));
@@ -42,7 +39,6 @@ const replacements = {
   __FIREBASE_STORAGE_BUCKET__: process.env.FIREBASE_STORAGE_BUCKET,
   __FIREBASE_MESSAGING_SENDER_ID__: process.env.FIREBASE_MESSAGING_SENDER_ID,
   __FIREBASE_APP_ID__: process.env.FIREBASE_APP_ID,
-  __FIREBASE_VAPID_KEY__: process.env.FIREBASE_VAPID_KEY || '',
   __BUILD_STAMP__: buildStamp,
 };
 
