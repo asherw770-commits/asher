@@ -487,7 +487,7 @@ function _deviceInitCheck(){
   var now=new Date();
   if(!was||now-new Date(was)>60000){
    D._approvedDevices[id].lastSeen=now.toISOString();
-   sv();
+   sv({bg:true});
   }
   return true;
  }
@@ -624,6 +624,17 @@ function ld(){
      if(remoteTs<localTs)sv();
      return;
     }
+    // We have unpushed local edits (_fbPending=true) but a NEWER snapshot
+    // arrived from another device. Naively overwriting D with remote would
+    // silently discard whatever the user just did on this device. Flush our
+    // pending write first so at least our edits reach the server (last-writer
+    // wins per-doc: some concurrent remote changes may be lost, but our own
+    // work isn't silently deleted). Skip this snapshot - our echo will come
+    // back with a newer timestamp and we'll process the merged state then.
+    if(_fbPending){
+     try{flushSv();}catch(e){console.error('flushSv on concurrent snapshot failed',e);}
+     return;
+    }
     D={...df(),...remote};
     heal();
     _mergePhotos();
@@ -665,7 +676,7 @@ function heal(){
  D.cs=D.cs.filter(function(x){return x&&typeof x==='object';});
  D.tk=D.tk.filter(function(x){return x&&typeof x==='object';});
  D._scans.forEach(function(x){if(x&&x.img)delete x.img;});
- if(fixed)try{sv();}catch(e){}
+ if(fixed)try{sv({bg:true});}catch(e){}
  return fixed;
 }
 // Google Drive Backup
@@ -884,7 +895,17 @@ function _mergePhotos(){
   if(rp&&rp.length&&(!e.photos||!e.photos.length))e.photos=rp;
  });
 }
-function sv(){D._updatedAt=Date.now();D._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
+// sv() called with {bg:true} means a background/auto-maintenance write
+// (auto-transitioning task status to 'late' on render, healing malformed
+// shape, updating device lastSeen). These MUST NOT bump _updatedAt or write
+// to Firestore - if they did, a device that just opened would claim a
+// newer timestamp than any legitimate user edit still sitting in the cloud
+// from another device, and its stale localStorage snapshot would then win
+// the "remoteTs<localTs? push local up" race and wipe the other device's
+// real edits. Real user edits (button clicks, form submits) call sv() with
+// no args and DO update the timestamp + push to Firestore.
+function sv(opts){opts=opts||{};if(!opts.bg){D._updatedAt=Date.now();}D._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
+ if(opts.bg)return;
  if(typeof _fbDocRef!=='undefined'){
   _fbPending=true;
   clearTimeout(_fbSaveTimer);
@@ -1053,7 +1074,7 @@ function rr(opts){
    return;
   }
  }
- var _pv=document.querySelector('.S');var _pt=_pv?_pv.scrollTop:null;const now=new Date;var _chg=false;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now){t.status='late';_chg=true;}});var _wl=D.wt.length;D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));if(D.wt.length!==_wl)_chg=true;if(_chg)sv();let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg==='manual')h=rMan();else if(pg==='locks')h=rLocks();else if(pg==='sleeptbl')h=rSleepTbl();else if(pg==='cleanup')h=rCleanUp();else if(pg==='scan')h=rScan();else if(pg==='scanDetect')h=rScanDetect();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h;if(_pt!=null){var _nv=document.querySelector('.S');if(_nv)_nv.scrollTop=_pt;}}
+ var _pv=document.querySelector('.S');var _pt=_pv?_pv.scrollTop:null;const now=new Date;var _chg=false;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now){t.status='late';_chg=true;}});var _wl=D.wt.length;D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));if(D.wt.length!==_wl)_chg=true;if(_chg)sv({bg:true});let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg==='manual')h=rMan();else if(pg==='locks')h=rLocks();else if(pg==='sleeptbl')h=rSleepTbl();else if(pg==='cleanup')h=rCleanUp();else if(pg==='scan')h=rScan();else if(pg==='scanDetect')h=rScanDetect();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h;if(_pt!=null){var _nv=document.querySelector('.S');if(_nv)_nv.scrollTop=_pt;}}
 function rN(){const lt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length;const ac=D.pb.filter(iA),ms=ac.filter(b=>D.pt[b]!==true).length;const ot=D.tk.filter(t=>!t.dn).length;
 return'<div class="N">'+[{k:'home',i:'🏠',l:'ראשי',b:0},{k:'phones',i:'📱',l:'הפקדות',b:ms||0},{k:'writing',i:'📝',l:'כתיבה',b:lt||0},{k:'tasks',i:'📋',l:'משימות',b:ot||0},{k:'pin',i:'🔒',l:'שיחות',b:0},{k:'settings',i:'⚙️',l:'הגדרות',b:0}].map(t=>{const on=pg===t.k||(t.k==='pin'&&pg.startsWith('c'));return'<div class="ni'+(on?' on':'')+'" onclick="go(\''+t.k+'\')"><span style="font-size:19.2px;position:relative">'+t.i+(t.b?'<span class="bg">'+t.b+'</span>':'')+'</span><span style="font-size:9.6px;margin-top:2px">'+t.l+'</span></div>'}).join('')+'</div>'}
 // ═══ HOME DASHBOARD ═══
