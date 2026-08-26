@@ -467,10 +467,13 @@ function _deviceInitCheck(){
 function _renderDeviceBlock(){
  var id=_getDeviceId();
  var name=_getDeviceName();
- return '<div style="position:fixed;inset:0;background:#0a0f1c;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;direction:rtl;font-family:Heebo,Arial,sans-serif;color:#e8edf5">'
-  +'<div style="font-size:56px;margin-bottom:18px">🔒</div>'
-  +'<div style="font-size:24px;font-weight:800;color:#eab54a;margin-bottom:10px">המכשיר לא מאושר</div>'
-  +'<div style="font-size:15px;color:#9ba8bb;line-height:1.6;max-width:340px;margin-bottom:16px">בקשת חיבור נשלחה למכשירים המאושרים. פתח שם את האפליקציה כדי לאשר את המכשיר הזה.</div>'
+ return '<div style="position:fixed;inset:0;background:#0a0f1c;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;direction:rtl;font-family:Heebo,Arial,sans-serif;color:#e8edf5;overflow-y:auto">'
+  +'<div style="font-size:56px;font-weight:900;color:#ef4444;margin-bottom:14px;letter-spacing:1px">נחסמת יבן אלף !</div>'
+  // image slot: real photo drops in when /assets/blocked.jpg is present,
+  // otherwise the emoji fallback keeps the vibe intact
+  +'<img id="blkImg" src="/assets/blocked.jpg" alt="" style="max-width:280px;width:80%;border-radius:14px;margin:6px 0 18px;box-shadow:0 8px 30px rgba(0,0,0,.6);display:none" onload="this.style.display=\'block\';document.getElementById(\'blkFallback\').style.display=\'none\'">'
+  +'<div id="blkFallback" style="font-size:110px;line-height:1;margin:0 0 20px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))">🦍🖕</div>'
+  +'<div style="font-size:14px;color:#9ba8bb;line-height:1.6;max-width:340px;margin-bottom:16px">בקשה נשלחה למכשירים המאושרים. אם ראוי — יאשרו לך. אם לא — לך לישון.</div>'
   +'<div style="background:#131926;border:1px solid rgba(148,163,184,.18);border-radius:12px;padding:14px 18px;margin-bottom:20px;text-align:right;min-width:240px">'
   +'<div style="font-size:12px;color:#5e6e85;margin-bottom:4px">שם המכשיר</div>'
   +'<div style="font-size:16px;font-weight:700;color:#e8edf5;margin-bottom:8px">'+es(name)+'</div>'
