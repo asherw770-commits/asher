@@ -15,6 +15,9 @@ const REQUIRED_VARS = [
   'FIREBASE_APP_ID',
 ];
 
+// optional - required only if push notifications are used
+const OPTIONAL_VARS = ['FIREBASE_VAPID_KEY'];
+
 const missing = REQUIRED_VARS.filter((k) => !process.env[k]);
 if (missing.length) {
   console.error('Missing required environment variables:', missing.join(', '));
@@ -39,17 +42,32 @@ const replacements = {
   __FIREBASE_STORAGE_BUCKET__: process.env.FIREBASE_STORAGE_BUCKET,
   __FIREBASE_MESSAGING_SENDER_ID__: process.env.FIREBASE_MESSAGING_SENDER_ID,
   __FIREBASE_APP_ID__: process.env.FIREBASE_APP_ID,
+  __FIREBASE_VAPID_KEY__: process.env.FIREBASE_VAPID_KEY || '',
   __BUILD_STAMP__: buildStamp,
 };
 
-for (const [token, value] of Object.entries(replacements)) {
-  // split/join instead of a regex replace - simplest way to replace every
-  // occurrence without worrying about regex special characters in values
-  html = html.split(token).join(value);
+function applyReplacements(text) {
+  for (const [token, value] of Object.entries(replacements)) {
+    // split/join instead of a regex replace - simplest way to replace every
+    // occurrence without worrying about regex special characters in values
+    text = text.split(token).join(value);
+  }
+  return text;
 }
+
+html = applyReplacements(html);
 
 if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true });
 fs.writeFileSync(distPath, html, 'utf8');
+
+// service worker for web push - must be served at root scope so it can
+// intercept push events for the whole PWA
+const swSrc = path.join(__dirname, 'src', 'sw.js');
+if (fs.existsSync(swSrc)) {
+  const sw = applyReplacements(fs.readFileSync(swSrc, 'utf8'));
+  fs.writeFileSync(path.join(distDir, 'sw.js'), sw, 'utf8');
+  console.log('Wrote dist/sw.js with Firebase config injected.');
+}
 
 // copy static assets (printable PDFs the app links to from the dashboard)
 const assetsSrc = path.join(__dirname, 'src', 'assets');

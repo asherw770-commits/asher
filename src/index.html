@@ -96,6 +96,7 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js"></script>
 <script>
 var FIREBASE_CONFIG={
   apiKey:"__FIREBASE_API_KEY__",
@@ -119,6 +120,48 @@ var _fbDocRef=_fbDb.collection('shared').doc('main');
 var _fbPhotosCol=_fbDb.collection('photos');
 // stamped at build time - lets each device show which deploy it's running
 var _BUILD_STAMP='__BUILD_STAMP__';
+// web push (iOS 16.4+ PWA). VAPID key is injected at build time from Vercel;
+// if not set, notification enable button will explain why it's inactive.
+var _FIREBASE_VAPID_KEY='__FIREBASE_VAPID_KEY__';
+var _fbMsg=null;
+try{if(firebase.messaging&&firebase.messaging.isSupported&&firebase.messaging.isSupported())_fbMsg=firebase.messaging();}catch(e){}
+function _pwaInstalled(){
+ return (window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;
+}
+function _pushSupported(){return !!(_fbMsg&&'Notification' in window&&'serviceWorker' in navigator);}
+async function enableNotifications(){
+ try{
+  if(!_pushSupported()){alert('הדפדפן/מכשיר לא תומכים בהתראות דחיפה');return;}
+  // iOS: notifications only work when the PWA is added to home screen
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  if(isIOS&&!_pwaInstalled()){
+   alert('באייפון:\n1. פתח את השיתוף בסאפארי\n2. הוסף למסך הבית\n3. פתח את האפליקציה מהמסך הבית\n4. אז לחץ שוב על "הפעל התראות"');
+   return;
+  }
+  if(!_FIREBASE_VAPID_KEY||_FIREBASE_VAPID_KEY.indexOf('__')===0){
+   alert('חסר מפתח VAPID. צריך להגדיר FIREBASE_VAPID_KEY ב-Vercel Environment Variables.\nמקבלים אותו ב-Firebase Console → Project settings → Cloud Messaging → Web Push certificates.');
+   return;
+  }
+  var perm=await Notification.requestPermission();
+  if(perm!=='granted'){alert('לא אישרת התראות. אפשר לשנות בהגדרות הדפדפן/מכשיר.');return;}
+  var reg=await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+  var token=await _fbMsg.getToken({vapidKey:_FIREBASE_VAPID_KEY,serviceWorkerRegistration:reg});
+  if(!token){alert('לא הצלחנו לקבל token מ-Firebase Messaging');return;}
+  if(!D._pushTokens)D._pushTokens={};
+  D._pushTokens[token]={device:navigator.userAgent.slice(0,80),at:Date.now()};
+  sv();
+  alert('✅ התראות הופעלו בהצלחה!\nהמכשיר הזה יקבל התראות מעכשיו.');
+ }catch(e){alert('שגיאה: '+(e.code||e.message||e));}
+}
+function disableNotifications(){
+ if(!D._pushTokens)return;
+ if(!confirm('לבטל התראות במכשיר הזה?'))return;
+ // clear all tokens - can't easily identify which is "this device" so wipe
+ // all and let each device re-enable if wanted
+ D._pushTokens={};sv();
+ alert('התראות בוטלו. כל מכשיר יצטרך להפעיל מחדש.');
+}
 // iOS PWAs cache the initial HTML in their own webkit container and DO NOT
 // honor Cache-Control headers reliably - once installed to the home screen
 // they can serve a version-frozen bundle for weeks. Fetch the live HTML on
@@ -912,6 +955,18 @@ h+='</div></div>';
 h+='<div class="C"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:8px">🔑 קוד נעילה</div><div style="display:flex;gap:8px"><input class="inp" id="pinInp" value="'+(D.pin||'1234')+'" style="width:100px;text-align:center;font-size:21.6px;letter-spacing:6px" maxlength="4"><button style="padding:8px 16px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="D.pin=document.getElementById(\'pinInp\').value;sv();alert(\'נשמר!\')">שמור</button></div></div>';
 
 // Backup & Restore
+// push-notification enable/disable (iOS 16.4+ PWA + Chrome/Safari desktop)
+{
+ var _pushCount=Object.keys((D&&D._pushTokens)||{}).length;
+ h+='<div class="C" style="margin-top:10px"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:6px">🔔 התראות</div>';
+ h+='<div style="font-size:13.2px;color:var(--t2);margin-bottom:10px">התראות דחיפה למכשירים על משימות באיחור, קיטים שהסתיימו, וכו׳.<br>באייפון: קודם להוסיף למסך הבית, אחר כך להפעיל.</div>';
+ h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+ h+='<button style="padding:10px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:14.4px;font-weight:700;cursor:pointer" onclick="enableNotifications()">🔔 הפעל התראות במכשיר זה</button>';
+ h+='<button style="padding:10px;border-radius:8px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:14.4px;font-weight:700;cursor:pointer" '+(_pushCount?'':'disabled ')+'onclick="disableNotifications()">🔕 בטל התראות</button>';
+ h+='</div>';
+ h+='<div style="font-size:12.0px;color:var(--t2);margin-top:8px">'+(_pushCount?'✓ '+_pushCount+' מכשיר'+(_pushCount>1?'ים':'')+' רשומים':'לא רשומים מכשירים עדיין')+'</div>';
+ h+='</div>';
+}
 h+='<div class="C" style="margin-top:10px"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:6px">💾 גיבוי ושחזור</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:10px">מייצא/מייבא את כל הנתונים: שיחות, הפקדות, משימות, תמונות, הכל.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button style="padding:10px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:14.4px;font-weight:700;cursor:pointer" onclick="doBackup(false)">⬇ ייצוא גיבוי</button><button style="padding:10px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:14.4px;font-weight:700;cursor:pointer" onclick="document.getElementById(\'impFile\').click()">⬆ ייבוא גיבוי</button></div><input type="file" id="impFile" accept="application/json,.json" style="display:none" onchange="impData(this)"><div style="font-size:12.0px;color:var(--t2);margin-top:8px">💡 כדאי לעשות ייצוא גיבוי פעם בשבוע ולפני שדרוג האפליקציה</div></div>';
 // Sample data
 h+='<div class="C" style="margin-top:10px"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:6px">📄 ייצוא שיחות לטקסט</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:10px">מייצא את כל השיחות מתקופה מוגדרת לקובץ טקסט נייד לעריכה.</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px"><button style="padding:10px 6px;border-radius:8px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:14.4px;font-weight:700;cursor:pointer" onclick="expText(\'week\')">📄 שבוע</button><button style="padding:10px 6px;border-radius:8px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:14.4px;font-weight:700;cursor:pointer" onclick="expText(\'month\')">📄 חודש</button><button style="padding:10px 6px;border-radius:8px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:14.4px;font-weight:700;cursor:pointer" onclick="expText(\'year\')">📄 שנה</button></div><div style="font-size:12.0px;color:var(--t2);margin-top:8px">💡 קובץ הטקסט ניתן לפתיחה בכל תוכנה (Word, מסמכי Google, וכו׳)</div></div>';
