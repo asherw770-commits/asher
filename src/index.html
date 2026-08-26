@@ -306,6 +306,111 @@ function sortByRoomBed(list){
 function cpML(){const rd=Object.keys(D.ph).sort((a,b)=>b.localeCompare(a)).slice(0,pMF);const ml=D.pb.filter(b=>{if(!iA(b))return false;let c=0;rd.forEach(dk=>{const hh=(D.ph||{})[dk];if(hh&&hh.m&&hh.m.includes(b))c++});return c===rd.length});if(!ml.length){alert('אין חסרים לתקופה זו');return}const txt=ml.sort(sLN).join('\n');navigator.clipboard.writeText(txt).then(()=>alert('הועתקו '+ml.length+' שמות!')).catch(()=>{prompt('העתק ידנית:',txt)})}
 function es(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 let D;const K='yv9';
+// ═══ Device access control ═══
+// each browser/PWA install gets a random UUID stored in localStorage. Any
+// device not in D._approvedDevices is blocked from viewing the app and a
+// push notification goes to approved devices asking for approval. First
+// device ever to load bootstraps itself as approved.
+const _DEV_KEY='asher_dev_id';
+function _getDeviceId(){
+ var id=localStorage.getItem(_DEV_KEY);
+ if(!id){
+  id=(window.crypto&&crypto.randomUUID?crypto.randomUUID():'dev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10));
+  try{localStorage.setItem(_DEV_KEY,id);}catch(e){}
+ }
+ return id;
+}
+function _getDeviceName(){
+ var ua=navigator.userAgent;
+ if(/iPad/.test(ua))return 'iPad';
+ if(/iPhone|iPod/.test(ua))return 'iPhone';
+ if(/Android/.test(ua))return 'Android';
+ if(/Macintosh/.test(ua))return 'Mac';
+ if(/Windows/.test(ua))return 'Windows';
+ if(/Linux/.test(ua))return 'Linux';
+ return 'מכשיר';
+}
+function _deviceApproved(){
+ var id=_getDeviceId();
+ return !!(D&&D._approvedDevices&&D._approvedDevices[id]);
+}
+function _deviceInitCheck(){
+ // called after ld() has loaded D from local/remote and every time a
+ // snapshot updates D. returns true if this device is allowed to view.
+ if(!D._approvedDevices)D._approvedDevices={};
+ var id=_getDeviceId();
+ var name=_getDeviceName();
+ // BOOTSTRAP: nobody approved yet → first device becomes approved. only
+ // happens once ever for the app.
+ if(Object.keys(D._approvedDevices).length===0){
+  D._approvedDevices[id]={name:name,ua:navigator.userAgent.slice(0,120),approvedAt:new Date().toISOString(),lastSeen:new Date().toISOString()};
+  sv();
+  return true;
+ }
+ if(D._approvedDevices[id]){
+  // update last-seen timestamp on every check (debounced by sv's own timer)
+  var was=D._approvedDevices[id].lastSeen;
+  var now=new Date();
+  if(!was||now-new Date(was)>60000){
+   D._approvedDevices[id].lastSeen=now.toISOString();
+   sv();
+  }
+  return true;
+ }
+ // Not approved - register a pending request and notify approved devices
+ if(!D._pendingDevices)D._pendingDevices={};
+ if(!D._pendingDevices[id]){
+  D._pendingDevices[id]={name:name,ua:navigator.userAgent.slice(0,120),requestedAt:new Date().toISOString()};
+  sv();
+  fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   title:'🔔 מכשיר חדש מבקש להתחבר',
+   body:name+' — פתח את האפליקציה לאישור',
+   tag:'device-request',
+   url:'/?page=settings&scrollTo=devices'
+  })}).catch(function(){});
+ }
+ return false;
+}
+function _renderDeviceBlock(){
+ var id=_getDeviceId();
+ var name=_getDeviceName();
+ return '<div style="position:fixed;inset:0;background:#0a0f1c;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;direction:rtl;font-family:Heebo,Arial,sans-serif;color:#e8edf5">'
+  +'<div style="font-size:56px;margin-bottom:18px">🔒</div>'
+  +'<div style="font-size:24px;font-weight:800;color:#eab54a;margin-bottom:10px">המכשיר לא מאושר</div>'
+  +'<div style="font-size:15px;color:#9ba8bb;line-height:1.6;max-width:340px;margin-bottom:16px">בקשת חיבור נשלחה למכשירים המאושרים. פתח שם את האפליקציה כדי לאשר את המכשיר הזה.</div>'
+  +'<div style="background:#131926;border:1px solid rgba(148,163,184,.18);border-radius:12px;padding:14px 18px;margin-bottom:20px;text-align:right;min-width:240px">'
+  +'<div style="font-size:12px;color:#5e6e85;margin-bottom:4px">שם המכשיר</div>'
+  +'<div style="font-size:16px;font-weight:700;color:#e8edf5;margin-bottom:8px">'+es(name)+'</div>'
+  +'<div style="font-size:12px;color:#5e6e85;margin-bottom:4px">מזהה קצר</div>'
+  +'<div style="font-size:13px;font-family:monospace;color:#9ba8bb">'+es(id.slice(0,8))+'</div>'
+  +'</div>'
+  +'<button style="padding:12px 22px;border-radius:10px;background:#c9a84c;color:#0a0f1c;border:none;font-size:15px;font-weight:800;cursor:pointer" onclick="location.reload()">🔄 בדוק שוב</button>'
+  +'</div>';
+}
+function _approveDevice(id){
+ if(!D._pendingDevices||!D._pendingDevices[id]){alert('בקשה זו כבר לא קיימת');return;}
+ var info=D._pendingDevices[id];
+ if(!D._approvedDevices)D._approvedDevices={};
+ D._approvedDevices[id]={name:info.name,ua:info.ua,approvedAt:new Date().toISOString(),lastSeen:info.requestedAt};
+ delete D._pendingDevices[id];
+ sv();rr();
+ showBanner('✅ אושר: '+info.name,2500);
+}
+function _denyDevice(id){
+ if(!D._pendingDevices||!D._pendingDevices[id])return;
+ if(!confirm('לדחות את '+D._pendingDevices[id].name+'?'))return;
+ delete D._pendingDevices[id];
+ sv();rr();
+}
+function _removeDevice(id){
+ if(!D._approvedDevices||!D._approvedDevices[id])return;
+ var info=D._approvedDevices[id];
+ var myId=_getDeviceId();
+ if(id===myId){if(!confirm('להסיר את המכשיר הזה? תצטרך לאשר מחדש בפעם הבאה שתפתח.'))return;}
+ else if(!confirm('להסיר את '+info.name+' מרשימת המכשירים המאושרים?'))return;
+ delete D._approvedDevices[id];
+ sv();rr();
+}
 function ld(){
  try{const s=localStorage.getItem(K);D=s?{...df(),...JSON.parse(s)}:df();}catch(e){D=df();}
  heal();
@@ -784,7 +889,15 @@ function sk(n){let s=0;for(let i=1;i<=60;i++){const d=new Date;d.setDate(d.getDa
 function cT(id){return D.cx.some(s=>s.si===id&&s.dt===td())}
 function lS(id){return[...D.cx].filter(s=>s.si===id).sort((a,b)=>b.dt.localeCompare(a.dt))[0]||null}
 // ═══ RENDER + NAV ═══
-function rr(){var _pv=document.querySelector('.S');var _pt=_pv?_pv.scrollTop:null;const now=new Date;var _chg=false;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now){t.status='late';_chg=true;}});var _wl=D.wt.length;D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));if(D.wt.length!==_wl)_chg=true;if(_chg)sv();let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg==='manual')h=rMan();else if(pg==='locks')h=rLocks();else if(pg==='sleeptbl')h=rSleepTbl();else if(pg==='cleanup')h=rCleanUp();else if(pg==='scan')h=rScan();else if(pg==='scanDetect')h=rScanDetect();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h;if(_pt!=null){var _nv=document.querySelector('.S');if(_nv)_nv.scrollTop=_pt;}}
+function rr(){
+ // device gate: after the initial 3-second bootstrap window, unapproved
+ // devices see only the lock screen. skipped until _deviceCheckReady so
+ // fresh installs don't false-negative before the first snapshot lands.
+ if(window._deviceCheckReady&&!_deviceApproved()){
+  document.getElementById('app').innerHTML=_renderDeviceBlock();
+  return;
+ }
+ var _pv=document.querySelector('.S');var _pt=_pv?_pv.scrollTop:null;const now=new Date;var _chg=false;D.wt.forEach(t=>{if(t.status==='waiting'&&new Date(t.dl)<now){t.status='late';_chg=true;}});var _wl=D.wt.length;D.wt=D.wt.filter(t=>!(t.status==='frozen'&&t.fu&&new Date(t.fu)<=now));if(D.wt.length!==_wl)_chg=true;if(_chg)sv();let h='';if(pg==='home')h=rHm();else if(pg==='phones')h=rPh();else if(pg==='writing')h=rWr();else if(pg==='tasks')h=rTk();else if(pg==='pin')h=rPn();else if(pg==='settings')h=rSt();else if(pg==='manual')h=rMan();else if(pg==='locks')h=rLocks();else if(pg==='sleeptbl')h=rSleepTbl();else if(pg==='cleanup')h=rCleanUp();else if(pg==='scan')h=rScan();else if(pg==='scanDetect')h=rScanDetect();else if(pg.startsWith('c'))h=rCv();h+=rN();document.getElementById('app').innerHTML=h;if(_pt!=null){var _nv=document.querySelector('.S');if(_nv)_nv.scrollTop=_pt;}}
 function rN(){const lt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length;const ac=D.pb.filter(iA),ms=ac.filter(b=>D.pt[b]!==true).length;const ot=D.tk.filter(t=>!t.dn).length;
 return'<div class="N">'+[{k:'home',i:'🏠',l:'ראשי',b:0},{k:'phones',i:'📱',l:'הפקדות',b:ms||0},{k:'writing',i:'📝',l:'כתיבה',b:lt||0},{k:'tasks',i:'📋',l:'משימות',b:ot||0},{k:'pin',i:'🔒',l:'שיחות',b:0},{k:'settings',i:'⚙️',l:'הגדרות',b:0}].map(t=>{const on=pg===t.k||(t.k==='pin'&&pg.startsWith('c'));return'<div class="ni'+(on?' on':'')+'" onclick="go(\''+t.k+'\')"><span style="font-size:19.2px;position:relative">'+t.i+(t.b?'<span class="bg">'+t.b+'</span>':'')+'</span><span style="font-size:9.6px;margin-top:2px">'+t.l+'</span></div>'}).join('')+'</div>'}
 // ═══ HOME DASHBOARD ═══
@@ -1028,6 +1141,44 @@ h+='<div class="C"><div style="font-weight:700;font-size:16.8px;color:var(--t0);
  h+='</div>';
  h+='<button style="width:100%;padding:9px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:13.2px;font-weight:600;cursor:'+(_pushCount?'pointer':'not-allowed')+'" '+(_pushCount?'':'disabled ')+'onclick="sendTestNotification()">🔔 שלח התראת בדיקה לכל המכשירים</button>';
  h+='<div style="font-size:12.0px;color:var(--t2);margin-top:8px">'+(_pushCount?'✓ '+_pushCount+' מכשיר'+(_pushCount>1?'ים':'')+' רשומים':'לא רשומים מכשירים עדיין')+'</div>';
+ h+='</div>';
+}
+// device access control - approve/remove devices that can view the app
+{
+ var _myDevId=_getDeviceId();
+ var _approved=D._approvedDevices||{};
+ var _pending=D._pendingDevices||{};
+ var _approvedKeys=Object.keys(_approved);
+ var _pendingKeys=Object.keys(_pending);
+ h+='<div id="devicesSection" class="C" style="margin-top:10px"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:6px">🔐 מכשירים מחוברים</div>';
+ h+='<div style="font-size:13.2px;color:var(--t2);margin-bottom:10px">רק מכשירים מאושרים יכולים להיכנס לאפליקציה. בקשה מכל מכשיר חדש תקפוץ פה + התראה.</div>';
+ if(_pendingKeys.length){
+  h+='<div style="background:var(--amd);border:1px solid rgba(245,158,11,.4);border-radius:9px;padding:10px 12px;margin-bottom:10px">'
+   +'<div style="font-size:14px;font-weight:700;color:var(--am);margin-bottom:8px">⏳ ממתינים לאישור ('+_pendingKeys.length+')</div>';
+  _pendingKeys.forEach(function(id){var p=_pending[id];
+   h+='<div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-top:1px solid rgba(245,158,11,.2)">'
+    +'<div style="flex:1;min-width:0"><div style="font-size:14.4px;font-weight:600;color:var(--t0)">'+es(p.name)+'</div>'
+    +'<div style="font-size:11.4px;color:var(--t2);font-family:monospace">'+es(id.slice(0,8))+' · '+es(new Date(p.requestedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}))+'</div></div>'
+    +'<button style="padding:7px 12px;border-radius:8px;background:var(--gr);color:#0a0f1c;border:none;font-size:12.6px;font-weight:800;cursor:pointer" onclick="_approveDevice(\''+id+'\')">✓ אשר</button>'
+    +'<button style="padding:7px 10px;border-radius:8px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:12.6px;font-weight:700;cursor:pointer" onclick="_denyDevice(\''+id+'\')">✕</button>'
+    +'</div>';
+  });
+  h+='</div>';
+ }
+ h+='<div style="font-size:13.2px;font-weight:700;color:var(--t1);margin-bottom:6px">מכשירים מאושרים ('+_approvedKeys.length+')</div>';
+ if(!_approvedKeys.length){
+  h+='<div style="text-align:center;padding:16px;color:var(--t2);font-size:13.5px">אין מכשירים מאושרים עדיין</div>';
+ }else{
+  _approvedKeys.forEach(function(id){var a=_approved[id];var isMe=id===_myDevId;
+   h+='<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;margin-bottom:5px;border-radius:9px;background:'+(isMe?'var(--gd)':'var(--s3)')+';border:1px solid '+(isMe?'var(--gb)':'var(--bd)')+'">'
+    +'<div style="flex:1;min-width:0">'
+    +'<div style="font-size:14.4px;font-weight:700;color:var(--t0)">'+es(a.name)+(isMe?' · <span style="color:var(--go);font-size:11.4px">אתה</span>':'')+'</div>'
+    +'<div style="font-size:11.4px;color:var(--t2)">מאושר '+es(new Date(a.approvedAt).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'}))+(a.lastSeen?' · נראה '+fmR(a.lastSeen):'')+'</div>'
+    +'</div>'
+    +'<button style="padding:6px 10px;border-radius:8px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:12.6px;font-weight:700;cursor:pointer" onclick="_removeDevice(\''+id+'\')">הסר</button>'
+    +'</div>';
+  });
+ }
  h+='</div>';
 }
 h+='<div class="C" style="margin-top:10px"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:6px">💾 גיבוי ושחזור</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:10px">מייצא/מייבא את כל הנתונים: שיחות, הפקדות, משימות, תמונות, הכל.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button style="padding:10px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:14.4px;font-weight:700;cursor:pointer" onclick="doBackup(false)">⬇ ייצוא גיבוי</button><button style="padding:10px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:14.4px;font-weight:700;cursor:pointer" onclick="document.getElementById(\'impFile\').click()">⬆ ייבוא גיבוי</button></div><input type="file" id="impFile" accept="application/json,.json" style="display:none" onchange="impData(this)"><div style="font-size:12.0px;color:var(--t2);margin-top:8px">💡 כדאי לעשות ייצוא גיבוי פעם בשבוע ולפני שדרוג האפליקציה</div></div>';
@@ -4299,11 +4450,16 @@ try{
  var _sn=_u.searchParams.get('snooze');
  var _act=_u.searchParams.get('action');
  if(_pg==='phones'){pg='phones';if(_pTab==='afternoon'||_pTab==='tonight')pT=_pTab;}
+ if(_pg==='settings')pg='settings';
  if(_sn==='1'){fetch('/api/snooze',{method:'POST'}).catch(function(){});}
  // notification-driven quick-actions: printing the daily report needs a slight
  // delay so the app has finished mounting before printHTML opens its iframe
  if(_act==='print-report'){setTimeout(function(){try{printReport();}catch(e){}},900);}
- if(_pg||_sn||_act){_u.search='';history.replaceState({},'',_u.pathname);}
+ // scroll-to helper for deep links (e.g. device-request notification lands on
+ // settings and needs to jump straight to the devices section)
+ var _scrollTo=_u.searchParams.get('scrollTo');
+ if(_scrollTo){setTimeout(function(){var el=document.getElementById(_scrollTo+'Section');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},1400);}
+ if(_pg||_sn||_act||_scrollTo){_u.search='';history.replaceState({},'',_u.pathname);}
 }catch(e){}
 // Multi-tab sync
 window.addEventListener('storage',e=>{if(e.key===K){try{D=JSON.parse(e.newValue)}catch(ex){};rr()}});
@@ -4381,6 +4537,15 @@ if((h>21||(h===21&&m>=30))&&D._lastEveResetDate!==today){
 setInterval(checkDailyReset,30000);
 checkDailyReset();// run once on load
 setInterval(()=>{const e=document.getElementById('hmClk');if(e){const n=new Date;e.textContent=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')}},10000);
+// after ~3s (enough for the initial Firestore snapshot to arrive), run the
+// device-approval check and enable the gate. Delaying prevents a fresh
+// install from bootstrapping itself as approved before the real remote
+// state (with the actual approved-device list) has loaded.
+setTimeout(function(){
+ try{_deviceInitCheck();}catch(e){}
+ window._deviceCheckReady=true;
+ rr();
+},3000);
 }; // end window._appBoot
 window._appBoot();
 </script>
