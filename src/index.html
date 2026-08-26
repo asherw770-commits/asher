@@ -2878,6 +2878,26 @@ h+='<script>(function(){var pg=document.getElementById("pg");if(!pg)return;pg.st
  +'var fsp=document.querySelector(".foldsp"),fg=document.getElementById("foldGuide");if(fsp&&fg){fg.style.left=(fsp.offsetLeft+fsp.offsetWidth/2)+"px";}'
  +'var w=pg.scrollWidth,hh=Math.max(pg.scrollHeight,ah);if(!w)return;var s=Math.min(aw/w,ah/hh)*0.995;s=Math.max(0.30,Math.min(s,1));pg.style.transform="scale("+s+")";pg.setAttribute("data-scale",s);})();<\/script>';
 h+='</div></body></html>';
+// snapshot the report's LOGICAL structure so a later scan of this printout
+// can map cells back to the right boy+type. grid[] already holds every OMR
+// cell's metadata in the order they were emitted; save it alongside the
+// per-column row layouts so the scan flow can iterate rows and columns
+// without regenerating the entire report.
+if(!D._reportGrid)D._reportGrid={};
+D._reportGrid[td()]={
+ date:td(),
+ savedAt:new Date().toISOString(),
+ grid:grid, // ordered list of every mark cell's OMR metadata
+ layout:{
+  col0_afternoon_missed:afM.slice(),
+  col1_writing_pending:pend.map(function(t){return{id:t.id,nm:t.nm,pk:(t.pk||[]).slice()};}),
+  col2_phones_boys:boys.slice(),
+  col3_rooms:(function(){var out={};for(var r=1;r<=13;r++){var rm=boys.filter(function(b){return D.boyRoom[b]==String(r);});if(rm.length)out[r]=rm;}return out;})(),
+  col4_lights_boys:boys.slice(),
+  col5_extra_boys:boys.slice()
+ }
+};
+sv();
 printHTML(h,'\u05d3\u05d5\u05d7 \u05d9\u05d5\u05de\u05d9');
 if(D.reportTalks&&D.reportTalks.length){D.reportTalks=[];sv();}
 }
