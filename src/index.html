@@ -117,6 +117,7 @@ var _fbDb=firebase.firestore();
 // arrays can push the whole state past that. world-readable per rules.
 var _fbDocRef=_fbDb.collection('shared').doc('main');
 var _fbPhotosCol=_fbDb.collection('photos');
+var _fbBackupsCol=_fbDb.collection('backups');
 // stamped at build time - lets each device show which deploy it's running
 var _BUILD_STAMP='__BUILD_STAMP__';
 // web push (iOS 16.4+ PWA). VAPID public key is safe to embed - the private
@@ -306,6 +307,98 @@ function sortByRoomBed(list){
 function cpML(){const rd=Object.keys(D.ph).sort((a,b)=>b.localeCompare(a)).slice(0,pMF);const ml=D.pb.filter(b=>{if(!iA(b))return false;let c=0;rd.forEach(dk=>{const hh=(D.ph||{})[dk];if(hh&&hh.m&&hh.m.includes(b))c++});return c===rd.length});if(!ml.length){alert('אין חסרים לתקופה זו');return}const txt=ml.sort(sLN).join('\n');navigator.clipboard.writeText(txt).then(()=>alert('הועתקו '+ml.length+' שמות!')).catch(()=>{prompt('העתק ידנית:',txt)})}
 function es(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 let D;const K='yv9';
+// ═══ Automatic cloud backups (in Firestore, no Google Drive setup) ═══
+// Saves a stripped snapshot (main state only, photos stay in /photos/*) to
+// /backups/{YYYY-MM-DD} once per day, on the first sv() of the day. Keeps
+// the last 30 days rolling. Restore from Settings.
+function _cloudBackupIfNeeded(){
+ if(typeof _fbBackupsCol==='undefined')return;
+ var today=td();
+ if(D._lastCloudBackup===today)return;
+ if(window._cloudBackupInFlight)return;
+ window._cloudBackupInFlight=true;
+ // strip photos - they already live in /photos/* and per-boy backups are
+ // huge; without stripping we blow past Firestore's 1MB doc size limit
+ var split=_splitPhotos(D);
+ var snapshotBody={
+  date:today,
+  savedAt:new Date().toISOString(),
+  writerBuild:(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown'),
+  pbCount:Array.isArray(D.pb)?D.pb.length:0,
+  wtCount:Array.isArray(D.wt)?D.wt.length:0,
+  cxCount:Array.isArray(D.cx)?D.cx.length:0,
+  phDays:Object.keys(D.ph||{}).length,
+  data:split.stripped
+ };
+ _fbBackupsCol.doc(today).set(snapshotBody).then(function(){
+  D._lastCloudBackup=today;
+  sv();
+  window._cloudBackupInFlight=false;
+  // prune anything older than 30 days
+  _fbBackupsCol.orderBy('date','desc').limit(60).get().then(function(qs){
+   var toDelete=[];
+   qs.forEach(function(doc,i){if(i>=30)toDelete.push(doc.id);});
+   toDelete.forEach(function(id){_fbBackupsCol.doc(id).delete().catch(function(){});});
+  }).catch(function(){});
+ }).catch(function(e){window._cloudBackupInFlight=false;console.error('Cloud backup failed',e);});
+}
+function _listCloudBackups(){
+ return _fbBackupsCol.orderBy('date','desc').limit(30).get().then(function(qs){
+  var out=[];qs.forEach(function(doc){var d=doc.data();out.push({id:doc.id,date:d.date,savedAt:d.savedAt,pbCount:d.pbCount,wtCount:d.wtCount,cxCount:d.cxCount,phDays:d.phDays});});return out;
+ });
+}
+function _restoreCloudBackup(dateISO){
+ _fbBackupsCol.doc(dateISO).get().then(function(doc){
+  if(!doc.exists){alert('לא נמצא גיבוי לתאריך זה');return;}
+  var body=doc.data();
+  if(!body||!body.data){alert('גיבוי לא תקין');return;}
+  var summary='📊 גיבוי מ-'+dateISO+' ('+new Date(body.savedAt).toLocaleString('he-IL')+')\n\n'
+   +'• '+body.pbCount+' בחורים\n'
+   +'• '+body.wtCount+' משימות\n'
+   +'• '+body.cxCount+' שיחות\n'
+   +'• '+body.phDays+' ימי הפקדות\n\n'
+   +'לשחזר?  ⚠️ כל הנתונים הנוכחיים יוחלפו!';
+  if(!confirm(summary))return;
+  var restored=body.data;
+  restored._updatedAt=Date.now();
+  restored._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');
+  // preserve current device approvals so we don't lock ourselves out
+  if(D._approvedDevices)restored._approvedDevices=D._approvedDevices;
+  if(D._pendingDevices)restored._pendingDevices=D._pendingDevices;
+  if(D._pushSubs)restored._pushSubs=D._pushSubs;
+  D=restored;
+  _mergePhotos();
+  sv();rr();
+  showBanner('✅ שוחזר מ-'+dateISO,4000);
+ }).catch(function(e){alert('שגיאה: '+(e.message||e));});
+}
+function _openBackupsList(){
+ var el=document.getElementById('backupsOv');
+ if(!el){el=document.createElement('div');el.id='backupsOv';document.body.appendChild(el);}
+ el.innerHTML='<div class="O" onclick="_closeBackupsList()"><div class="M" onclick="event.stopPropagation()" style="max-height:80vh;overflow-y:auto">'
+  +'<div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div>'
+  +'<div style="padding:8px 16px 14px"><div style="font-size:18px;font-weight:800;color:var(--go);text-align:center">☁️ גיבויים אוטומטיים בענן</div>'
+  +'<div style="font-size:12.5px;color:var(--t2);text-align:center;margin-top:4px">נשמר אוטומטית פעם ביום · 30 ימים אחרונים</div></div>'
+  +'<div id="backupsList" style="padding:0 12px 20px"><div style="text-align:center;padding:20px;color:var(--t2)">טוען...</div></div>'
+  +'</div></div>';
+ _listCloudBackups().then(function(list){
+  var body='';
+  if(!list.length){body='<div style="text-align:center;color:var(--t2);padding:20px">אין גיבויים עדיין. גיבוי אוטומטי נוצר בשמירה הראשונה של כל יום.</div>';}
+  else{list.forEach(function(b){
+   var savedLocal=b.savedAt?new Date(b.savedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+   var hebDate=hF(b.date);
+   body+='<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:10px;background:var(--s1);border:1px solid var(--bd)">'
+    +'<div style="flex:1;min-width:0"><div style="font-size:14.4px;font-weight:700;color:var(--t0)">'+es(hebDate)+'</div>'
+    +'<div style="font-size:11.6px;color:var(--t2)">'+es(b.date)+' · '+es(savedLocal)+'</div>'
+    +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+b.pbCount+' בחורים · '+b.wtCount+' משימות · '+b.phDays+' ימי הפקדות</div>'
+    +'</div>'
+    +'<button style="padding:7px 12px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:12.6px;font-weight:800;cursor:pointer" onclick="_restoreCloudBackup(\''+b.date+'\');_closeBackupsList()">שחזר</button>'
+    +'</div>';
+  });}
+  var elL=document.getElementById('backupsList');if(elL)elL.innerHTML=body;
+ }).catch(function(e){var elL=document.getElementById('backupsList');if(elL)elL.innerHTML='<div style="color:var(--rd);padding:14px">שגיאה: '+es(e.message||String(e))+'</div>';});
+}
+function _closeBackupsList(){var e=document.getElementById('backupsOv');if(e)e.innerHTML='';}
 // ═══ Device access control ═══
 // each browser/PWA install gets a random UUID stored in localStorage. Any
 // device not in D._approvedDevices is blocked from viewing the app and a
@@ -765,6 +858,9 @@ function sv(){D._updatedAt=Date.now();D._writerBuild=(typeof _BUILD_STAMP!=='und
     _fbPhotosCol.doc(id).set({photos:split.photos[id],_updatedAt:D._updatedAt}).catch(function(e){console.error('Firestore photo save failed',id,e);});
     window._remotePhotos[id]=split.photos[id];
    });
+   // first save of the day → also write a permanent /backups snapshot so
+   // any day's state can be restored later from the settings page
+   try{_cloudBackupIfNeeded();}catch(e){}
   },1500);
  }
 }
@@ -1102,6 +1198,17 @@ function printBoyRoster(mode){
 }
 // ═══ SETTINGS ═══
 function rSt(){let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:20.4px;color:var(--t0)">⚙️ הגדרות</span><div style="width:60px"></div></div><div class="S" style="padding:8px 12px 100px">';
+// automatic cloud backups (Firestore-based, no Drive OAuth needed)
+{
+ var _cbLast=D._lastCloudBackup;
+ h+='<div class="C" style="margin-bottom:10px"><div style="font-size:16.8px;font-weight:700;color:var(--t0);margin-bottom:6px">☁️ גיבויים אוטומטיים בענן</div>';
+ h+='<div style="display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:9px;background:'+(_cbLast?'var(--grd)':'var(--s3)')+';border:1px solid '+(_cbLast?'rgba(34,197,94,.3)':'var(--bm)')+';margin-bottom:8px">'
+  +'<div style="width:8px;height:8px;border-radius:50%;background:'+(_cbLast?'var(--gr)':'var(--t2)')+'"></div>'
+  +'<div style="flex:1;min-width:0"><div style="font-size:14.4px;font-weight:700;color:'+(_cbLast?'var(--gr)':'var(--t2)')+'">'+(_cbLast?'פעיל':'ממתין לגיבוי הראשון')+'</div>'
+  +'<div style="font-size:12px;color:var(--t2);margin-top:1px">'+(_cbLast?'אחרון: '+hF(_cbLast):'נשמר אוטומטית בשמירה הראשונה של כל יום')+'</div></div></div>';
+ h+='<button style="width:100%;height:42px;border-radius:10px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:15px;font-weight:700;cursor:pointer" onclick="_openBackupsList()">☁️ שחזר מגיבוי בענן</button>';
+ h+='<div style="font-size:11.4px;color:var(--t2);margin-top:6px;line-height:1.5">30 ימים אחרונים נשמרים אוטומטית ב-Firestore. אין צורך בהגדרות Google Cloud.</div></div>';
+}
 var _gc=!!gdToken,_lb=D._lastGdBackup;
 h+='<div class="C" style="margin-bottom:10px"><div style="font-size:16.8px;font-weight:700;color:var(--t0);margin-bottom:6px">\u2601\ufe0f \u05d2\u05d9\u05d1\u05d5\u05d9 \u05dc-Google Drive</div>';
 h+='<div style="display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:9px;background:'+(_gc?'var(--grd)':'var(--s3)')+';border:1px solid '+(_gc?'rgba(34,197,94,.3)':'var(--bm)')+';margin-bottom:8px"><div style="width:8px;height:8px;border-radius:50%;background:'+(_gc?'var(--gr)':'var(--t2)')+'"></div><div style="flex:1;min-width:0"><div style="font-size:14.4px;font-weight:700;color:'+(_gc?'var(--gr)':'var(--t2)')+'">'+(_gc?'\u05de\u05d7\u05d5\u05d1\u05e8':'\u05dc\u05d0 \u05de\u05d7\u05d5\u05d1\u05e8')+'</div><div style="font-size:12.0px;color:var(--t2);margin-top:1px">'+(_lb?('\u05d0\u05d7\u05e8\u05d5\u05df: '+new Date(_lb).toLocaleString('he-IL')):'\u05d8\u05e8\u05dd \u05d2\u05d5\u05d1\u05d4')+'</div></div></div>';

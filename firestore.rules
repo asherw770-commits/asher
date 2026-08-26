@@ -14,5 +14,8 @@ service cloud.firestore {
     match /photos/{boyId} {
       allow read, write: if true;
     }
+    match /backups/{date} {
+      allow read, write: if true;
+    }
   }
 }
