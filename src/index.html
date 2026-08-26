@@ -359,6 +359,24 @@ function ld(){
      sv();
      return;
     }
+    // BIG-DROP guard: even when the remote has SOMETHING, if it's much less
+    // than we already have locally (e.g. Firestore has 1 boy but local has 35)
+    // do NOT auto-apply. This blocks a stale/broken device that pushed a
+    // partial state from silently wiping every other device's real data on
+    // its next sync. User must explicitly resolve via the recovery banner.
+    var localCount=(Array.isArray(D.pb)?D.pb.length:0)+
+                   (Array.isArray(D.wt)?D.wt.length:0)+
+                   Object.keys(D.ph||{}).length+
+                   Object.keys(D.sleepTables||{}).length;
+    var remoteCount=(Array.isArray(remote.pb)?remote.pb.length:0)+
+                    (Array.isArray(remote.wt)?remote.wt.length:0)+
+                    Object.keys(remote.ph||{}).length+
+                    Object.keys(remote.sleepTables||{}).length;
+    if(localCount>=10&&remoteCount<localCount*0.4){
+     // more than 60% of the entries would disappear - refuse and warn
+     _showDataLossBanner(localCount,remoteCount,remote);
+     return;
+    }
     // remote must be strictly newer to overwrite - protects freshly-imported
     // local data from being clobbered by a stale server copy on reload, and
     // silences the write-then-read echo of our own sv() calls
@@ -3677,6 +3695,46 @@ function ackAlert(key){
  showBanner('\u2705 \u05e1\u05d5\u05de\u05df \u05db\u05e0\u05e6\u05e4\u05d4',2500);
 }
 function closeFloatingAlert(){var e=document.getElementById('floatAlert');if(e)e.innerHTML='';}
+// Shown when a snapshot arrives with dramatically less data than local. The
+// user picks: keep local (and push it, overwriting the tiny cloud copy),
+// accept cloud (destructive), or defer. Held state (window._pendingRemote)
+// so "accept" can be applied later without another snapshot.
+function _showDataLossBanner(localCount,remoteCount,remote){
+ window._pendingRemote=remote;
+ var e=document.getElementById('floatAlert');
+ if(!e){e=document.createElement('div');e.id='floatAlert';document.body.appendChild(e);}
+ var lost=localCount-remoteCount;
+ e.innerHTML='<div style="position:fixed;left:8px;right:8px;bottom:78px;z-index:99998;'
+ +'background:var(--s1);border:2px solid var(--rd);border-radius:16px;'
+ +'box-shadow:0 10px 30px rgba(0,0,0,.5);padding:14px 16px;direction:rtl;animation:bannerUp .25s ease-out;font-family:Heebo,Arial,sans-serif">'
+ +'<div style="font-size:16.8px;font-weight:800;color:var(--rd);margin-bottom:6px">⚠️ סנכרון נבלם — סכנת אובדן נתונים</div>'
+ +'<div style="font-size:13.5px;color:var(--t1);line-height:1.55;margin-bottom:10px">'
+ +'הענן מנסה להחיל מצב עם <b>'+remoteCount+'</b> רשומות בלבד, בעוד שאצלך יש <b>'+localCount+'</b>. '
+ +'ההפרש: <b style="color:var(--rd)">'+lost+' רשומות</b> יימחקו. '
+ +'כנראה מכשיר אחר נכנס עם localStorage ריק ודחף מצב חסר.'
+ +'</div>'
+ +'<div style="display:flex;flex-direction:column;gap:6px">'
+ +'<button style="padding:11px;border-radius:9px;background:var(--gr);color:#0a0f1c;border:none;font-size:14.4px;font-weight:800;cursor:pointer" onclick="_resolveDataLoss(\'keepLocal\')">✓ שמור את הנתונים שלי, דחה את הענן</button>'
+ +'<button style="padding:11px;border-radius:9px;background:var(--rdd);border:1px solid rgba(239,68,68,.4);color:var(--rd);font-size:13.2px;font-weight:700;cursor:pointer" onclick="_resolveDataLoss(\'acceptCloud\')">⚠️ החל את הענן (מוחק ' +lost+ ' רשומות)</button>'
+ +'<button style="padding:9px;border-radius:9px;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:12.6px;cursor:pointer" onclick="closeFloatingAlert()">התעלם לעכשיו</button>'
+ +'</div></div>';
+}
+function _resolveDataLoss(choice){
+ closeFloatingAlert();
+ if(choice==='keepLocal'){
+  // bump _updatedAt then push, which will overwrite the tiny cloud copy
+  sv();
+  showBanner('✅ הנתונים שלך נשמרו — הענן מתעדכן',3000);
+ }else if(choice==='acceptCloud'&&window._pendingRemote){
+  D={...df(),...window._pendingRemote};
+  heal();
+  _mergePhotos();
+  sv();
+  rr();
+  showBanner('הענן הוחל — נתונים מקומיים נמחקו',3000);
+ }
+ window._pendingRemote=null;
+}
 // bi-weekly cleaning-report reminder: every other Tuesday that has yeshiva
 // (skips holidays/breaks), anchored to a fixed known Tuesday so the
 // once-every-two-weeks cadence never drifts regardless of when the app runs
