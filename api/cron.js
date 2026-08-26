@@ -39,6 +39,15 @@ module.exports = async (req, res) => {
   try {
     const t = (req.query && req.query.t) || 'af';
 
+    if (t === 'pr') {
+      await sendToAll(
+        '🖨 זמן להדפיס דוח יומי',
+        'בוקר טוב! הדפס את הדוח היומי לתחילת היום',
+        { tag: 'print-report', url: '/?action=print-report' }
+      );
+      return res.status(200).json({ ok: true, type: 'print' });
+    }
+
     if (t === 'af') {
       await sendToAll(
         '📱 הפקדות טלפונים - צהריים',

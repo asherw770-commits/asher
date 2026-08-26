@@ -3865,9 +3865,13 @@ try{
  var _pg=_u.searchParams.get('page');
  var _pTab=_u.searchParams.get('t');
  var _sn=_u.searchParams.get('snooze');
+ var _act=_u.searchParams.get('action');
  if(_pg==='phones'){pg='phones';if(_pTab==='afternoon'||_pTab==='tonight')pT=_pTab;}
  if(_sn==='1'){fetch('/api/snooze',{method:'POST'}).catch(function(){});}
- if(_pg||_sn){_u.search='';history.replaceState({},'',_u.pathname);}
+ // notification-driven quick-actions: printing the daily report needs a slight
+ // delay so the app has finished mounting before printHTML opens its iframe
+ if(_act==='print-report'){setTimeout(function(){try{printReport();}catch(e){}},900);}
+ if(_pg||_sn||_act){_u.search='';history.replaceState({},'',_u.pathname);}
 }catch(e){}
 // Multi-tab sync
 window.addEventListener('storage',e=>{if(e.key===K){try{D=JSON.parse(e.newValue)}catch(ex){};rr()}});
