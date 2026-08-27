@@ -17,6 +17,7 @@
     { "path": "/api/cron?t=prS", "schedule": "0 18 * * 6" },
     { "path": "/api/cron?t=af", "schedule": "13 12 * * 0-4" },
     { "path": "/api/cron?t=ev", "schedule": "48 18 * * 0-4" },
-    { "path": "/api/cron?t=sn", "schedule": "3 19 * * 0-4" }
+    { "path": "/api/cron?t=sn", "schedule": "3 19 * * 0-4" },
+    { "path": "/api/backup", "schedule": "0 21 * * *" }
   ]
 }

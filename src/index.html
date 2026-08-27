@@ -386,13 +386,16 @@ function _cloudBackupIfNeeded(){
   D._lastCloudBackup=today;
   sv();
   window._cloudBackupInFlight=false;
-  // prune older backups: keep the last 30 daily + last 30 safety backups
-  // (safety backups have a suffix after the date - "_before-..." - so we can
-  // separate them by id shape when deciding what to prune)
-  _fbBackupsCol.orderBy('date','desc').limit(200).get().then(function(qs){
-   var daily=[],safety=[];
-   qs.forEach(function(doc){(doc.id.indexOf('_')>10?safety:daily).push(doc.id);});
-   var toDelete=daily.slice(30).concat(safety.slice(30));
+  // prune older backups: independent quotas per kind so no single category
+  // can crowd out the others. daily=30, nightly=30, safety=30.
+  _fbBackupsCol.orderBy('date','desc').limit(300).get().then(function(qs){
+   var daily=[],nightly=[],safety=[];
+   qs.forEach(function(doc){
+    if(doc.id.endsWith('_nightly'))nightly.push(doc.id);
+    else if(doc.id.indexOf('_')>10)safety.push(doc.id);
+    else daily.push(doc.id);
+   });
+   var toDelete=daily.slice(30).concat(nightly.slice(30)).concat(safety.slice(30));
    toDelete.forEach(function(id){_fbBackupsCol.doc(id).delete().catch(function(){});});
   }).catch(function(){});
  }).catch(function(e){window._cloudBackupInFlight=false;console.error('Cloud backup failed',e);});
@@ -439,7 +442,13 @@ async function _withSafetyBackup(label,friendlyName,action){
 }
 function _listCloudBackups(){
  return _fbBackupsCol.orderBy('date','desc').limit(100).get().then(function(qs){
-  var out=[];qs.forEach(function(doc){var d=doc.data();out.push({id:doc.id,date:d.date,savedAt:d.savedAt,pbCount:d.pbCount,wtCount:d.wtCount,cxCount:d.cxCount,phDays:d.phDays,label:d.label,reason:d.reason,isSafety:doc.id.indexOf('_')>10});});return out;
+  var out=[];qs.forEach(function(doc){
+   var d=doc.data();
+   var kind='daily';
+   if(doc.id.endsWith('_nightly'))kind='nightly';
+   else if(doc.id.indexOf('_')>10)kind='safety';
+   out.push({id:doc.id,date:d.date,savedAt:d.savedAt,pbCount:d.pbCount,wtCount:d.wtCount,cxCount:d.cxCount,phDays:d.phDays,label:d.label,reason:d.reason,kind:kind});
+  });return out;
  });
 }
 function _restoreCloudBackup(dateISO){
@@ -483,15 +492,19 @@ function _openBackupsList(){
   if(!list.length){body='<div style="text-align:center;color:var(--t2);padding:20px">אין גיבויים עדיין. גיבוי אוטומטי נוצר בשמירה הראשונה של כל יום.</div>';}
   else{list.forEach(function(b){
    var savedLocal=b.savedAt?new Date(b.savedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-   var displayDate=b.isSafety?b.date.slice(0,10):b.date;
+   var displayDate=(b.kind==='daily')?b.date:b.date.slice(0,10);
    var hebDate=hF(displayDate);
-   var reasonLabel=b.reason?b.reason.replace(/-/g,' '):'';
-   var chipHtml=b.isSafety
-    ?'<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--amd);color:var(--am);font-size:10.5px;font-weight:800;margin-right:6px">🛟 בטיחות</span>'
-    :'<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--grd);color:var(--gr);font-size:10.5px;font-weight:800;margin-right:6px">📆 יומי</span>';
-   body+='<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:10px;background:var(--s1);border:1px solid '+(b.isSafety?'rgba(245,158,11,.25)':'var(--bd)')+'">'
+   var reasonLabel=(b.kind==='safety'&&b.reason)?b.reason.replace(/-/g,' '):'';
+   var chipMap={
+    daily:{bg:'var(--grd)',c:'var(--gr)',t:'📆 יומי',br:'var(--bd)'},
+    nightly:{bg:'var(--bld)',c:'var(--bl)',t:'🌙 חצות',br:'rgba(59,130,246,.25)'},
+    safety:{bg:'var(--amd)',c:'var(--am)',t:'🛟 בטיחות',br:'rgba(245,158,11,.25)'}
+   };
+   var chip=chipMap[b.kind]||chipMap.daily;
+   var chipHtml='<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:'+chip.bg+';color:'+chip.c+';font-size:10.5px;font-weight:800;margin-right:6px">'+chip.t+'</span>';
+   body+='<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:10px;background:var(--s1);border:1px solid '+chip.br+'">'
     +'<div style="flex:1;min-width:0"><div style="font-size:14.4px;font-weight:700;color:var(--t0);display:flex;align-items:center;flex-wrap:wrap">'+chipHtml+' '+es(hebDate)+'</div>'
-    +(b.isSafety&&reasonLabel?'<div style="font-size:12.6px;color:var(--am);font-weight:700;margin-top:2px">'+es(reasonLabel)+'</div>':'')
+    +(reasonLabel?'<div style="font-size:12.6px;color:'+chip.c+';font-weight:700;margin-top:2px">'+es(reasonLabel)+'</div>':'')
     +'<div style="font-size:11.6px;color:var(--t2)">'+es(savedLocal)+'</div>'
     +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+b.pbCount+' בחורים · '+b.wtCount+' משימות · '+b.phDays+' ימי הפקדות</div>'
     +'</div>'
