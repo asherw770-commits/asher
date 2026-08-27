@@ -1925,14 +1925,14 @@ function openCamera(){
  e.innerHTML='<div style="position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column">'
  +'<div style="padding:10px 12px;color:#fff;font-size:16.8px;font-weight:700;display:flex;align-items:center;gap:10px;direction:rtl">'
  +'<button onclick="closeCamera()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:15.6px;cursor:pointer">סגור</button>'
- +'<span style="flex:1">צלם את הדוח</span></div>'
+ +'<span style="flex:1">🔍 סריקת דוח</span></div>'
  +'<div style="flex:1;position:relative;overflow:hidden">'
  +'<video id="camV" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain;background:#000"></video>'
  +'<div id="camGuide" style="position:absolute;inset:6% 4%;border:2px dashed rgba(255,255,255,.45);border-radius:8px;pointer-events:none"></div>'
  +'</div>'
  +'<div id="camMsg" style="padding:10px 12px;color:#fff;font-size:15.6px;text-align:center;direction:rtl">מפעיל מצלמה…</div>'
  +'<div style="padding:0 12px 22px;display:flex;gap:10px;align-items:center;direction:rtl">'
- +'<button onclick="camShoot()" style="flex:1;height:52px;border-radius:12px;background:#fff;color:#111;border:none;font-size:18.0px;font-weight:700;cursor:pointer">צלם עכשיו</button>'
+ +'<button onclick="camShoot()" style="flex:1;height:52px;border-radius:12px;background:#fff;color:#111;border:none;font-size:18.0px;font-weight:700;cursor:pointer">🔍 סרוק עכשיו</button>'
  +'</div><canvas id="camC" style="display:none"></canvas></div>';
  var v=document.getElementById('camV');
  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:2560},height:{ideal:1440}},audio:false})
@@ -1965,7 +1965,7 @@ function camTick(){
   var msg=document.getElementById('camMsg'),gd=document.getElementById('camGuide');
   if(m){_cam.ok++;
    gd.style.borderColor='rgba(34,197,94,.95)';gd.style.borderStyle='solid';
-   msg.textContent=_cam.ok>=2?'נעול — מצלם…':'ארבע הפינות זוהו — החזק יציב';
+   msg.textContent=_cam.ok>=2?'✓ נעול — סורק…':'ארבע הפינות זוהו — החזק יציב';
    if(_cam.ok>=2){clearInterval(_cam.timer);_cam.timer=null;camShoot();}
   }else{_cam.ok=0;
    gd.style.borderColor='rgba(255,255,255,.45)';gd.style.borderStyle='dashed';
@@ -2226,6 +2226,8 @@ if(r&&r._marks){
 if(!changes.length)h+='<div style="font-size:15.6px;color:var(--t2)">⚠️ לא נמצאו סימונים</div>';
 changes.forEach(ch=>{h+='<div style="font-size:14.4px;color:var(--t0);padding:6px;border:1px solid var(--bd);border-radius:8px;margin-bottom:4px;background:var(--s3)">'+ch+'</div>'});
 h+='<img src="'+imgB64+'" style="width:100%;border-radius:8px;margin:8px 0;max-height:200px;object-fit:contain">';
+window._lastScanImg=imgB64;window._lastScanResult=r;
+h+='<button style="width:100%;padding:10px;border-radius:9px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:14.4px;font-weight:700;cursor:pointer;margin-bottom:6px" onclick="showScanDebug()">🔍 הראה בדיוק מה זוהה על הדף</button>';
 h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px"><button style="width:100%;padding:12px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:16.8px;font-weight:700;cursor:pointer" onclick="confirmReport()">✅ אשר ועדכן</button>';
 h+='<button style="width:100%;padding:12px;border-radius:10px;background:var(--bld);border:1px solid rgba(59,130,246,.2);color:var(--bl);font-size:16.8px;font-weight:700;cursor:pointer" onclick="openManual()">\u270f\ufe0f \u05e2\u05e8\u05d5\u05da \u05d9\u05d3\u05e0\u05d9\u05ea</button>';
 h+='<button style="width:100%;padding:12px;border-radius:10px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:16.8px;font-weight:700;cursor:pointer" onclick="cancelReport()">❌ בטל</button></div></div>';
@@ -2240,6 +2242,75 @@ const blob=new Blob([ab],{type:'image/jpeg'});const file=new File([blob],'report
 if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:'דוח יומי'}).catch(()=>{})}
 else{const a=document.createElement('a');a.href=b64;a.download='report-'+td()+'.jpg';a.click()}}
 function cancelReport(){const p=document.getElementById('reportPreview');if(p)p.innerHTML='';window._rptActions=null}
+// Visualize what the OMR engine detected: draws the scanned image with a
+// colored rectangle over each cell of the grid it used - green=marked,
+// gray=empty, orange=unsure/borderline. Purely diagnostic; doesn't touch
+// the applied result. Lets the user verify with their own eyes that
+// detection is working (or spot exactly which cells the engine missed).
+function showScanDebug(){
+ var r=window._lastScanResult,img=window._lastScanImg;
+ if(!r||!img){alert('אין תוצאת סריקה זמינה');return;}
+ var gridDate=r._gridUsed||r._pageDate||D._omrGridDate;
+ var grid=(D._omrGrids&&D._omrGrids[gridDate])?D._omrGrids[gridDate]:(D._omrGrid||[]);
+ grid=grid.filter(function(q){return q&&q.px!=null;});
+ if(!grid.length){alert('אין לוח משבצות שמור לתאריך '+gridDate+' — לא ניתן לצייר.');return;}
+ // Build a set of "marked" (type,name) pairs from the result arrays. Match
+ // exactly the categories _omrScan pushes into.
+ var markedSet={};var typeToArr={
+  phone_ok:'phones_deposited',phone_late:'phones_late',phone_10sh:'phones_home',
+  wr_done:'writing_done',af_1y:'afternoon_10sh',af_10sh:'afternoon_10sh',
+  lo_out:'lights_outside',lo_10sh:'lights_10sh',
+  bw_ok:'bowls_ok',bw_late:'bowls_late',bw_5sh:'bowls_5sh'
+ };
+ grid.forEach(function(gi){
+  var arrKey=typeToArr[gi.type];
+  if(!arrKey)return;
+  var arr=r[arrKey]||[];
+  var key=gi.type==='wr_done'?gi.id:gi.name;
+  if(arr.indexOf(key)>=0)markedSet[gi.type+'|'+key]='ok';
+ });
+ (r.extra_chapters||[]).forEach(function(ec){markedSet['ex_ch|'+ec.name+'|'+ec.chapter]='ok';});
+ // unsure list from OMR
+ var unsureSet={};(r._unsure||[]).forEach(function(u){unsureSet[u.t+'|'+u.name]=u.f;});
+ // Draw
+ var el=document.getElementById('scanDbgOv');
+ if(!el){el=document.createElement('div');el.id='scanDbgOv';document.body.appendChild(el);}
+ el.innerHTML='<div class="O" onclick="document.getElementById(\'scanDbgOv\').innerHTML=\'\'"><div class="M" onclick="event.stopPropagation()" style="max-width:900px;max-height:92vh;overflow-y:auto">'
+  +'<div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div>'
+  +'<div style="padding:6px 16px 12px;text-align:center"><div style="font-size:17px;font-weight:800;color:var(--go)">🔍 מה הזיהוי ראה על הדף</div>'
+  +'<div style="font-size:12.6px;color:var(--t2);margin-top:4px">'+(r._hits||0)+' סימונים ברורים · '+(r._unsure?r._unsure.length:0)+' גבוליים · '+(r._cells||0)+' משבצות · '+es(gridDate)+'</div>'
+  +'<div style="font-size:11.5px;color:var(--t2);margin-top:6px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">'
+  +'<span><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-left:4px"></span>סומן</span>'
+  +'<span><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px;vertical-align:middle;margin-left:4px"></span>גבולי</span>'
+  +'<span><span style="display:inline-block;width:10px;height:10px;background:rgba(148,163,184,.35);border-radius:2px;vertical-align:middle;margin-left:4px"></span>ריק</span>'
+  +'</div></div>'
+  +'<div id="scanDbgCanvasWrap" style="padding:0 12px 16px"></div>'
+  +'</div></div>';
+ var wrap=document.getElementById('scanDbgCanvasWrap');
+ var i=new Image();
+ i.onload=function(){
+  var cv=document.createElement('canvas');cv.width=i.width;cv.height=i.height;
+  var ctx=cv.getContext('2d');
+  ctx.drawImage(i,0,0);
+  ctx.lineWidth=Math.max(2,Math.round(i.width/500));
+  grid.forEach(function(gi){
+   var key=gi.type==='wr_done'?gi.id:(gi.type==='ex_ch'?gi.name+'|'+gi.ch:gi.name);
+   var isMarked=markedSet[gi.type+'|'+key];
+   var uKey=(gi.type==='ex_ch')?null:(gi.type+'|'+gi.name);
+   var isUnsure=uKey&&unsureSet[uKey];
+   var color,fill;
+   if(isMarked){color='#22c55e';fill='rgba(34,197,94,0.30)';}
+   else if(isUnsure){color='#f59e0b';fill='rgba(245,158,11,0.30)';}
+   else{color='rgba(148,163,184,0.5)';fill='rgba(148,163,184,0.08)';}
+   var x=gi.px-gi.pw/2,y=gi.py-gi.ph/2;
+   ctx.fillStyle=fill;ctx.fillRect(x,y,gi.pw,gi.ph);
+   ctx.strokeStyle=color;ctx.strokeRect(x,y,gi.pw,gi.ph);
+  });
+  cv.style.cssText='width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--bd)';
+  wrap.innerHTML='';wrap.appendChild(cv);
+ };
+ i.src=img;
+}
 
 
 function _dlFor(ch){var days=(ch==='קיט')?2:1;var d=new Date();
@@ -2870,13 +2941,13 @@ function rScan(){
   +'<div class="S" style="padding:12px 14px 100px">';
  h+='<div class="C" style="margin-bottom:12px">'
   +'<div style="font-size:14.4px;color:var(--t1);line-height:1.65;margin-bottom:12px">'
-  +'צלם את הדוח היומי המודפס לאחר שמלאת אותו. האפליקציה תזהה את התאריך מהברקוד/כותרת ותפתח את הנתונים לעדכון.'
+  +'סרוק את הדוח היומי לאחר שמלאת אותו — מהמדפסת (Preview → Import from Scanner) או ממצלמת הטלפון. האפליקציה מזהה את התאריך + הסימונים ומציגה תצוגה מקדימה לאישור.'
   +'</div>'
   +'<label style="display:block">'
   +'<input type="file" accept="image/*" capture="environment" onchange="handleScanImage(this);this.value=null" style="display:none">'
-  +'<div style="width:100%;padding:18px;border-radius:12px;background:var(--pu);color:#fff;font-size:17.6px;font-weight:800;text-align:center;cursor:pointer">📷 צלם או בחר תמונה</div>'
+  +'<div style="width:100%;padding:18px;border-radius:12px;background:var(--pu);color:#fff;font-size:17.6px;font-weight:800;text-align:center;cursor:pointer">🔍 סרוק / בחר סריקה</div>'
   +'</label>'
-  +'<div style="font-size:12.4px;color:var(--t2);margin-top:8px;text-align:center;line-height:1.5">💡 טיפ: וודא שהתאריך בראש הדף (מעל הטבלאות) גלוי וחד</div>'
+  +'<div style="font-size:12.4px;color:var(--t2);margin-top:8px;text-align:center;line-height:1.5">💡 טיפ: סריקת מדפסת (300+ DPI) מדויקת יותר מצילום. הזיהוי דורש שהתאריך בראש והפינות ברורים.</div>'
   +'</div>';
  h+='<div id="scanPreview"></div>';
  h+='<div id="scanResult" style="margin-top:12px"></div>';
