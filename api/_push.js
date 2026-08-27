@@ -50,18 +50,46 @@ async function sendToAll(title, body, opts) {
   const D = await loadDoc();
   const subs = D._pushSubs || {};
   const payload = JSON.stringify(Object.assign({ title: title, body: body }, opts || {}));
-  const result = { sent: 0, failed: 0 };
+  const result = { sent: 0, failed: 0, pruned: 0 };
+  const deadKeys = [];
   for (const key of Object.keys(subs)) {
     const sub = subs[key] && subs[key].sub;
-    if (!sub || !sub.endpoint) continue;
+    if (!sub || !sub.endpoint) { deadKeys.push(key); continue; }
     try {
       await webpush.sendNotification(sub, payload);
       result.sent++;
     } catch (e) {
       result.failed++;
+      // 404 (subscription not found) and 410 (Gone) mean the browser/OS has
+      // permanently revoked this subscription. Keeping it around wastes a
+      // send attempt on every notification and can slow down the whole
+      // dispatch, so prune it from Firestore.
+      const code = e && (e.statusCode || e.status);
+      if (code === 404 || code === 410) deadKeys.push(key);
     }
   }
+  if (deadKeys.length) {
+    result.pruned = await pruneSubs(deadKeys);
+  }
   return result;
+}
+
+// Remove a set of push subscription entries from shared/main._pushSubs.
+// Uses Firestore REST PATCH with fieldPaths mask targeting only the doomed
+// keys so unrelated concurrent updates aren't clobbered.
+async function pruneSubs(keys) {
+  if (!keys || !keys.length) return 0;
+  const paths = keys.map(k => '_pushSubs.`' + k.replace(/`/g, '\\`') + '`');
+  const params = paths.map(p => 'updateMask.fieldPaths=' + encodeURIComponent(p)).join('&');
+  const url = FS_BASE + '/shared/main?' + params;
+  const fields = {};
+  // Firestore delete-a-field: PATCH with the mask but no value in fields.
+  const resp = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: fields })
+  });
+  return resp.ok ? keys.length : 0;
 }
 
 module.exports = { sendToAll, loadDoc };

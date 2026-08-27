@@ -1,21 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Single-user app with no login. World-readable and world-writable -
-    // security is by URL obscurity only. Anyone who knows the Firebase
-    // project id (visible in the client HTML) can read and modify. Do
-    // not share the app URL.
-    // - shared/main: the main D state, minus per-boy photos
-    // - photos/{boyId}: photos for one boy (split out to stay under the
-    //   1MB per-document Firestore limit)
-    match /shared/main {
-      allow read, write: if true;
-    }
-    match /photos/{boyId} {
-      allow read, write: if true;
-    }
-    match /backups/{date} {
-      allow read, write: if true;
-    }
+    // World-readable and world-writable. Security is by URL obscurity only.
+    // Anyone who knows the Firebase project id (visible in the client HTML)
+    // can read and modify. Do not share the app URL.
+    //
+    // The client now signs in anonymously on load - so the STRICTER rules
+    // (below, commented out) would work as an upgrade path:
+    //
+    //   1. Enable Anonymous Auth in Firebase console (Authentication →
+    //      Sign-in method → Anonymous → Enable).
+    //   2. Update /api/cron.js, /api/backup.js, /api/snooze.js and
+    //      /api/_push.js to authenticate their Firestore REST calls with
+    //      a service account (they currently use unauthenticated REST).
+    //   3. Swap in the auth-required rules block below.
+    //
+    // Rules commented out - server code must be updated first, otherwise
+    // Vercel crons stop being able to write backups / push flags.
+    //
+    // match /shared/main    { allow read, write: if request.auth != null; }
+    // match /photos/{boyId} { allow read, write: if request.auth != null; }
+    // match /backups/{date} { allow read, write: if request.auth != null; }
+
+    match /shared/main    { allow read, write: if true; }
+    match /photos/{boyId} { allow read, write: if true; }
+    match /backups/{date} { allow read, write: if true; }
   }
 }

@@ -148,6 +148,7 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script>
 var FIREBASE_CONFIG={
   apiKey:"__FIREBASE_API_KEY__",
@@ -164,6 +165,17 @@ var FIREBASE_CONFIG={
 <script>
 firebase.initializeApp(FIREBASE_CONFIG);
 var _fbDb=firebase.firestore();
+// Anonymous auth: silently signs the browser in as an anonymous user so
+// firestore.rules can require `request.auth != null`. This raises the bar
+// for random unauthenticated scrapers who found the project ID in the
+// public HTML - they'd still need to run the sign-in flow to touch data.
+// Best-effort: if Anonymous Auth isn't enabled in Firebase console, we
+// continue without auth so the app doesn't hard-break on legacy setups.
+try{
+ firebase.auth().signInAnonymously().catch(function(e){
+  console.warn('Anonymous auth failed - continuing without it. Enable Anonymous Auth in Firebase console to require auth in rules.',e&&e.code);
+ });
+}catch(e){console.warn('firebase.auth() unavailable',e);}
 // no login: main state at /shared/main, photos in a separate /photos/{boyId}
 // collection because a single Firestore doc caps at 1MB and per-boy photo
 // arrays can push the whole state past that. world-readable per rules.
@@ -269,15 +281,23 @@ const PRC=['א','ב','יח','קיט','10ש','5ש'],PAL=['ב','ג','ד','ה','ו'
 const RSN=[{k:'talk',i:'💬',l:'דיבורים בחדר',hh:1},{k:'lights',i:'💡',l:'כיבוי אורות'},{k:'late',i:'⏰',l:'איחור בצהריים'},{k:'morningOut',i:'🌅',l:'איחור ביציאה מהקומה בבוקר'},{k:'showerOut',i:'🚿',l:'יציאה מהמקלחת באיחור'},{k:'other',i:'✏️',l:'אחר',ho:1}];
 const DLS=[{k:'today',l:'הערב',t:'21:30',d:0,h:21,m:30},{k:'tl',l:'מחר צהריים',t:'15:30',d:1,h:15,m:30},{k:'te',l:'מחר ערב',t:'21:30',d:1,h:21,m:30},{k:'2l',l:'עוד יומיים צהריים',t:'15:30',d:2,h:15,m:30},{k:'2e',l:'עוד יומיים ערב',t:'21:30',d:2,h:21,m:30}];
 function dld(k){
-// Skip Friday and Shabbat for deadline counting
-function addYeshivaDays(n){const d=new Date();for(let added=0;added<n;){d.setDate(d.getDate()+1);const day=d.getDay();if(day!==5&&day!==6)added++}d.setHours(21,0,0,0);return d}
-if(k==='te')return addYeshivaDays(1);
-if(k==='2e')return addYeshivaDays(2);
-const d=new Date();if(k==='tl'){d.setHours(21,0,0,0);return d}
-if(k==='te'){d.setHours(21,0,0,0);return d}
-if(k==='2l'){d.setDate(d.getDate()+1);d.setHours(21,0,0,0);return d}
-if(k==='2e'){d.setDate(d.getDate()+1);d.setHours(21,0,0,0);return d}
-return d}
+ // Deadline for a DLS shortcut. Reads day-offset + hour/minute directly
+ // from the DLS entry so the label and the actual deadline always agree
+ // (previously 'tl' claimed "tomorrow 15:30" but computed today 21:00).
+ // Skips Fridays and Shabbat when advancing day count - those aren't
+ // yeshiva days, so "tomorrow" from a Thursday means Sunday.
+ var o=DLS.find(function(x){return x.k===k;});
+ var d=new Date();
+ if(!o){d.setHours(21,0,0,0);return d;}
+ var need=o.d||0;var added=0;
+ while(added<need){
+  d.setDate(d.getDate()+1);
+  var day=d.getDay();
+  if(day!==5&&day!==6)added++;
+ }
+ d.setHours(o.h,o.m||0,0,0);
+ return d;
+}
 function dll(k){const o=DLS.find(x=>x.k===k);return o?o.l+' '+o.t:k}
 const HOL=[
 // אלול תשפ"ו - Aug-Sep 2026
@@ -456,13 +476,32 @@ function _restoreCloudBackup(dateISO){
   if(!doc.exists){alert('לא נמצא גיבוי לתאריך זה');return;}
   var body=doc.data();
   if(!body||!body.data){alert('גיבוי לא תקין');return;}
+  // Diff preview: what this restore would actually change on the CURRENT
+  // device. Compares counts by category so the user knows what's about to
+  // be added/removed before they commit.
+  var b=body.data;
+  var curBoys=new Set(Array.isArray(D.pb)?D.pb:[]);
+  var newBoys=new Set(Array.isArray(b.pb)?b.pb:[]);
+  var boysGain=[...newBoys].filter(function(x){return !curBoys.has(x);}).length;
+  var boysLoss=[...curBoys].filter(function(x){return !newBoys.has(x);}).length;
+  var wtDelta=(Array.isArray(b.wt)?b.wt.length:0)-(Array.isArray(D.wt)?D.wt.length:0);
+  var cxDelta=(Array.isArray(b.cx)?b.cx.length:0)-(Array.isArray(D.cx)?D.cx.length:0);
+  var phDelta=Object.keys(b.ph||{}).length-Object.keys(D.ph||{}).length;
+  function fmt(n){return n>0?'+'+n:''+n;}
   var summary='📊 גיבוי מ-'+dateISO+' ('+new Date(body.savedAt).toLocaleString('he-IL')+')\n\n'
+   +'תוכן הגיבוי:\n'
    +'• '+body.pbCount+' בחורים\n'
    +'• '+body.wtCount+' משימות\n'
    +'• '+body.cxCount+' שיחות\n'
    +'• '+body.phDays+' ימי הפקדות\n\n'
+   +'שינוי צפוי במכשיר הזה:\n'
+   +'• בחורים: '+(boysGain?'+'+boysGain+' חדשים':'')+(boysGain&&boysLoss?', ':'')+(boysLoss?'-'+boysLoss+' יימחקו':(!boysGain?'ללא שינוי':''))+'\n'
+   +'• משימות: '+fmt(wtDelta)+'\n'
+   +'• שיחות: '+fmt(cxDelta)+'\n'
+   +'• ימי הפקדות: '+fmt(phDelta)+'\n\n'
    +'לשחזר?  ⚠️ כל הנתונים הנוכחיים יוחלפו (יישמר גיבוי בטיחות של המצב הנוכחי לפני השחזור)';
   if(!confirm(summary))return;
+  if(!(await requireAuth('לשחזור מגיבוי')))return;
   await _withSafetyBackup('before-restore-'+dateISO,'לפני שחזור מ-'+dateISO,async function(){
    var restored=body.data;
    restored._updatedAt=Date.now();
@@ -473,9 +512,27 @@ function _restoreCloudBackup(dateISO){
    if(D._pushSubs)restored._pushSubs=D._pushSubs;
    D=restored;
    _mergePhotos();
-   sv();rr();
+   sv();
+   // Flush the restore write immediately so a concurrent device edit
+   // arriving in the next 1.5s can't win the timestamp race and undo us.
+   try{flushSv();}catch(e){}
+   rr();
    showBanner('✅ שוחזר מ-'+dateISO,4000);
   });
+ }).catch(function(e){alert('שגיאה: '+(e.message||e));});
+}
+// Download a specific backup as a local JSON file, so the user can archive
+// off-cloud copies before, say, wiping the app or handing over the device.
+function _downloadCloudBackup(dateISO){
+ _fbBackupsCol.doc(dateISO).get().then(function(doc){
+  if(!doc.exists){alert('לא נמצא גיבוי לתאריך זה');return;}
+  var body=doc.data();
+  if(!body||!body.data){alert('גיבוי לא תקין');return;}
+  var payload={version:1,exportedAt:new Date().toISOString(),from:'firestore-backup/'+dateISO,savedAt:body.savedAt,data:body.data};
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='yeshiva-backup-'+dateISO.replace(/[:_]/g,'-')+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
  }).catch(function(e){alert('שגיאה: '+(e.message||e));});
 }
 function _openBackupsList(){
@@ -508,7 +565,10 @@ function _openBackupsList(){
     +'<div style="font-size:11.6px;color:var(--t2)">'+es(savedLocal)+'</div>'
     +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+b.pbCount+' בחורים · '+b.wtCount+' משימות · '+b.phDays+' ימי הפקדות</div>'
     +'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:4px;align-items:stretch">'
     +'<button style="padding:7px 12px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:12.6px;font-weight:800;cursor:pointer" onclick="_restoreCloudBackup(\''+b.date+'\');_closeBackupsList()">שחזר</button>'
+    +'<button style="padding:5px 10px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:11.5px;font-weight:600;cursor:pointer" onclick="_downloadCloudBackup(\''+b.date+'\')" title="הורד JSON">⬇️ הורד</button>'
+    +'</div>'
     +'</div>';
   });}
   var elL=document.getElementById('backupsList');if(elL)elL.innerHTML=body;
@@ -767,191 +827,11 @@ function heal(){
  if(fixed)try{sv({bg:true});}catch(e){}
  return fixed;
 }
-// Google Drive Backup
-const GD_SCOPE='https://www.googleapis.com/auth/drive.file';
-let gdToken=null;
-try{gdToken=localStorage.getItem('gdToken')||null;}catch(e){}
-function gdInit(){
-  const cid=D._gdClientId;if(!cid||!window.google)return;
-  window._gdClient=google.accounts.oauth2.initTokenClient({
-    client_id:cid,scope:GD_SCOPE,
-    callback:(resp)=>{if(resp.access_token){gdToken=resp.access_token;localStorage.setItem('gdToken',gdToken);showBanner('✅ מחובר ל-Google Drive',3000);gdBackup(true)}}
-  });
-}
-function gdConnect(){
-  if(!D._gdClientId){showGdSetupGuide();return;}
-  if(!window.google){showBanner('⏳ Google SDK נטען...',2000);setTimeout(gdConnect,2000);return}
-  gdInit();
-  if(window._gdClient)window._gdClient.requestAccessToken();
-}
-function showGdSetupGuide(){
- var e=document.getElementById('gdOv');
- if(!e){e=document.createElement('div');e.id='gdOv';document.body.appendChild(e);}
- // origin the user needs to paste as an "Authorized JavaScript origin" in
- // the OAuth client \u2014 computed from the actual page so it works locally too
- var origin=location.origin;
- e.innerHTML='<div class="O" onclick="closeGd()"><div class="M" onclick="event.stopPropagation()" style="max-height:88vh;overflow-y:auto">'
-  +'<div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div>'
-  +'<div style="font-size:19.2px;font-weight:800;text-align:center;padding:6px 16px 4px;color:var(--t0)">\u2601\ufe0f \u05d7\u05d9\u05d1\u05d5\u05e8 \u05dc\u05d2\u05d5\u05d2\u05dc \u05d3\u05e8\u05d9\u05d9\u05d1</div>'
-  +'<div style="font-size:12.6px;color:var(--t2);text-align:center;padding:0 16px 14px;line-height:1.6">\u05d7\u05d3-\u05e4\u05e2\u05de\u05d9 \u05db-3 \u05d3\u05e7\u05d5\u05ea. \u05d0\u05d7\u05e8 \u05db\u05da \u05d2\u05d9\u05d1\u05d5\u05d9 \u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9 \u05db\u05dc 90 \u05e9\u05e0\u05d9\u05d5\u05ea \u05d0\u05d7\u05e8\u05d9 \u05e9\u05d9\u05e0\u05d5\u05d9 + \u05e4\u05e2\u05dd \u05d1\u05d9\u05d5\u05dd \u05de\u05dc\u05d0.</div>'
-  // step 1
-  +'<div style="padding:0 16px 10px"><div style="font-size:14.4px;font-weight:700;color:var(--go);margin-bottom:4px">1\ufe0f\u20e3 \u05d4\u05e4\u05e2\u05dc \u05d0\u05ea Google Drive API</div>'
-  +'<div style="font-size:12.8px;color:var(--t1);line-height:1.6;margin-bottom:6px">\u05e4\u05ea\u05d7 \u05d0\u05ea \u05d4\u05e7\u05d9\u05e9\u05d5\u05e8 \u05d5\u05dc\u05d7\u05e5 <b>ENABLE</b> (\u05d0\u05d5 <b>MANAGE</b> \u05d0\u05dd \u05db\u05d1\u05e8 \u05e4\u05e2\u05d9\u05dc):</div>'
-  +'<a href="https://console.cloud.google.com/apis/library/drive.googleapis.com?project=asher-1b6e7" target="_blank" rel="noopener" style="display:block;text-align:center;padding:10px;border-radius:9px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:13.8px;font-weight:700;text-decoration:none">\ud83d\udd17 \u05e4\u05ea\u05d7 \u05d3\u05e3 \u05d4\u05e4\u05e2\u05dc\u05ea Drive API</a></div>'
-  // step 2
-  +'<div style="padding:0 16px 10px"><div style="font-size:14.4px;font-weight:700;color:var(--go);margin-bottom:4px">2\ufe0f\u20e3 \u05d4\u05d2\u05d3\u05e8 \u05de\u05e1\u05da \u05d4\u05e8\u05e9\u05d0\u05d4 (\u05d7\u05d3-\u05e4\u05e2\u05de\u05d9, \u05d0\u05dd \u05e2\u05d5\u05d3 \u05dc\u05d0)</div>'
-  +'<div style="font-size:12.8px;color:var(--t1);line-height:1.6;margin-bottom:6px">\u05d0\u05dd \u05d6\u05d5 \u05d4\u05e4\u05e2\u05dd \u05d4\u05e8\u05d0\u05e9\u05d5\u05e0\u05d4: <b>User Type: External \u2192 Create</b>. \u05de\u05dc\u05d0 App name, User support email, Developer contact email \u2192 <b>Save and Continue</b>. \u05d0\u05d9\u05df \u05d7\u05d5\u05d1\u05d4 \u05dc\u05d4\u05d5\u05e1\u05d9\u05e3 scopes \u05d0\u05d5 test users.</div>'
-  +'<a href="https://console.cloud.google.com/apis/credentials/consent?project=asher-1b6e7" target="_blank" rel="noopener" style="display:block;text-align:center;padding:10px;border-radius:9px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:13.8px;font-weight:700;text-decoration:none">\ud83d\udd17 \u05e4\u05ea\u05d7 \u05de\u05e1\u05da \u05d4\u05e8\u05e9\u05d0\u05d4</a></div>'
-  // step 3
-  +'<div style="padding:0 16px 10px"><div style="font-size:14.4px;font-weight:700;color:var(--go);margin-bottom:4px">3\ufe0f\u20e3 \u05e6\u05d5\u05e8 OAuth 2.0 Client ID</div>'
-  +'<div style="font-size:12.8px;color:var(--t1);line-height:1.6;margin-bottom:6px"><b>Create Credentials \u2192 OAuth client ID \u2192 Web application</b>.<br>\u05d1-<b>Authorized JavaScript origins</b> \u05d4\u05d5\u05e1\u05e3 \u05d0\u05ea \u05d4\u05db\u05ea\u05d5\u05d1\u05ea \u05d4\u05d6\u05d0\u05ea:</div>'
-  +'<div style="display:flex;gap:6px;margin-bottom:6px"><input readonly value="'+es(origin)+'" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--bm);background:var(--s3);color:var(--t0);font-size:12.6px;font-family:monospace" onclick="this.select()"><button style="padding:8px 14px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:12.6px;font-weight:700;cursor:pointer" onclick="navigator.clipboard.writeText(\''+es(origin)+'\');this.textContent=\'\u05d4\u05d5\u05e2\u05ea\u05e7 \u2713\';setTimeout(()=>this.textContent=\'\u05d4\u05e2\u05ea\u05e7\',1500)">\u05d4\u05e2\u05ea\u05e7</button></div>'
-  +'<a href="https://console.cloud.google.com/apis/credentials?project=asher-1b6e7" target="_blank" rel="noopener" style="display:block;text-align:center;padding:10px;border-radius:9px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:13.8px;font-weight:700;text-decoration:none">\ud83d\udd17 \u05e4\u05ea\u05d7 \u05d3\u05e3 Credentials</a></div>'
-  // step 4
-  +'<div style="padding:0 16px 16px"><div style="font-size:14.4px;font-weight:700;color:var(--go);margin-bottom:4px">4\ufe0f\u20e3 \u05d4\u05d3\u05d1\u05e7 \u05d0\u05ea \u05d4-Client ID \u05e9\u05e7\u05d9\u05d1\u05dc\u05ea</div>'
-  +'<div style="font-size:12.8px;color:var(--t1);line-height:1.6;margin-bottom:8px">\u05d0\u05d7\u05e8\u05d9 \u05d4\u05d9\u05e6\u05d9\u05e8\u05d4 \u05d9\u05d5\u05e6\u05d2 \u05dc\u05da <b>Client ID</b> (\u05de\u05d7\u05e8\u05d5\u05d6\u05ea \u05d0\u05e8\u05d5\u05db\u05d4 \u05e9\u05de\u05e1\u05ea\u05d9\u05d9\u05de\u05ea \u05d1-<code>.apps.googleusercontent.com</code>). \u05d4\u05e2\u05ea\u05e7 \u05d0\u05d5\u05ea\u05d5 \u05d5\u05d1\u05d5\u05d3\u05e7 \u05db\u05d0\u05df:</div>'
-  +'<input type="text" id="gdCidInput" placeholder="123...apps.googleusercontent.com" style="width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--bm);background:var(--s3);color:var(--t0);font-size:13.2px;font-family:monospace;margin-bottom:8px">'
-  +'<button style="width:100%;height:44px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:800;cursor:pointer" onclick="var v=document.getElementById(\'gdCidInput\').value.trim();if(!v){alert(\'\u05d4\u05d3\u05d1\u05e7 Client ID\');return}D._gdClientId=v;sv();closeGd();setTimeout(gdConnect,300);">\ud83d\udcbe \u05e9\u05de\u05d5\u05e8 \u05d5\u05d4\u05ea\u05d7\u05d1\u05e8</button></div>'
-  // secondary: manual sheet share
-  +'<div style="padding:12px 16px 20px;border-top:1px solid var(--bd);margin-top:4px"><div style="font-size:12.6px;color:var(--t2);text-align:center;margin-bottom:8px">\u05e8\u05d5\u05e6\u05d4 \u05dc\u05d3\u05dc\u05d2 \u05d5\u05e8\u05e7 \u05dc\u05d2\u05d1\u05d5\u05ea \u05e2\u05db\u05e9\u05d9\u05d5 \u05dc\u05e7\u05d5\u05d1\u05e5 \u05de\u05e7\u05d5\u05de\u05d9 / \u05e9\u05d9\u05ea\u05d5\u05e3 \u05dc\u05d3\u05e8\u05d9\u05d9\u05d1 \u05de\u05d4\u05d0\u05d9\u05d9\u05e4\u05d5\u05df?</div>'
-  +'<button style="width:100%;height:38px;border-radius:9px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:13.2px;font-weight:600;cursor:pointer" onclick="closeGd();doBackup(false)">\ud83d\udce4 \u05e9\u05ea\u05e3 \u05e7\u05d5\u05d1\u05e5 \u05d2\u05d9\u05d1\u05d5\u05d9 (\u05d7\u05d3-\u05e4\u05e2\u05de\u05d9)</button></div>'
-  +'</div></div>';
-}
-function gdStatus(t,ok){D._gdMsg=t;D._gdOk=!!ok;sv();if(pg==='settings')keepScroll(rr);}
-function gdFetch(url,opt){
- opt=opt||{};opt.headers=Object.assign({},opt.headers||{},{'Authorization':'Bearer '+gdToken});
- return fetch(url,opt).then(function(res){
-  if(res.status===401||res.status===403){gdToken=null;try{localStorage.removeItem('gdToken')}catch(e){}
-   throw new Error('החיבור פג — התחבר שוב');}
-  if(!res.ok)throw new Error('שגיאה '+res.status);
-  return res;});}
-// a SINGLE always-current file (not the dated backups) that every device
-// overwrites on save and checks on load - this is what makes "see it from
-// another device" actually work, on top of the existing Drive connection
-function gdSyncUpload(){
- if(!gdToken)return Promise.resolve(false);
- var data=JSON.stringify(D);
- return gdFetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name='yeshiva-live-sync.json' and trashed=false")+'&spaces=drive&fields=files(id)')
-  .then(function(r){return r.json();})
-  .then(function(res){
-   var meta={name:'yeshiva-live-sync.json',mimeType:'application/json'};
-   var form=new FormData();
-   form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
-   form.append('file',new Blob([data],{type:'application/json'}));
-   var id=res.files&&res.files[0]&&res.files[0].id;
-   return gdFetch(id?'https://www.googleapis.com/upload/drive/v3/files/'+id+'?uploadType=multipart'
-                    :'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-                  {method:id?'PATCH':'POST',body:form});})
-  .then(function(){D._lastSyncPush=new Date().toISOString();return true;})
-  .catch(function(){return false;});}
-function gdCheckForUpdates(silent){
- if(!gdToken)return;
- gdFetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name='yeshiva-live-sync.json' and trashed=false")+'&fields=files(id,modifiedTime)')
-  .then(function(r){return r.json();})
-  .then(function(res){
-   var f=res.files&&res.files[0];
-   if(!f){if(!silent)showBanner('אין עדיין גרסה משותפת בענן',3000);return;}
-   var remoteTime=new Date(f.modifiedTime).getTime();
-   var localSeen=D._lastSyncSeen?new Date(D._lastSyncSeen).getTime():0;
-   var justPushed=D._lastSyncPush?new Date(D._lastSyncPush).getTime():0;
-   // a full minute of slack around our own last push avoids re-prompting
-   // about the very update this device just sent
-   if(remoteTime>localSeen+2000&&remoteTime>justPushed-60000){
-    showCloudUpdateBanner(f.id,f.modifiedTime);
-   }else if(!silent){showBanner('✅ הנתונים כבר עדכניים',2500);}
-  }).catch(function(){if(!silent)showBanner('⚠️ בדיקת עדכונים נכשלה',3000);});}
-function showCloudUpdateBanner(fileId,modifiedTime){
- var e=document.getElementById('floatAlert');
- if(!e){e=document.createElement('div');e.id='floatAlert';document.body.appendChild(e);}
- var when=new Date(modifiedTime).toLocaleString('he-IL',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'numeric'});
- e.innerHTML='<div style="position:fixed;left:8px;right:8px;bottom:78px;z-index:99998;'
- +'background:var(--s1);border:1px solid var(--gb);border-radius:16px;'
- +'box-shadow:0 10px 30px rgba(0,0,0,.5);padding:12px 14px;direction:rtl;animation:bannerUp .25s ease-out">'
- +'<div style="display:flex;align-items:flex-start;gap:10px">'
- +'<div style="flex:1;min-width:0">'
- +'<div style="font-size:15.6px;font-weight:700;color:var(--go);line-height:1.4">☁️ יש עדכון ממכשיר אחר</div>'
- +'<div style="font-size:13.2px;color:var(--t1);margin-top:2px;line-height:1.45">נשמר '+when+' — לטעון את הגרסה הזו?</div></div>'
- +'<button aria-label="סגור" onclick="closeFloatingAlert()" style="flex:0 0 30px;width:30px;height:30px;'
- +'border-radius:50%;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:17px;line-height:1;cursor:pointer;padding:0">×</button>'
- +'</div>'
- +'<div style="display:flex;gap:8px;margin-top:10px">'
- +'<button style="flex:1;height:42px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14.4px;font-weight:700;cursor:pointer" '
- +'onclick="closeFloatingAlert();gdRestore(\''+fileId+'\',\'המכשיר האחר\')">☁️ טען עכשיו</button>'
- +'<button style="flex:1;height:42px;border-radius:10px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14.4px;font-weight:700;cursor:pointer" '
- +'onclick="D._lastSyncSeen=new Date().toISOString();sv();closeFloatingAlert()">התעלם</button>'
- +'</div></div>';
-}
-function gdBackup(manual){
- if(!gdToken){if(manual)gdStatus('לא מחובר ל-Google Drive',false);return Promise.resolve(false);}
- var data=JSON.stringify(D),kb=Math.round(data.length/1024);
- var fileName='yeshiva-backup-'+hF(new Date).replace(/\s/g,'-')+'.json';
- if(manual)gdStatus('מגבה…',true);
- return gdFetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name='"+fileName+"' and trashed=false")+'&spaces=drive&fields=files(id)')
-  .then(function(r){return r.json();})
-  .then(function(res){
-   var meta={name:fileName,mimeType:'application/json'};
-   var form=new FormData();
-   form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
-   form.append('file',new Blob([data],{type:'application/json'}));
-   var id=res.files&&res.files[0]&&res.files[0].id;
-   return gdFetch(id?'https://www.googleapis.com/upload/drive/v3/files/'+id+'?uploadType=multipart'
-                    :'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-                  {method:id?'PATCH':'POST',body:form});})
-  .then(function(){D._lastGdBackup=new Date().toISOString();D._gdSize=kb;
-   gdStatus('גובה '+new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})+' · '+kb+'KB',true);
-   if(manual)showBanner('☁️ הגיבוי נשמר ב-Drive ('+kb+'KB)',3500);
-   return true;})
-  .catch(function(err){gdStatus('הגיבוי נכשל: '+err.message,false);
-   if(manual)showBanner('⚠️ הגיבוי נכשל — '+err.message,5000);
-   return false;});}
-function closeGd(){var e=document.getElementById('gdOv');if(e)e.innerHTML='';}
-function gdList(){
- if(!gdToken){showBanner('התחבר קודם ל-Google Drive',3000);return;}
- showBanner('טוען גיבויים…',1500);
- gdFetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name contains 'yeshiva-backup-' and trashed=false")+'&orderBy=name desc&pageSize=60&fields=files(id,name,modifiedTime,size)')
-  .then(function(r){return r.json();})
-  .then(function(res){
-   var f=res.files||[];
-   var e=document.getElementById('gdOv');
-   if(!e){e=document.createElement('div');e.id='gdOv';document.body.appendChild(e);}
-   var h='<div class="O" onclick="closeGd()"><div class="M" onclick="event.stopPropagation()" style="max-height:78vh;overflow-y:auto">'
-    +'<div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div>'
-    +'<div style="font-size:19.2px;font-weight:700;text-align:center;padding:6px 16px;color:var(--t0)">☁️ גיבויים ב-Drive</div>'
-    +'<div style="font-size:13.2px;color:var(--t2);text-align:center;padding:0 16px 10px">'+f.length+' גיבויים · שחזור מחליף את כל הנתונים</div>'
-    +'<div style="padding:0 12px 20px">';
-   if(!f.length)h+='<div style="text-align:center;color:var(--t2);font-size:15.6px;padding:20px">לא נמצאו גיבויים</div>';
-   f.forEach(function(x){
-    var hebPart=x.name.replace(/^yeshiva-backup-/,'').replace(/\.json$/,'').replace(/-/g,' ');
-    var kb=x.size?Math.round(x.size/1024)+'KB':'';
-    h+='<div style="display:flex;align-items:center;gap:8px;padding:10px;border-radius:10px;background:var(--s1);border:1px solid var(--bd);margin-bottom:6px">'
-     +'<div style="flex:1;min-width:0"><div style="font-size:15.6px;font-weight:600;color:var(--t0)">'+es(hebPart||x.name)+'</div>'
-     +'<div style="font-size:12.0px;color:var(--t2)">'+new Date(x.modifiedTime).toLocaleString('he-IL')+(kb?' · '+kb:'')+'</div></div>'
-     +'<button style="padding:7px 12px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:13.2px;font-weight:700;cursor:pointer" onclick="gdRestore(\''+x.id+'\',\''+jq(hebPart||x.name)+'\')">שחזר</button></div>';});
-   h+='</div></div></div>';e.innerHTML=h;})
-  .catch(function(err){showBanner('⚠️ '+err.message,4000);});}
-function gdRestore(id,label){
- if(!confirm('לשחזר את הגיבוי מ-'+label+'?\nכל הנתונים הנוכחיים יוחלפו.'))return;
- gdFetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media')
-  .then(function(r){return r.text();})
-  .then(function(txt){
-   var parsed=JSON.parse(txt);
-   if(!parsed||!Array.isArray(parsed.pb))throw new Error('קובץ לא תקין');
-   try{localStorage.setItem(K+'_prev',JSON.stringify(D));}catch(e){}
-   D=parsed;sv();closeGd();
-   showBanner('✅ שוחזר גיבוי מ-'+label,4000);go('home');})
-  .catch(function(err){showBanner('⚠️ השחזור נכשל — '+err.message,5000);});}
-var _gdT=null;
-function gdTouch(){if(!gdToken)return;if(_gdT)clearTimeout(_gdT);
- _gdT=setTimeout(function(){gdBackup(false);gdSyncUpload();},90000);}
-function checkGdAutoBackup(){if(!gdToken)return;
- var last=D._lastGdBackup;
- if(!last||last.slice(0,10)!==td())gdBackup(false);}
-setInterval(checkGdAutoBackup,60000);
+// Google Drive backup removed — all cloud backup lives in Firestore /backups now.
 setInterval(checkTaskAlerts,30000); // check every 30 min
 // once per app load (not on every render), quietly check whether another
 // device pushed something newer - this is what makes opening the app
 // elsewhere actually show you up-to-date data
-if(gdToken)setTimeout(function(){gdCheckForUpdates(true);},2500);
 
 let _fbSaveTimer=null,_fbPending=false;
 // cache of remote photos (per cs entry id). populated by the photos listener;
@@ -992,15 +872,21 @@ function _mergePhotos(){
 // the "remoteTs<localTs? push local up" race and wipe the other device's
 // real edits. Real user edits (button clicks, form submits) call sv() with
 // no args and DO update the timestamp + push to Firestore.
-function sv(opts){opts=opts||{};if(!opts.bg){D._updatedAt=Date.now();}D._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');try{if(typeof gdTouch==='function')gdTouch();}catch(e){}try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
+function sv(opts){opts=opts||{};if(!opts.bg){D._updatedAt=Date.now();D._lastWriterDevice=_getDeviceId();D._lastWriterName=_getDeviceName();D._lastWriterAt=Date.now();}D._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');try{localStorage.setItem(K,JSON.stringify(D))}catch(e){if(e.name==='QuotaExceededError')alert('⚠️ הזיכרון מלא! גבה נתונים ומחק היסטוריה ישנה.')}
  if(opts.bg)return;
  if(typeof _fbDocRef!=='undefined'){
   _fbPending=true;
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer=setTimeout(function(){
    _fbPending=false;
+   window._syncStatus.state='pushing';_updateSyncPill();
    var split=_splitPhotos(D);
-   _fbDocRef.set(split.stripped).catch(function(e){console.error('Firestore save failed',e);});
+   _fbDocRef.set(split.stripped).then(function(){
+    window._syncStatus.state='idle';window._syncStatus.lastOkAt=Date.now();window._syncStatus.lastErr=null;_updateSyncPill();
+   }).catch(function(e){
+    window._syncStatus.state='error';window._syncStatus.lastErr=(e&&e.message||String(e));window._syncStatus.lastErrAt=Date.now();_updateSyncPill();
+    console.error('Firestore save failed',e);
+   });
    // write photos separately, one doc per boy. only for boys who currently
    // have photos - stale photo docs from boys who lost their photos aren't
    // cleaned up here (rare, and photos come back on next update anyway)
@@ -1034,6 +920,29 @@ function flushSv(){
 document.addEventListener('visibilitychange',function(){if(document.hidden)flushSv();});
 window.addEventListener('pagehide',flushSv);
 window.addEventListener('beforeunload',flushSv);
+// ─── Sync status pill (top-left corner, tiny) ───
+// tracks: online/offline, pending write, last successful write. Shown as
+// a small colored dot with a tooltip on hover/tap; expands to a short
+// message when there's an active problem the user should know about.
+window._syncStatus={state:'idle',lastOkAt:null,lastErrAt:null,lastErr:null};
+function _updateSyncPill(){
+ var el=document.getElementById('_syncPill');
+ if(!el){el=document.createElement('div');el.id='_syncPill';document.body.appendChild(el);}
+ var st=window._syncStatus;
+ var color='var(--gr)',title='מסונכרן',emoji='●';
+ if(!navigator.onLine){color='var(--t2)';title='לא מחובר לרשת';emoji='◌';}
+ else if(st.state==='pushing'){color='var(--am)';title='דוחף…';emoji='◐';}
+ else if(st.state==='error'){color='var(--rd)';title='שגיאת סנכרון: '+(st.lastErr||'לא ידוע');emoji='!';}
+ else if(st.lastOkAt){title='מסונכרן · אחרון '+new Date(st.lastOkAt).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});}
+ el.title=title;
+ el.setAttribute('aria-label',title);
+ el.style.cssText='position:fixed;top:max(env(safe-area-inset-top),6px);left:6px;z-index:99997;width:14px;height:14px;border-radius:50%;background:'+color+';box-shadow:0 0 0 2px rgba(0,0,0,.25);cursor:pointer;font-size:9px;color:#0a0f1c;display:flex;align-items:center;justify-content:center;font-weight:900';
+ el.textContent=emoji==='●'?'':emoji;
+ el.onclick=function(){alert(title);};
+}
+window.addEventListener('online',_updateSyncPill);
+window.addEventListener('offline',_updateSyncPill);
+setInterval(_updateSyncPill,15000);
 const YOFF={'2026-08-14':'ערב שבת חופש','2026-08-15':'שבת חופש','2026-08-29':'שבת חופש','2026-09-18':'ערב שבת חופש','2026-09-19':'שבת חופש','2026-09-20':'בין הזמנים','2026-09-21':'יום כיפור','2026-09-22':'בין הזמנים','2026-09-23':'בין הזמנים','2026-09-24':'בין הזמנים','2026-09-25':'ערב שבת חופש','2026-09-26':'סוכות','2026-09-27':'סוכות','2026-09-28':'סוכות','2026-09-29':'סוכות','2026-09-30':'סוכות','2026-10-01':'סוכות','2026-10-02':'סוכות','2026-10-03':'שמחת תורה','2026-10-04':'בין הזמנים','2026-10-05':'בין הזמנים','2026-10-06':'בין הזמנים','2026-10-07':'בין הזמנים','2026-10-17':'שבת חופש','2026-10-31':'שבת חופש','2026-11-14':'שבת חופש','2026-11-28':'שבת חופש','2026-12-08':'חנוכה','2026-12-09':'חנוכה','2026-12-10':'חנוכה','2026-12-11':'חנוכה','2026-12-12':'חנוכה','2026-12-26':'שבת חופש','2027-01-09':'שבת חופש','2027-01-23':'שבת חופש','2027-02-06':'שבת חופש','2027-02-20':'שבת חופש','2027-03-06':'שבת חופש','2027-03-20':'שבת חופש','2027-03-21':'בין הזמנים','2027-03-22':'בין הזמנים','2027-03-23':'פורים','2027-03-24':'שושן פורים','2027-04-08':'בין הזמנים','2027-04-09':'ערב שבת חופש','2027-04-10':'שבת חופש','2027-04-11':'בין הזמנים','2027-04-12':'בין הזמנים','2027-04-13':'בין הזמנים','2027-04-14':'בין הזמנים','2027-04-15':'בין הזמנים','2027-04-16':'ערב שבת חופש','2027-04-17':'שבת חופש','2027-04-18':'בין הזמנים','2027-04-19':'בין הזמנים','2027-04-20':'בין הזמנים','2027-04-21':'ערב פסח','2027-04-22':'פסח','2027-04-23':'פסח','2027-04-24':'פסח','2027-04-25':'פסח','2027-04-26':'פסח','2027-04-27':'פסח','2027-04-28':'פסח','2027-04-29':'בין הזמנים','2027-04-30':'ערב שבת חופש','2027-05-01':'שבת חופש','2027-05-02':'בין הזמנים','2027-05-03':'בין הזמנים','2027-05-15':'שבת חופש','2027-05-29':'שבת חופש','2027-06-10':'בין הזמנים','2027-06-19':'שבת חופש','2027-07-10':'שבת חופש','2027-07-24':'שבת חופש','2027-08-10':'בין הזמנים','2027-08-11':'בין הזמנים','2027-08-12':'תשעה באב','2027-08-13':'ערב שבת חופש','2027-08-14':'שבת חופש','2027-08-15':'בין הזמנים','2027-08-16':'בין הזמנים','2027-08-17':'בין הזמנים','2027-08-18':'בין הזמנים','2027-08-19':'בין הזמנים','2027-08-20':'ערב שבת חופש','2027-08-21':'שבת חופש','2027-08-22':'בין הזמנים','2027-08-23':'בין הזמנים','2027-08-24':'בין הזמנים','2027-08-25':'בין הזמנים','2027-08-26':'בין הזמנים','2027-08-27':'ערב שבת חופש','2027-08-28':'שבת חופש','2027-08-29':'בין הזמנים','2027-08-30':'בין הזמנים','2027-08-31':'בין הזמנים','2027-09-01':'בין הזמנים','2027-09-02':'בין הזמנים'};
 const YMARK={'2026-08-22':'שבת ישיבה','2026-09-05':'שבת ישיבה','2026-09-12':'חג בישיבה','2026-09-13':'חג בישיבה','2026-10-10':'שבת ישיבה','2026-10-24':'שבת ישיבה','2026-11-01':'אסיפת הורים','2026-11-07':'שבת ישיבה','2026-11-21':'שבת ישיבה','2026-12-05':'שבת ישיבה','2026-12-06':'חג בישיבה','2026-12-19':'שבת ישיבה','2027-01-02':'שבת ישיבה','2027-01-16':'שבת ישיבה','2027-01-30':'שבת ישיבה','2027-02-13':'שבת ישיבה','2027-02-27':'שבת ישיבה','2027-03-13':'שבת ישיבה','2027-03-27':'שבת ישיבה','2027-04-03':'שבת ישיבה','2027-05-08':'שבת ישיבה','2027-05-22':'שבת ישיבה','2027-05-25':'חג בישיבה','2027-06-05':'שבת ישיבה','2027-06-11':'חג בישיבה','2027-06-12':'שבת ישיבה','2027-06-20':'אסיפת הורים','2027-06-26':'שבת ישיבה','2027-07-03':'שבת ישיבה','2027-07-17':'שבת ישיבה','2027-07-31':'שבת ישיבה','2027-08-07':'שבת ישיבה'};
 function todayISO(){var n=new Date();return new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10);}
@@ -1493,14 +1402,9 @@ function rSt(){let h='<div class="P"><div class="H"><span style="font-weight:800
  h+='<button style="width:100%;height:42px;border-radius:10px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:15px;font-weight:700;cursor:pointer" onclick="_openBackupsList()">☁️ שחזר מגיבוי בענן</button>';
  h+='<div style="font-size:11.4px;color:var(--t2);margin-top:6px;line-height:1.5">30 ימים אחרונים נשמרים אוטומטית ב-Firestore. אין צורך בהגדרות Google Cloud.</div></div>';
 }
-var _gc=!!gdToken,_lb=D._lastGdBackup;
-h+='<div class="C" style="margin-bottom:10px"><div style="font-size:16.8px;font-weight:700;color:var(--t0);margin-bottom:6px">\u2601\ufe0f \u05d2\u05d9\u05d1\u05d5\u05d9 \u05dc-Google Drive</div>';
-h+='<div style="display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:9px;background:'+(_gc?'var(--grd)':'var(--s3)')+';border:1px solid '+(_gc?'rgba(34,197,94,.3)':'var(--bm)')+';margin-bottom:8px"><div style="width:8px;height:8px;border-radius:50%;background:'+(_gc?'var(--gr)':'var(--t2)')+'"></div><div style="flex:1;min-width:0"><div style="font-size:14.4px;font-weight:700;color:'+(_gc?'var(--gr)':'var(--t2)')+'">'+(_gc?'\u05de\u05d7\u05d5\u05d1\u05e8':'\u05dc\u05d0 \u05de\u05d7\u05d5\u05d1\u05e8')+'</div><div style="font-size:12.0px;color:var(--t2);margin-top:1px">'+(_lb?('\u05d0\u05d7\u05e8\u05d5\u05df: '+new Date(_lb).toLocaleString('he-IL')):'\u05d8\u05e8\u05dd \u05d2\u05d5\u05d1\u05d4')+'</div></div></div>';
-if(D._gdMsg)h+='<div style="font-size:13.2px;padding:7px 9px;border-radius:8px;margin-bottom:8px;background:'+(D._gdOk?'var(--grd)':'var(--rdd)')+';color:'+(D._gdOk?'var(--gr)':'var(--rd)')+'">'+es(D._gdMsg)+'</div>';
-if(!_gc){h+='<button style="width:100%;height:44px;border-radius:10px;background:var(--bl);color:#fff;border:none;font-size:16.8px;font-weight:700;cursor:pointer" onclick="gdConnect()">\u05d4\u05ea\u05d7\u05d1\u05e8 \u05dc-Google Drive</button>';}
-else{h+='<div style="display:flex;gap:6px"><button style="flex:1;height:42px;border-radius:10px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:15.6px;font-weight:700;cursor:pointer" onclick="gdBackup(true)">\u05d2\u05d1\u05d4 \u05e2\u05db\u05e9\u05d9\u05d5</button><button style="flex:1;height:42px;border-radius:10px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:15.6px;font-weight:700;cursor:pointer" onclick="gdList()">\u05e9\u05d7\u05d6\u05e8 \u05de\u05d2\u05d9\u05d1\u05d5\u05d9</button></div>'+'<button style="width:100%;height:40px;margin-top:6px;border-radius:10px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14.4px;font-weight:600;cursor:pointer" onclick="gdCheckForUpdates(false)">\u2601\ufe0f \u05d1\u05d3\u05d5\u05e7 \u05d0\u05dd \u05d9\u05e9 \u05e2\u05d3\u05db\u05d5\u05df \u05de\u05de\u05db\u05e9\u05d9\u05e8 \u05d0\u05d7\u05e8</button>';}
+h+='<div class="C" style="margin-bottom:10px"><div style="font-size:16.8px;font-weight:700;color:var(--t0);margin-bottom:6px">\u2b07\ufe0f \u05d9\u05e6\u05d5\u05d0 \u05d9\u05d3\u05e0\u05d9</div>';
 h+='<button style="width:100%;height:42px;margin-top:6px;border-radius:10px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14.4px;font-weight:700;cursor:pointer" onclick="expData()">\u2b07\ufe0f \u05d9\u05e6\u05d0 \u05e7\u05d5\u05d1\u05e5 \u05d2\u05d9\u05d1\u05d5\u05d9 \u05dc\u05de\u05db\u05e9\u05d9\u05e8</button>';
-h+='<div style="font-size:12.0px;color:var(--t2);margin-top:6px;line-height:1.5">\u05de\u05ea\u05d2\u05d1\u05d4 \u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9\u05ea \u05d1\u05e4\u05ea\u05d9\u05d7\u05d4 \u05d5\u05d0\u05d7\u05e8\u05d9 \u05e9\u05d9\u05e0\u05d5\u05d9\u05d9\u05dd \u00b7 \u05e7\u05d5\u05d1\u05e5 \u05dc\u05db\u05dc \u05d9\u05d5\u05dd</div></div>';
+h+='<div style="font-size:11.4px;color:var(--t2);margin-top:6px;line-height:1.5">\u05e7\u05d5\u05d1\u05e5 JSON \u05de\u05dc\u05d0 \u05e9\u05e0\u05e9\u05de\u05e8 \u05d1\u05d4\u05d5\u05e8\u05d3\u05d5\u05ea \u05d4\u05de\u05db\u05e9\u05d9\u05e8. \u05d4\u05d2\u05d9\u05d1\u05d5\u05d9\u05d9\u05dd \u05d4\u05e2\u05d9\u05e7\u05e8\u05d9\u05d9\u05dd \u05e9\u05de\u05d5\u05e8\u05d9\u05dd \u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9\u05ea \u05d1\u05e2\u05e0\u05df.</div></div>';
 h+='<div class="C" style="margin-bottom:10px">';
 h+='<div style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding-bottom:4px" onclick="window._boyOpen=!window._boyOpen;keepScroll(rr)"><span style="font-weight:700;font-size:16.8px;color:var(--t0)">👥 ניהול בחורים ('+D.pb.length+') '+(window._boyOpen?'▲':'▼')+'</span><div style="display:flex;gap:5px"><button style="padding:6px 10px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:13.2px;font-weight:700;cursor:pointer" onclick="event.stopPropagation();addBoy()">+ יחיד</button><button style="padding:6px 10px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:13.2px;font-weight:700;cursor:pointer" onclick="event.stopPropagation();addBulk()">+ כמות</button></div></div>';
 h+='<div style="display:'+(window._boyOpen?'block':'none')+'">';
@@ -1553,6 +1457,11 @@ h+='</div></div>';
  var _pendingKeys=Object.keys(_pending);
  h+='<div id="devicesSection" class="C" style="margin-top:10px"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:6px">🔐 מכשירים מחוברים</div>';
  h+='<div style="font-size:13.2px;color:var(--t2);margin-bottom:10px">רק מכשירים מאושרים יכולים להיכנס לאפליקציה. בקשה מכל מכשיר חדש תקפוץ פה + התראה.</div>';
+ if(D._lastWriterDevice){
+  var _lw=D._lastWriterDevice===_myDevId?'המכשיר הזה':(D._lastWriterName||'מכשיר אחר');
+  var _lwt=D._lastWriterAt?new Date(D._lastWriterAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+  h+='<div style="font-size:12px;color:var(--t2);padding:6px 8px;border-radius:8px;background:var(--s3);margin-bottom:10px">📝 עדכון אחרון: '+es(_lw)+(_lwt?' · '+es(_lwt):'')+'</div>';
+ }
  if(_pendingKeys.length){
   h+='<div style="background:var(--amd);border:1px solid rgba(245,158,11,.4);border-radius:9px;padding:10px 12px;margin-bottom:10px">'
    +'<div style="font-size:14px;font-weight:700;color:var(--am);margin-bottom:8px">⏳ ממתינים לאישור ('+_pendingKeys.length+')</div>';
@@ -1601,6 +1510,7 @@ e.innerHTML='<div class="O" onclick="document.getElementById(\'bkov\').innerHTML
 function doBulkAdd(){const ta=document.getElementById('bkta');if(!ta)return;const lines=ta.value.split('\n').map(l=>l.trim()).filter(Boolean);let added=0,skip=0;lines.forEach(n=>{if(!n.includes(' ')){skip++;return}if(D.pb.includes(n)){skip++;return}D.pb.push(n);D.cs.push({id:uid(),name:n,urgent:false,notes:'',friends:'',cb:''});added++});sv();document.getElementById('bkov').innerHTML='';alert('נוספו '+added+' בחורים'+(skip>0?' ('+skip+' דולגו)':''));rr()}
 function rmBoyI(sortIdx){const srt=sortByRoomBed(D.pb);const n=srt[sortIdx];if(!n)return;if(!confirm('להסיר את '+n+'? (יישמר גיבוי בטיחות)'))return;rmBoyByName(n)}
 async function rmBoyByName(n){
+ if(!(await requireAuth('למחיקת בחור')))return;
  await _withSafetyBackup('before-remove-'+n.replace(/\s+/g,'_'),'לפני מחיקת '+n,async function(){
   D.pb=D.pb.filter(b=>b!==n);D.cs=D.cs.filter(s=>s.name!==n);D.wt=D.wt.filter(t=>t.nm!==n);D.wh=D.wh.filter(t=>t.nm!==n);D.ci=D.ci.filter(t=>t.sn!==n);delete D.ps[n];delete D.pt[n];sv();rr();
  });
@@ -2214,7 +2124,12 @@ function saveScan(imgB64,dateISO,info){
   if(!D._scans)D._scans=[];
   D._scans.push({d:dateISO||td(),at:new Date().toISOString(),
     cells:(info&&info._cells)||0,hits:(info&&info._hits)||0});
-  while(D._scans.length>500)D._scans.shift();
+  // keep scans lean: last 60 entries and only from the past 90 days.
+  // scan log is diagnostic, not user-facing beyond OMR audits, and used
+  // to bloat the shared/main doc toward the 1MB Firestore limit
+  var cutoff=Date.now()-90*86400000;
+  D._scans=D._scans.filter(function(x){var t=x.at?new Date(x.at).getTime():0;return t>=cutoff;});
+  while(D._scans.length>60)D._scans.shift();
   D._scans.forEach(function(x){if(x.img)delete x.img;});
   sv();
  }catch(err){}
@@ -3188,7 +3103,23 @@ if(ed.lights_10sh)window._rptActions.push(function(){ed.lights_10sh.forEach(func
 if(ed.bowls_5sh)window._rptActions.push(function(){ed.bowls_5sh.forEach(function(n){_mkTask(n,'5ש','איחור קערה וספל');});});
 window._rptActions.push(function(){var ac=D.pb.filter(iA);var _rd=(window._rptDate)||tdEve();D.ph[_rd]={dp:ac.filter(function(b){return D.pt[b]===true;}),m:ac.filter(function(b){return D.pt[b]!==true;}),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};snapDayStatus(_rd,'eve');});
 closeManualEdit();confirmReport();}
-function confirmReport(){if(window._rptActions)window._rptActions.forEach(fn=>fn());sv();rr();const p=document.getElementById('reportPreview');if(p)p.innerHTML='<div class="C" style="margin-top:8px;text-align:center;color:var(--go);font-size:16.8px;font-weight:700">✅ כל הנתונים עודכנו!</div>';const kitTasks=D.wt.filter(t=>t.pk&&t.pk.includes('קיט')&&t.status==='waiting');if(kitTasks.length>0){const kitNames=kitTasks.map(t=>t.nm).filter((v,i,a)=>a.indexOf(v)===i);kitNames.forEach(nm=>{let b=document.createElement('div');b.id='kit_'+nm;b.style.cssText='position:fixed;top:20px;right:12px;background:linear-gradient(135deg,#f59e0b,#f97316);color:white;padding:12px 16px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.25);font-weight:700;font-size:16.8px;z-index:9999;cursor:pointer;max-width:250px;text-align:right;direction:rtl';b.innerHTML='📖 '+nm+' — הוספו קיטים!';b.onclick=()=>{printSleepTable(nm)};document.body.appendChild(b);setTimeout(()=>{if(b.parentNode)b.parentNode.removeChild(b)},8000)})}}
+function confirmReport(){
+ if(window._rptActions)window._rptActions.forEach(fn=>fn());
+ sv();rr();
+ const p=document.getElementById('reportPreview');
+ if(!p)return;
+ const kitTasks=D.wt.filter(t=>t.pk&&t.pk.includes('קיט')&&t.status==='waiting');
+ const kitNames=kitTasks.length?kitTasks.map(t=>t.nm).filter((v,i,a)=>a.indexOf(v)===i):[];
+ var h='<div class="C" style="margin-top:8px;text-align:center;color:var(--go);font-size:16.8px;font-weight:700">✅ כל הנתונים עודכנו!</div>';
+ if(kitNames.length){
+  h+='<div class="C" style="margin-top:8px;border-color:rgba(245,158,11,.4);background:var(--amd)">'
+   +'<div style="font-size:15.6px;font-weight:800;color:var(--am);margin-bottom:8px">📖 הוספו קיטים — הדפס טבלה:</div>'
+   +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+   +kitNames.map(function(nm){return '<button style="flex:1 1 auto;min-width:120px;padding:9px 12px;border-radius:9px;background:var(--am);color:#0a0f1c;border:none;font-size:14.4px;font-weight:800;cursor:pointer" onclick="printSleepTable(\''+jq(nm)+'\')">🖨 '+es(nm)+'</button>';}).join('')
+   +'</div></div>';
+ }
+ p.innerHTML=h;
+}
 
 function schedTalkIssues(nm){
 var seenP={};var punish=[...D.wt,...D.wh].filter(function(t){if(t.nm!==nm||!(t.status==='late'||t.status==='doubled'))return false;if(seenP[t.id])return false;seenP[t.id]=true;return true;}).length;
@@ -4895,7 +4826,7 @@ if(h>=14&&D._lastResetDate!==today){
     delete D.pt[b+'_t'];
   });
   D._lastResetDate=today;
-  sv();rr();
+  sv({bg:true});rr();
 }
 // afternoon: once 14:00 passes, yesterday's afternoon round is over -
 // save whatever was marked (even if the person never pressed the save
@@ -4911,7 +4842,7 @@ if(h>=14&&D._lastAftResetDate!==today){
   }
   D.ptA={};
   D._lastAftResetDate=today;
-  sv();rr();
+  sv({bg:true});rr();
 }
 // evening: at 21:30 start a fresh round for tonight - save whatever the
 // previous evening round had (again, even if never explicitly saved) before
@@ -4924,7 +4855,7 @@ if((h>21||(h===21&&m>=30))&&D._lastEveResetDate!==today){
   }
   D.pb.forEach(b=>{D.pt[b]=false;delete D.pt[b+'_t'];});
   D._lastEveResetDate=today;
-  sv();rr();
+  sv({bg:true});rr();
 }
 }catch{}}
 setInterval(checkDailyReset,30000);
