@@ -529,7 +529,10 @@ function _renderDeviceBlock(){
   +'<div style="font-size:12px;color:#5e6e85;margin-bottom:4px">מזהה קצר</div>'
   +'<div style="font-size:13px;font-family:monospace;color:#9ba8bb">'+es(id.slice(0,8))+'</div>'
   +'</div>'
+  +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'
   +'<button style="padding:12px 22px;border-radius:10px;background:#c9a84c;color:#0a0f1c;border:none;font-size:15px;font-weight:800;cursor:pointer" onclick="location.reload()">🔄 בדוק שוב</button>'
+  +'<button style="padding:12px 22px;border-radius:10px;background:#202c42;color:#9ba8bb;border:1px solid rgba(148,163,184,.18);font-size:14px;font-weight:700;cursor:pointer" onclick="if(confirm(\'לאפס את נתוני המכשיר ולקרוא הכל מהשרת מחדש? (מומלץ אם המכשיר תקוע חסום למרות שאושר)\')){try{var kd=localStorage.getItem(_DEV_KEY);localStorage.clear();if(kd)localStorage.setItem(_DEV_KEY,kd);}catch(e){}location.reload();}">↺ איפוס וקריאה מהשרת</button>'
+  +'</div>'
   +'</div>';
 }
 function _approveDevice(id){
@@ -583,6 +586,10 @@ function ld(){
       heal();
       _mergePhotos();
       if(!D._updatedAt)D._updatedAt=remoteTs||Date.now();
+      if(!window._deviceCheckReady){
+       try{_deviceInitCheck();}catch(e){}
+       window._deviceCheckReady=true;
+      }
       rr({external:true});
       return;
      }
@@ -649,6 +656,12 @@ function ld(){
     D={...df(),...remote};
     heal();
     _mergePhotos();
+    // first real snapshot has landed with the authoritative approved-devices
+    // list - safe to enable the gate now instead of guessing with a timer
+    if(!window._deviceCheckReady){
+     try{_deviceInitCheck();}catch(e){}
+     window._deviceCheckReady=true;
+    }
     rr({external:true});
    },function(err){console.error('Firestore sync error',err);});
   // photos listener - each doc under /photos is one boy's photo array.
@@ -4808,15 +4821,17 @@ if((h>21||(h===21&&m>=30))&&D._lastEveResetDate!==today){
 setInterval(checkDailyReset,30000);
 checkDailyReset();// run once on load
 setInterval(()=>{const e=document.getElementById('hmClk');if(e){const n=new Date;e.textContent=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')}},10000);
-// after ~3s (enough for the initial Firestore snapshot to arrive), run the
-// device-approval check and enable the gate. Delaying prevents a fresh
-// install from bootstrapping itself as approved before the real remote
-// state (with the actual approved-device list) has loaded.
+// Fallback timer: if the first Firestore snapshot never arrives (device is
+// offline, Firestore is down, network is slow) enable the gate anyway after
+// 8s so the app doesn't hang. The primary path is the snapshot handler,
+// which flips _deviceCheckReady as soon as the real remote state lands -
+// this timer only fires if that never happens.
 setTimeout(function(){
+ if(window._deviceCheckReady)return;
  try{_deviceInitCheck();}catch(e){}
  window._deviceCheckReady=true;
  rr();
-},3000);
+},8000);
 }; // end window._appBoot
 window._appBoot();
 </script>
