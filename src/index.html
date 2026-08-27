@@ -183,6 +183,13 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
  .depDouble{display:grid;grid-template-columns:1fr 1fr;gap:8px}
  .depDouble>*{margin:0!important}
 }
+/* iOS-style toggle switch (used in task-modal reminder toggle) */
+.switch{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--s3);border:1px solid var(--bm);border-radius:28px;transition:.2s}
+.switch span:before{position:absolute;content:"";height:22px;width:22px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.switch input:checked+span{background:var(--gr);border-color:var(--gr)}
+.switch input:checked+span:before{transform:translateX(22px)}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
@@ -4165,14 +4172,12 @@ function returnAllPhones(){if(!D._returnDue)return;D._returnDue={};sv();rr();}
 function checkAfAlert(){var el=document.getElementById('afAlert');if(el)el.remove();}
 checkAfAlert();
 function schedTalk(nm){
-const when=prompt('מתי לתזכר שיחה עם '+nm+'? (HH:MM)','09:00');
-if(!when)return;
-const today=new Date();const [hh,mm]=when.split(':');
-today.setHours(parseInt(hh),parseInt(mm),0,0);
-if(today<new Date())today.setDate(today.getDate()+1);
+// Open the shared task modal pre-filled with a "talk with X" template so
+// the time-picker experience matches the rest of the app (native wheel).
 if(!D.tk)D.tk=[];
-D.tk.push({id:uid(),tx:'💬 שיחה עם '+nm,ps:nm,dt:td(),dn:false,alertAt:today.toISOString()});
-sv();showBanner('⏰ תזכורת שיחה עם '+nm+' ב-'+when,3000);rr()}
+var tid=uid();
+D.tk.push({id:tid,tx:'💬 שיחה עם '+nm,ps:nm,dt:td(),dn:false,alertAt:null});
+sv();rr();openTaskModal(tid);}
 function boyStatsHTML(nm,range){
 range=range||'all';
 // scoped spacing bump - the global .C class is shared across the whole app,
@@ -4766,16 +4771,99 @@ if(wRs==='morningOut'||wRs==='late'){
 function rTk(){const op=D.tk.filter(t=>!t.dn),dn2=D.tk.filter(t=>t.dn);
 let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:20.4px;color:var(--t0)">📋 משימות כלליות</span><button class="B" style="background:var(--gd);color:var(--go);border-color:var(--gb)" onclick="aTk()">+ חדש</button></div><div class="S" style="padding:8px 12px 100px">';
 if(!op.length&&!dn2.length)h+='<div style="text-align:center;padding:40px 20px;color:var(--t2)"><div style="font-size:43.2px;opacity:.5">📋</div><div>אין משימות</div></div>';
-if(op.length){h+='<div class="sl">פתוחות ('+op.length+')</div><div class="dcolgrid">';op.forEach(t=>{h+='<div class="C" style="display:flex;align-items:flex-start;gap:9px"><div style="flex:1"><div style="font-size:16.8px;font-weight:600;color:var(--t0)">'+es(t.tx)+'</div>'+(t.ps?'<div style="font-size:13.2px;color:var(--t2);margin-top:2px">👤 '+es(t.ps)+'</div>':'')+(t.issues?'<div style="font-size:13.2px;color:var(--am);margin-top:2px;font-weight:600">🎯 '+es(t.issues)+'</div>':'')+(t.notes?'<div style="font-size:13.2px;color:var(--t1);margin-top:2px;white-space:pre-line">📝 '+es(t.notes)+'</div>':'')+'<div style="font-size:12.0px;color:var(--t2);margin-top:2px">'+fm(t.dt)+'</div></div><button class="ab" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.1);color:var(--gr)" onclick="D.tk.forEach(x=>{if(x.id===\''+t.id+'\')x.dn=true});sv();rr()">✓</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="D.tk=D.tk.filter(x=>x.id!==\''+t.id+'\');sv();rr()">🗑</button></div>'});h+='</div>';}
+if(op.length){h+='<div class="sl">פתוחות ('+op.length+')</div><div class="dcolgrid">';op.forEach(t=>{
+ var alertLabel='';
+ if(t.alertAt){
+  var d=new Date(t.alertAt);
+  var soon=d.getTime()-Date.now();
+  var col=soon<0?'var(--rd)':soon<3600000?'var(--am)':'var(--bl)';
+  alertLabel='<div style="font-size:12.6px;color:'+col+';margin-top:3px;font-weight:600">🔔 '+d.toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+(soon<0?' (עבר)':'')+'</div>';
+ }
+ h+='<div class="C" style="display:flex;align-items:flex-start;gap:9px"><div style="flex:1"><div style="font-size:16.8px;font-weight:600;color:var(--t0)">'+es(t.tx)+'</div>'+(t.ps?'<div style="font-size:13.2px;color:var(--t2);margin-top:2px">👤 '+es(t.ps)+'</div>':'')+(t.issues?'<div style="font-size:13.2px;color:var(--am);margin-top:2px;font-weight:600">🎯 '+es(t.issues)+'</div>':'')+(t.notes?'<div style="font-size:13.2px;color:var(--t1);margin-top:2px;white-space:pre-line">📝 '+es(t.notes)+'</div>':'')+alertLabel+'<div style="font-size:12.0px;color:var(--t2);margin-top:2px">'+fm(t.dt)+'</div></div>'
+  +'<div style="display:flex;flex-direction:column;gap:4px">'
+  +'<button class="ab" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.1);color:var(--gr)" onclick="D.tk.forEach(x=>{if(x.id===\''+t.id+'\')x.dn=true});sv();rr()">✓</button>'
+  +'<button class="ab" style="border-color:rgba(59,130,246,.3);background:var(--bld);color:var(--bl)" onclick="editTaskModal(\''+t.id+'\')">✏️</button>'
+  +'<button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="if(confirm(\'למחוק את המשימה?\')){D.tk=D.tk.filter(x=>x.id!==\''+t.id+'\');sv();rr();}">🗑</button>'
+  +'</div>'
+  +'</div>';});h+='</div>';}
 if(dn2.length){h+='<div class="sl" style="margin-top:10px">הושלמו ('+dn2.length+')</div><div class="dcolgrid3">';dn2.slice(0,10).forEach(t=>{h+='<div class="C" style="opacity:.4"><div style="text-decoration:line-through;font-size:15.6px;color:var(--t1)">'+es(t.tx)+'</div></div>'});h+='</div>';}
 h+='</div></div>';return h}
-function aTk(){const tx=prompt('תוכן המשימה:');if(!tx)return;const ps=prompt('קשור למישהו? (ריק=כללי)');
-const wantAlert=confirm('להוסיף תזכורת?');
-let alertAt=null;
-if(wantAlert){const d=prompt('תאריך (YYYY-MM-DD):',new Date().toISOString().slice(0,10));
-const t=prompt('שעה (HH:MM):','09:00');
-if(d&&t)alertAt=new Date(d+'T'+t+':00').toISOString()}
-D.tk.push({id:uid(),tx,ps:ps||'',dt:td(),dn:false,alertAt});sv();rr()}
+function aTk(){openTaskModal(null);}
+function editTaskModal(id){openTaskModal(id);}
+// Modal for creating or editing a task. Uses native <input type="date"> and
+// <input type="time"> — on iOS these render the native scroll-wheel pickers
+// (like the Clock app's alarm setter) instead of forcing the user to type
+// numeric strings into a prompt(). Keyboard falls open on desktop for
+// typing, mobile gets the picker wheels.
+function openTaskModal(id){
+ var t=id?D.tk.find(function(x){return x.id===id;}):null;
+ var editing=!!t;
+ var tx=t?t.tx:'';
+ var ps=t?(t.ps||''):'';
+ var hasAlert=!!(t&&t.alertAt);
+ var alertDate='',alertTime='';
+ if(hasAlert){
+  var d=new Date(t.alertAt);
+  alertDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  alertTime=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+ }else{
+  var today=new Date();
+  alertDate=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  alertTime='09:00';
+ }
+ var el=document.getElementById('taskModal');
+ if(!el){el=document.createElement('div');el.id='taskModal';document.body.appendChild(el);}
+ var h='<div class="O" onclick="closeTaskModal()"><div class="M" onclick="event.stopPropagation()">'
+  +'<div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div>'
+  +'<div style="font-size:18px;font-weight:800;text-align:center;padding:6px 16px 12px;color:var(--t0)">'+(editing?'✏️ עריכת משימה':'➕ משימה חדשה')+'</div>'
+  +'<div style="padding:0 16px 20px">'
+  +'<label style="display:block;font-size:13.2px;color:var(--t2);margin-bottom:4px">תוכן המשימה</label>'
+  +'<textarea id="tkTx" rows="3" style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--bm);background:var(--s3);color:var(--t0);font-size:15.6px;resize:vertical;font-family:Heebo,Arial,sans-serif;margin-bottom:10px" placeholder="מה צריך לעשות?">'+es(tx)+'</textarea>'
+  +'<label style="display:block;font-size:13.2px;color:var(--t2);margin-bottom:4px">קשור למישהו? (רשות)</label>'
+  +'<input id="tkPs" type="text" value="'+es(ps)+'" style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--bm);background:var(--s3);color:var(--t0);font-size:15.6px;margin-bottom:14px" placeholder="שם הבחור, או השאר ריק לכללי">'
+  +'<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:9px;background:var(--s3);border:1px solid var(--bm);margin-bottom:10px">'
+  +'<label style="font-size:15.6px;color:var(--t0);cursor:pointer;flex:1" for="tkAlertOn">🔔 תזכורת עם התראה</label>'
+  +'<label class="switch"><input type="checkbox" id="tkAlertOn"'+(hasAlert?' checked':'')+' onchange="document.getElementById(\'tkAlertRow\').style.display=this.checked?\'block\':\'none\'"><span></span></label>'
+  +'</div>'
+  +'<div id="tkAlertRow" style="display:'+(hasAlert?'block':'none')+';padding:12px;border-radius:9px;background:var(--bld);border:1px solid rgba(59,130,246,.25);margin-bottom:14px">'
+  +'<div style="display:flex;gap:8px">'
+  +'<div style="flex:1"><label style="display:block;font-size:12px;color:var(--t2);margin-bottom:4px">תאריך</label>'
+  +'<input id="tkDate" type="date" value="'+es(alertDate)+'" style="width:100%;padding:10px 8px;border-radius:9px;border:1px solid var(--bm);background:var(--s3);color:var(--t0);font-size:16px;font-family:inherit;text-align:center;-webkit-appearance:none"></div>'
+  +'<div style="flex:1"><label style="display:block;font-size:12px;color:var(--t2);margin-bottom:4px">שעה</label>'
+  +'<input id="tkTime" type="time" value="'+es(alertTime)+'" style="width:100%;padding:10px 8px;border-radius:9px;border:1px solid var(--bm);background:var(--s3);color:var(--t0);font-size:16px;font-family:inherit;text-align:center;-webkit-appearance:none"></div>'
+  +'</div>'
+  +'<div style="font-size:12px;color:var(--t2);margin-top:8px;text-align:center">👆 לחץ על השדה כדי לפתוח את סליל השעון</div>'
+  +'</div>'
+  +'<div style="display:flex;gap:8px">'
+  +'<button style="flex:2;padding:13px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:16.8px;font-weight:800;cursor:pointer" onclick="saveTaskModal('+(editing?"'"+id+"'":'null')+')">💾 שמור</button>'
+  +'<button style="flex:1;padding:13px;border-radius:10px;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:15.6px;cursor:pointer" onclick="closeTaskModal()">ביטול</button>'
+  +'</div>'
+  +'</div></div></div>';
+ el.innerHTML=h;
+ setTimeout(function(){var ta=document.getElementById('tkTx');if(ta&&!editing)ta.focus();},50);
+}
+function closeTaskModal(){var e=document.getElementById('taskModal');if(e)e.innerHTML='';}
+function saveTaskModal(id){
+ var tx=(document.getElementById('tkTx').value||'').trim();
+ if(!tx){alert('תוכן המשימה חובה');return;}
+ var ps=(document.getElementById('tkPs').value||'').trim();
+ var alertOn=document.getElementById('tkAlertOn').checked;
+ var alertAt=null;
+ if(alertOn){
+  var d=document.getElementById('tkDate').value;
+  var tm=document.getElementById('tkTime').value;
+  if(d&&tm){
+   var iso=new Date(d+'T'+tm+':00');
+   if(!isNaN(iso.getTime()))alertAt=iso.toISOString();
+  }
+ }
+ if(id){
+  D.tk.forEach(function(x){if(x.id===id){x.tx=tx;x.ps=ps;x.alertAt=alertAt;}});
+ }else{
+  D.tk.push({id:uid(),tx:tx,ps:ps,dt:td(),dn:false,alertAt:alertAt});
+ }
+ sv();closeTaskModal();rr();
+}
 
 // ═══ PIN ═══
 let pV='',pE=false,pSh=false,pShowKp=false;
