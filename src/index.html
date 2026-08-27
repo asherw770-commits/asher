@@ -62,6 +62,26 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
 .al{background:var(--rdd);border:1px solid rgba(239,68,68,.25);border-radius:14px;padding:11px 14px;margin-bottom:10px}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* ─── Dashboard (mobile default) ─── everything stacks in one column; the
+   3-col grid + hero band only kick in at ≥1024px (in the desktop media
+   query further down). */
+.home-dash .hm-hero{background:linear-gradient(135deg,var(--s2),var(--s1));border:1px solid var(--bm);border-radius:14px;padding:14px 16px;margin-bottom:8px;text-align:center;direction:rtl}
+.home-dash .hm-hero-clock{margin-bottom:8px}
+.home-dash .hm-body{display:flex;flex-direction:column;gap:8px;direction:rtl}
+.home-dash .hm-col{display:flex;flex-direction:column;gap:8px}
+.home-dash .hm-col > *{margin-bottom:0!important}
+.home-dash .hm-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.home-dash .hm-stats > *{margin-bottom:0!important;padding:10px 12px}
+.home-dash .hm-stat-l{font-size:13.2px;color:var(--t2);margin-bottom:4px}
+.home-dash .hm-stat-r{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.home-dash .hm-stat{text-align:center}
+.home-dash .hm-actions-title{font-size:14.4px;font-weight:700;color:var(--t0);margin-bottom:8px}
+.home-dash .hm-actgrid{display:flex;flex-direction:column;gap:8px}
+.home-dash .hm-actrow{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.home-dash .hm-actrow-single{grid-template-columns:1fr}
+.home-dash .hm-actlbl{grid-column:1/-1;font-size:13.2px;color:var(--t2);font-weight:600;margin-bottom:2px}
+.home-dash .hm-actbtn{padding:11px;border-radius:9px;border:1px solid var(--bm);font-size:14.4px;font-weight:700;cursor:pointer;min-height:40px}
+.home-dash .hm-actbtn-wide{width:100%}
 @media (min-width:1024px){
  /* container + sidebar geometry */
  body{padding-right:220px}
@@ -116,21 +136,39 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
  /* deposit stats side-by-side */
  .boystat-wrap .depGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
  .boystat-wrap .depGrid>*{margin:0!important}
- /* home dashboard hero grid — stats + status cards balance in 3 cols */
- .homeHero{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
- .homeHero>*{margin:0!important}
+ /* ─── DASHBOARD (desktop) ─── hero band + 3-column grid ───
+    Hero: clock left, date+status right, side by side.
+    Body: three columns of unrelated content, top-aligned so a tall
+    "live workflow" list doesn't stretch neighbours. */
+ .home-dash .hm-hero{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;padding:20px 24px;background:linear-gradient(135deg,var(--s2),var(--s1));border:1px solid var(--bm);border-radius:16px;margin-bottom:14px;direction:rtl}
+ .home-dash .hm-hero-clock{text-align:center;padding-left:24px;border-left:1px solid var(--bd)}
+ .home-dash .hm-hero-date{padding-right:8px}
+ .home-dash .hm-body{display:grid;grid-template-columns:0.95fr 1.05fr 1.15fr;gap:14px;align-items:start;direction:rtl}
+ .home-dash .hm-col{display:flex;flex-direction:column;gap:8px;min-width:0}
+ .home-dash .hm-col > *{margin-bottom:0!important}
+ /* Stats mini-grid inside col A */
+ .home-dash .hm-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+ .home-dash .hm-stats > *{margin-bottom:0!important;padding:11px 12px}
+ .home-dash .hm-stat{cursor:pointer;transition:border-color .15s,transform .1s}
+ .home-dash .hm-stat[onclick]:hover{border-color:var(--gb);transform:translateY(-1px)}
+ .home-dash .hm-stat-l{font-size:12.6px;color:var(--t2);margin-bottom:5px}
+ .home-dash .hm-stat-r{display:flex;gap:5px;flex-wrap:wrap}
+ /* Daily-actions grouped card in col A */
+ .home-dash .hm-actions{padding:12px 14px}
+ .home-dash .hm-actions-title{font-size:13.5px;font-weight:700;color:var(--t2);margin-bottom:10px;text-transform:none}
+ .home-dash .hm-actgrid{display:flex;flex-direction:column;gap:8px}
+ .home-dash .hm-actrow{display:grid;grid-template-columns:105px 1fr 1fr;gap:6px;align-items:stretch}
+ .home-dash .hm-actrow-single{grid-template-columns:1fr}
+ .home-dash .hm-actlbl{display:flex;align-items:center;font-size:12.6px;color:var(--t1);font-weight:600;padding-right:2px}
+ .home-dash .hm-actbtn{padding:10px;border-radius:9px;border:1px solid var(--bm);font-size:13.8px;font-weight:700;cursor:pointer;transition:opacity .12s,transform .1s;min-height:38px}
+ .home-dash .hm-actbtn:hover{opacity:.85;transform:translateY(-1px)}
+ .home-dash .hm-actbtn-wide{width:100%;font-size:15px;padding:12px}
+ /* Section labels inside columns don't span full width anymore */
+ .home-dash .hm-col .sl{margin-top:4px;margin-bottom:2px}
  /* row items: make the room list breathe more */
  .R{padding:12px 15px}
- /* dashboard: proper CSS-grid layout — cards flow into 2–3 equal columns
-    depending on viewport width, all aligning to the top so tall cards
-    don't stretch their neighbours. Group headings (.sl) always span the
-    whole grid so lists that belong under them stay under them. */
- .S.home-dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;align-items:start;padding-bottom:60px}
- .S.home-dash > *{margin-bottom:0!important}
- .S.home-dash > .sl{grid-column:1/-1;margin-top:14px;margin-bottom:2px}
- /* wide items (that build their own inner grid) span the full row so their
-    layout doesn't compete with the outer grid */
- .S.home-dash > [data-wide]{grid-column:1/-1}
+ /* dashboard scroll area sizing (structure now handled by .hm-hero + .hm-body) */
+ .S.home-dash{padding-bottom:60px}
  /* generic list→grid on desktop for any container marked .dcolgrid;
     2 columns by default, 3 with .dcolgrid3. direction:rtl on the grid
     makes items flow right-to-left first, then wrap down — matching the
@@ -1190,150 +1228,151 @@ function rr(opts){
 function rN(){const lt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length;const ac=D.pb.filter(iA),ms=ac.filter(b=>D.pt[b]!==true).length;const ot=D.tk.filter(t=>!t.dn).length;
 return'<div class="N">'+[{k:'home',i:'🏠',l:'ראשי',b:0},{k:'phones',i:'📱',l:'הפקדות',b:ms||0},{k:'writing',i:'📝',l:'כתיבה',b:lt||0},{k:'tasks',i:'📋',l:'משימות',b:ot||0},{k:'pin',i:'🔒',l:'שיחות',b:0},{k:'settings',i:'⚙️',l:'הגדרות',b:0}].map(t=>{const on=pg===t.k||(t.k==='pin'&&pg.startsWith('c'));return'<div class="ni'+(on?' on':'')+'" onclick="go(\''+t.k+'\')"><span style="font-size:19.2px;position:relative">'+t.i+(t.b?'<span class="bg">'+t.b+'</span>':'')+'</span><span style="font-size:9.6px;margin-top:2px">'+t.l+'</span></div>'}).join('')+'</div>'}
 // ═══ HOME DASHBOARD ═══
-function rHm(){const ac=D.pb.filter(iA),dc=ac.filter(b=>D.pt[b]===true).length,mc=ac.length-dc;
-const wLt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length,wWt=D.wt.filter(t=>t.status==='waiting').length;
-const otk=D.tk.filter(t=>!t.dn).length;
-const now=new Date,dy=DN[now.getDay()],tm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
-const hol=getHol(td()),yesh=isYD(now);
-let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:20.4px;color:var(--t0)">🏠 דשבורד</span><div style="width:60px"></div></div><div class="S home-dash" style="padding:8px 12px 100px">';
-// Big clock
-h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:16px;margin-bottom:8px;text-align:center"><div id="hmClk" style="font-size:50.4px;font-weight:700;color:var(--go);font-variant-numeric:tabular-nums;letter-spacing:4px">'+tm+'</div></div>';
-// Date & yeshiva status
-h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:14px;margin-bottom:8px;text-align:center"><div style="font-size:24.0px;font-weight:700;color:var(--t0)">יום '+dy+'</div><div style="font-size:15.6px;color:var(--t1);margin-top:2px">'+hF(now)+'</div>';
-var _t=todayISO(),_off=isSchoolHoliday(_t),_mk=YMARK[_t];
-if(_off){h+='<div style="margin-top:6px;background:rgba(239,68,68,.12);padding:8px;border-radius:10px;border:1.5px solid rgba(239,68,68,.55)"><div style="font-size:15.6px;font-weight:700;color:var(--rd)">\ud83c\udf89 '+_off+'</div><div style="font-size:13.2px;color:var(--rd);margin-top:2px">\u05d0\u05d9\u05df \u05d9\u05e9\u05d9\u05d1\u05d4 \u05d4\u05d9\u05d5\u05dd</div></div>';}
-else if(_mk){h+='<div style="margin-top:6px">'+cH('var(--gr)','var(--grd)','\u2713 '+_mk)+'</div>';}
-else{h+='<div style="margin-top:6px">'+cH('var(--gr)','var(--grd)','\u2713 \u05d9\u05d5\u05dd \u05d9\u05e9\u05d9\u05d1\u05d4')+'</div>';}
-var _nx=Object.keys(YOFF).filter(function(d){return d>_t;}).sort()[0];
-if(_nx&&!_off){var _dd=Math.round((new Date(_nx)-new Date(_t))/864e5);h+='<div style="font-size:12.0px;color:var(--t2);margin-top:5px">\u05d4\u05d7\u05d5\u05e4\u05e9\u05d4 \u05d4\u05d1\u05d0\u05d4: '+(YOFF[_nx]||isSchoolHoliday(_nx))+' \u00b7 \u05d1\u05e2\u05d5\u05d3 '+_dd+' \u05d9\u05de\u05d9\u05dd</div>';}
-h+='</div>';
-// Quick stats grid
-h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
-h+='<div class="C" style="cursor:pointer;text-align:center" onclick="go(\'phones\')"><div style="font-size:13.2px;color:var(--t2)">📱 הפקדות</div><div style="display:flex;gap:6px;justify-content:center;margin-top:4px">'+cH('var(--gr)','var(--grd)',dc+'')+cH('var(--rd)','var(--rdd)',mc+' חסר')+'</div></div>';
-h+='<div class="C" style="cursor:pointer;text-align:center" onclick="go(\'writing\')"><div style="font-size:13.2px;color:var(--t2)">📝 כתיבה</div><div style="display:flex;gap:6px;justify-content:center;margin-top:4px">'+cH('var(--am)','var(--amd)',wWt+' ממתין')+cH('var(--rd)','var(--rdd)',wLt+' איחור')+'</div></div>';
-h+='</div>';
-// Show confiscated phones - reads status via gS() (the canonical source,
-// backed by D.ps) rather than D._confiscate directly, since not every path
-// that creates a confiscation writes to D._confiscate too - this was
-// silently hiding confiscations set via the quick-status (⚙) flow.
-{const confList=D.pb.filter(b=>gS(b)==='conf');
-if(confList.length){h+='<div class="sl" style="margin-top:4px">📵 טלפונים מוחרמים</div>';
-confList.forEach(function(nm){var cu=confUntil(nm);
-h+='<div style="width:100%;border-radius:6px;background:var(--s1);border:1px solid var(--bd);border-right:4px solid var(--rd);padding:10px 14px;margin-bottom:6px">'
-+'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
-+'<div><div style="font-size:16.8px;font-weight:700;color:var(--t0)">'+es(nm)+'</div>'
-+(cu?'<div style="font-size:13.2px;color:var(--rd);font-weight:600;margin-top:2px">📵 '+friendlyUntil(cu)+'</div>':'')+'</div>'
-+'<button style="padding:8px 16px;border-radius:6px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:13.2px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="returnPhoneNow(\''+jq(nm)+'\')">✅ קיבל בחזרה</button>'
-+'</div></div>';});}}
-// Phones due back - confiscated yesterday, window has now closed
-if(D&&D._returnDue){const rd=Object.entries(D._returnDue);
-if(rd.length){h+='<div class="sl" style="margin-top:4px;color:var(--gr)">📲 להחזיר טלפון</div>';
-h+='<div class="C" style="border-color:rgba(34,197,94,.25);background:var(--grd)">';
-rd.forEach(([nm,v],idx)=>{h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:'+(idx?'8px 0 0':'0')+'"><span style="font-size:15.6px;font-weight:600;color:var(--t0)">'+es(nm)+'</span><button style="padding:5px 12px;border-radius:8px;background:var(--gr);border:none;color:#0a0f1c;font-size:13.2px;font-weight:700;cursor:pointer" onclick="returnPhone(\''+jq(nm)+'\')">✓ הוחזר</button></div>'});
-if(rd.length>1)h+='<div style="text-align:center;margin-top:8px;padding-top:8px;border-top:1px solid rgba(34,197,94,.2)"><span style="font-size:13.2px;color:var(--gr);cursor:pointer;font-weight:600" onclick="returnAllPhones()">✓ סמן שכולם הוחזרו</span></div>';
-h+='</div>'}}
-h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
-h+='<div class="C" style="cursor:pointer;text-align:center" onclick="go(\'tasks\')"><div style="font-size:13.2px;color:var(--t2)">📋 משימות</div><div style="margin-top:4px">'+cH(otk>0?'var(--am)':'var(--gr)',otk>0?'var(--amd)':'var(--grd)',otk>0?otk+' פתוחות':'✓')+'</div></div>';
-h+='<div class="C" style="text-align:center"><div style="font-size:13.2px;color:var(--t2)">👥 בחורים</div><div style="margin-top:4px">'+cH('var(--t0)','var(--s3)',D.pb.length+' רשומים')+'</div></div>';
-h+='</div>';
-// Open tasks
-if(otk>0){h+='<div class="sl" style="margin-top:4px">📋 משימות פתוחות</div>';D.tk.filter(t=>!t.dn).forEach(t=>{
-const hasAlert=t.alertAt&&new Date(t.alertAt)>new Date();
-h+='<div class="C" style="'+(hasAlert?'border-color:rgba(234,179,8,.3)':'')+'">';
-h+='<div style="display:flex;justify-content:space-between;align-items:center"><div style="flex:1;font-size:15.6px;color:var(--t0)">'+es(t.tx)+'</div>';
-h+='<button style="padding:4px 8px;border-radius:6px;background:var(--grd);border:1px solid rgba(34,197,94,.2);color:var(--gr);font-size:12.0px;font-weight:700;cursor:pointer" onclick="markTaskDone(\''+t.id+'\')">✅</button></div>';
-if(t.ps)h+='<div style="font-size:12.0px;color:var(--t2)">👤 '+es(t.ps)+'</div>';
-if(t.alertAt)h+='<div style="font-size:12.0px;color:var(--am)">🔔 '+new Date(t.alertAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+'</div>';
-h+='</div>'})}
-// Completed tasks (last 5)
-const doneTk=D.tk.filter(t=>t.dn);
-if(doneTk.length){h+='<div class="sl" style="margin-top:4px;cursor:pointer" onclick="window._showDoneTk=!window._showDoneTk;rr()">✅ הושלמו ('+doneTk.length+') '+(window._showDoneTk?'▲':'▼')+'</div>';
-if(window._showDoneTk)doneTk.slice(-5).reverse().forEach(t=>{h+='<div class="C" style="opacity:.6"><div style="font-size:14.4px;color:var(--t2);text-decoration:line-through">'+es(t.tx)+'</div></div>'})}
-// Deposits graph with period selection
-if(D.pb.length){
-if(!window._grPd)window._grPd='week';const gp=window._grPd;
-const gpN=gp==='day'?1:gp==='week'?7:gp==='month'?30:9999;
-const gDates=Object.keys(D.ph).sort((a,b)=>b.localeCompare(a)).slice(0,gpN).reverse();
-if(gDates.length>=1){
-h+='<div class="C" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:15.6px;font-weight:700;color:var(--t0)">📊 אחוז הפקדות</span><div style="display:flex;gap:4px">'+['day','week','month','all'].map(p=>'<button class="fb'+(gp===p?' on':'')+'" style="font-size:12.0px;padding:3px 8px" onclick="window._grPd=\''+p+'\';rr()">'+(p==='day'?'יום':p==='week'?'שבוע':p==='month'?'חודש':'הכל')+'</button>').join('')+'</div></div>';
-h+='<div style="display:flex;align-items:flex-end;gap:4px;min-height:112px;overflow-x:auto;overflow-y:visible;padding-top:4px">';
-gDates.forEach(d=>{const ph=(D.ph||{})[d];if(!ph)return;const tot=(ph.dp?ph.dp.length:0)+(ph.m?ph.m.length:0);const dep=ph.dp?ph.dp.length:0;const pct=tot>0?Math.round(dep/tot*100):0;const bh=Math.max(8,Math.round(pct*0.7));const dn=DN[new Date(d).getDay()];
-h+='<div style="flex:1 1 0;min-width:22px;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:10.8px;font-weight:700;color:'+(pct>=80?'var(--gr)':pct>=50?'var(--am)':'var(--rd)')+'">'+pct+'%</div><div style="width:100%;height:'+bh+'px;background:'+(pct>=80?'var(--gr)':pct>=50?'var(--am)':'var(--rd)')+';border-radius:4px;opacity:.6"></div><div style="font-size:9.6px;color:var(--t2)">'+dn.charAt(0)+"\'</div></div>"});
-h+='</div></div>'}
-// Risk Analysis
-const wkStart=new Date;wkStart.setDate(wkStart.getDate()-7);wkStart.setHours(0,0,0,0);
-const wkStartStr=wkStart.toISOString().slice(0,10);
-const boyStats={};D.pb.forEach(b=>{const punish=D.wt.filter(t=>t.nm===b&&t.ca&&t.ca.slice(0,10)>=wkStartStr&&(t.status==='late'||t.status==='doubled')).length;const phDates=Object.keys(D.ph).filter(d=>d>=wkStartStr).sort((a,b)=>b.localeCompare(a));const notDeposited=phDates.length-phDates.filter(d=>(D.ph||{})[d].dp&&(D.ph||{})[d].dp.includes(b)).length;boyStats[b]={punish,notDeposited,risk:punish*2+notDeposited}});
-// only repeat offenders (confiscated twice or more, ever) get offered a
-// scheduled talk here - a single missed deposit or a single confiscation is
-// not itself grounds for one
-// Print button - split into print + manual update, matching the cleaning
-// report pattern. The scan/camera upload path is removed entirely; manual
-// update (go('manual')) is the one way data gets corrected in-app now.
-h+='<div class="sl" style="margin-top:4px">📋 דוח יומי</div>';
-h+='<div style="margin:8px 0;display:flex;gap:8px"><button style="flex:1;padding:12px;border-radius:10px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:15.6px;font-weight:700;cursor:pointer" onclick="printReport()">🖨 הדפס</button><button style="flex:1;padding:12px;border-radius:10px;background:var(--amd);border:1px solid rgba(245,158,11,.3);color:var(--am);font-size:15.6px;font-weight:700;cursor:pointer" onclick="go(\'manual\')">✏️ עדכון ידני</button></div>';
-h+='<div class="sl" style="margin-top:4px">🧹 דוח ניקיון</div>';
-h+='<div style="margin:8px 0;display:flex;gap:8px"><button style="flex:1;padding:12px;border-radius:10px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:15.6px;font-weight:700;cursor:pointer" onclick="printCleaningReport()">🖨 הדפס</button><button style="flex:1;padding:12px;border-radius:10px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:15.6px;font-weight:700;cursor:pointer" onclick="go(\'cleanup\')">📱 עדכן באפליקציה</button></div>';
-h+='<div class="sl" style="margin-top:4px">⏰ איחור ביציאה מהקומה</div>';
-h+='<div style="margin:8px 0;display:flex;gap:8px"><button style="flex:1;padding:12px;border-radius:10px;background:var(--amd);border:1px solid rgba(245,158,11,.3);color:var(--am);font-size:15.6px;font-weight:700;cursor:pointer" onclick="showFloorLateModal(\'am\')">🌅 סמן בוקר</button><button style="flex:1;padding:12px;border-radius:10px;background:var(--amd);border:1px solid rgba(245,158,11,.3);color:var(--am);font-size:15.6px;font-weight:700;cursor:pointer" onclick="showFloorLateModal(\'pm\')">🕐 סמן צהריים</button></div>';
-h+='<div style="margin:8px 0"><button style="width:100%;padding:12px;border-radius:10px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:16.8px;font-weight:700;cursor:pointer" onclick="go(\'locks\')">🔐 עדכון מנעולים</button></div>';
-h+='<div style="margin:8px 0"><button style="width:100%;padding:12px;border-radius:10px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:16.8px;font-weight:700;cursor:pointer" onclick="go(\'sleeptbl\')">🛏 טבלת שינה</button></div>';
-{const sleepAlerts=Object.entries(D._sleepAlerts||{});
-sleepAlerts.forEach(function(e){var nm=e[0],st=e[1];var ok=st==='success';
-h+='<div class="C" style="padding:14px;border-color:'+(ok?'rgba(34,197,94,.3)':'rgba(239,68,68,.3)')+'"><div style="font-size:15.6px;font-weight:700;color:'+(ok?'var(--gr)':'var(--rd)')+';margin-bottom:6px">'+(ok?'🎉':'❌')+' טבלת שינה — '+es(nm)+'</div>'
-+'<div style="font-size:13.2px;color:var(--t1);margin-bottom:10px">'+(ok?'הצליח בטבלת השינה!':'לא עמד בטבלת השינה')+'</div>'
-+'<button style="width:100%;padding:8px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:13.2px;font-weight:700;cursor:pointer" onclick="dismissSleepAlert(\''+jq(nm)+'\')">הבנתי ✓</button></div>';});}
-{const activeSleep=Object.entries(D.sleepTables||{}).filter(function(e){return e[1].status==='active';});
-if(activeSleep.length){h+='<div class="sl" style="margin-top:4px">🛏 טבלת שינה פעילה</div>';
-activeSleep.forEach(function(e){var nm=e[0],t=e[1];
-var schoolDays=t.days.filter(function(d){return d.isSchoolDay;});
-var signed=schoolDays.filter(function(d){return t.signed[d.date];}).length;
-h+='<div class="C" style="cursor:pointer" onclick="window._sleepSelected=\''+jq(nm)+'\';go(\'sleeptbl\')"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:15.6px;color:var(--t0);font-weight:600">'+es(nm)+'</span><span style="font-size:13.2px;color:var(--bl);font-weight:700">'+signed+'/'+schoolDays.length+' ימים</span></div></div>';});}}
-{const homeLockList=D.pb.filter(b=>D.lockStatus&&D.lockStatus[b]==='home');
-if(homeLockList.length){h+='<div class="C" style="margin-bottom:8px;border-color:rgba(239,68,68,.3)"><div style="font-size:15.6px;font-weight:700;color:var(--rd);margin-bottom:6px">🔐 מנעול לא של הישיבה</div>';
-homeLockList.forEach(function(nm){h+='<div style="font-size:14.4px;color:var(--t0);padding:3px 0">'+es(nm)+'</div>';});
-h+='</div>';}}
-h+='<div id="reportPreview"></div>';
+function rHm(){
+ const ac=D.pb.filter(iA),dc=ac.filter(b=>D.pt[b]===true).length,mc=ac.length-dc;
+ const wLt=D.wt.filter(t=>t.status==='late'||t.status==='doubled').length,wWt=D.wt.filter(t=>t.status==='waiting').length;
+ const otk=D.tk.filter(t=>!t.dn).length;
+ const now=new Date,dy=DN[now.getDay()],tm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+ const hol=getHol(td()),yesh=isYD(now);
+ const _t=todayISO(),_off=isSchoolHoliday(_t),_mk=YMARK[_t];
+ const _nx=Object.keys(YOFF).filter(function(d){return d>_t;}).sort()[0];
+ // ── HERO ── big clock on the left, date+status on the right
+ var hero='<div class="hm-hero">'
+  +'<div class="hm-hero-clock"><div id="hmClk" style="font-size:56px;font-weight:700;color:var(--go);font-variant-numeric:tabular-nums;letter-spacing:4px;line-height:1">'+tm+'</div><div style="font-size:14px;color:var(--t2);margin-top:6px">יום '+dy+'</div></div>'
+  +'<div class="hm-hero-date"><div style="font-size:22px;font-weight:700;color:var(--t0)">'+hF(now)+'</div>';
+ if(_off)hero+='<div style="margin-top:8px;background:rgba(239,68,68,.12);padding:8px 12px;border-radius:10px;border:1.5px solid rgba(239,68,68,.55);display:inline-block"><div style="font-size:15px;font-weight:700;color:var(--rd)">🎉 '+_off+'</div><div style="font-size:12.6px;color:var(--rd);margin-top:2px">אין ישיבה היום</div></div>';
+ else if(_mk)hero+='<div style="margin-top:8px">'+cH('var(--gr)','var(--grd)','✓ '+_mk)+'</div>';
+ else hero+='<div style="margin-top:8px">'+cH('var(--gr)','var(--grd)','✓ יום ישיבה')+'</div>';
+ if(_nx&&!_off){var _dd=Math.round((new Date(_nx)-new Date(_t))/864e5);hero+='<div style="font-size:12px;color:var(--t2);margin-top:6px">החופשה הבאה: '+(YOFF[_nx]||isSchoolHoliday(_nx))+' · בעוד '+_dd+' ימים</div>';}
+ hero+='</div></div>';
+ // ── COL A: stats + daily actions ──
+ var colA='';
+ colA+='<div class="hm-stats">';
+ colA+='<div class="C hm-stat" style="cursor:pointer" onclick="go(\'phones\')"><div class="hm-stat-l">📱 הפקדות</div><div class="hm-stat-r">'+cH('var(--gr)','var(--grd)',dc+'')+cH('var(--rd)','var(--rdd)',mc+' חסר')+'</div></div>';
+ colA+='<div class="C hm-stat" style="cursor:pointer" onclick="go(\'writing\')"><div class="hm-stat-l">📝 כתיבה</div><div class="hm-stat-r">'+cH('var(--am)','var(--amd)',wWt+' ממתין')+cH('var(--rd)','var(--rdd)',wLt+' איחור')+'</div></div>';
+ colA+='<div class="C hm-stat" style="cursor:pointer" onclick="go(\'tasks\')"><div class="hm-stat-l">📋 משימות</div><div class="hm-stat-r">'+cH(otk>0?'var(--am)':'var(--gr)',otk>0?'var(--amd)':'var(--grd)',otk>0?otk+' פתוחות':'✓ אין')+'</div></div>';
+ colA+='<div class="C hm-stat"><div class="hm-stat-l">👥 בחורים</div><div class="hm-stat-r">'+cH('var(--t0)','var(--s3)',D.pb.length+' רשומים')+'</div></div>';
+ colA+='</div>';
+ // Daily actions grouped in a single card with mini-sections
+ colA+='<div class="C hm-actions"><div class="hm-actions-title">🗓 פעולות היום</div>';
+ colA+='<div class="hm-actgrid">';
+ colA+='<div class="hm-actrow"><div class="hm-actlbl">📋 דוח יומי</div><button class="hm-actbtn" style="background:var(--bld);border-color:rgba(59,130,246,.3);color:var(--bl)" onclick="printReport()">🖨 הדפס</button><button class="hm-actbtn" style="background:var(--amd);border-color:rgba(245,158,11,.3);color:var(--am)" onclick="go(\'manual\')">✏️ עדכן</button></div>';
+ colA+='<div class="hm-actrow"><div class="hm-actlbl">🧹 דוח ניקיון</div><button class="hm-actbtn" style="background:var(--grd);border-color:rgba(34,197,94,.3);color:var(--gr)" onclick="printCleaningReport()">🖨 הדפס</button><button class="hm-actbtn" style="background:var(--bld);border-color:rgba(59,130,246,.3);color:var(--bl)" onclick="go(\'cleanup\')">📱 עדכן</button></div>';
+ colA+='<div class="hm-actrow"><div class="hm-actlbl">⏰ איחור מהקומה</div><button class="hm-actbtn" style="background:var(--amd);border-color:rgba(245,158,11,.3);color:var(--am)" onclick="showFloorLateModal(\'am\')">🌅 בוקר</button><button class="hm-actbtn" style="background:var(--amd);border-color:rgba(245,158,11,.3);color:var(--am)" onclick="showFloorLateModal(\'pm\')">🕐 צהריים</button></div>';
+ colA+='<div class="hm-actrow hm-actrow-single"><button class="hm-actbtn hm-actbtn-wide" style="background:var(--bld);border-color:rgba(59,130,246,.3);color:var(--bl)" onclick="go(\'locks\')">🔐 עדכון מנעולים</button></div>';
+ colA+='<div class="hm-actrow hm-actrow-single"><button class="hm-actbtn hm-actbtn-wide" style="background:var(--pud);border-color:rgba(167,139,250,.3);color:var(--pu)" onclick="go(\'sleeptbl\')">🛏 טבלת שינה</button></div>';
+ colA+='</div></div>';
+ // Scan card
+ colA+='<div class="C" style="cursor:pointer;background:var(--pud);border-color:rgba(167,139,250,.35)" onclick="go(\'scan\')">'
+  +'<div style="display:flex;align-items:center;gap:12px">'
+  +'<div style="font-size:28px">📷</div>'
+  +'<div style="flex:1"><div style="font-size:15px;font-weight:700;color:var(--pu)">סרוק דוח יומי</div>'
+  +'<div style="font-size:12px;color:var(--t1)">האפליקציה תזהה תאריך + סימונים</div></div>'
+  +'<div style="color:var(--pu);font-size:20px">›</div></div></div>';
+ // ── COL B: live workflow (things needing attention right now) ──
+ var colB='';
+ var _bAny=false;
+ var confList=D.pb.filter(b=>gS(b)==='conf');
+ if(confList.length){_bAny=true;
+  colB+='<div class="sl">📵 טלפונים מוחרמים</div>';
+  confList.forEach(function(nm){var cu=confUntil(nm);
+   colB+='<div style="width:100%;border-radius:8px;background:var(--s1);border:1px solid var(--bd);border-right:4px solid var(--rd);padding:10px 14px;margin-bottom:6px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div><div style="font-size:16px;font-weight:700;color:var(--t0)">'+es(nm)+'</div>'
+    +(cu?'<div style="font-size:12.6px;color:var(--rd);font-weight:600;margin-top:2px">📵 '+friendlyUntil(cu)+'</div>':'')+'</div>'
+    +'<button style="padding:7px 14px;border-radius:8px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:12.6px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="returnPhoneNow(\''+jq(nm)+'\')">✅ קיבל</button>'
+    +'</div></div>';});
+ }
+ if(D&&D._returnDue){const rd=Object.entries(D._returnDue);
+  if(rd.length){_bAny=true;
+   colB+='<div class="sl" style="color:var(--gr)">📲 להחזיר טלפון</div>';
+   colB+='<div class="C" style="border-color:rgba(34,197,94,.25);background:var(--grd)">';
+   rd.forEach(([nm,v],idx)=>{colB+='<div style="display:flex;align-items:center;justify-content:space-between;padding:'+(idx?'8px 0 0':'0')+'"><span style="font-size:15px;font-weight:600;color:var(--t0)">'+es(nm)+'</span><button style="padding:5px 12px;border-radius:8px;background:var(--gr);border:none;color:#0a0f1c;font-size:12.6px;font-weight:700;cursor:pointer" onclick="returnPhone(\''+jq(nm)+'\')">✓ הוחזר</button></div>';});
+   if(rd.length>1)colB+='<div style="text-align:center;margin-top:8px;padding-top:8px;border-top:1px solid rgba(34,197,94,.2)"><span style="font-size:12.6px;color:var(--gr);cursor:pointer;font-weight:600" onclick="returnAllPhones()">✓ סמן שכולם הוחזרו</span></div>';
+   colB+='</div>';
+  }
+ }
+ const sleepAlerts=Object.entries(D._sleepAlerts||{});
+ sleepAlerts.forEach(function(e){_bAny=true;var nm=e[0],st=e[1];var ok=st==='success';
+  colB+='<div class="C" style="padding:12px;border-color:'+(ok?'rgba(34,197,94,.3)':'rgba(239,68,68,.3)')+'"><div style="font-size:15px;font-weight:700;color:'+(ok?'var(--gr)':'var(--rd)')+';margin-bottom:6px">'+(ok?'🎉':'❌')+' טבלת שינה — '+es(nm)+'</div>'
+   +'<div style="font-size:12.6px;color:var(--t1);margin-bottom:8px">'+(ok?'הצליח בטבלת השינה!':'לא עמד בטבלת השינה')+'</div>'
+   +'<button style="width:100%;padding:7px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:12.6px;font-weight:700;cursor:pointer" onclick="dismissSleepAlert(\''+jq(nm)+'\')">הבנתי ✓</button></div>';
+ });
+ const activeSleep=Object.entries(D.sleepTables||{}).filter(function(e){return e[1].status==='active';});
+ if(activeSleep.length){_bAny=true;
+  colB+='<div class="sl">🛏 טבלאות שינה פעילות</div>';
+  activeSleep.forEach(function(e){var nm=e[0],t=e[1];
+   var schoolDays=t.days.filter(function(d){return d.isSchoolDay;});
+   var signed=schoolDays.filter(function(d){return t.signed[d.date];}).length;
+   colB+='<div class="C" style="cursor:pointer" onclick="window._sleepSelected=\''+jq(nm)+'\';go(\'sleeptbl\')"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:15px;color:var(--t0);font-weight:600">'+es(nm)+'</span><span style="font-size:12.6px;color:var(--bl);font-weight:700">'+signed+'/'+schoolDays.length+' ימים</span></div></div>';});
+ }
+ const homeLockList=D.pb.filter(b=>D.lockStatus&&D.lockStatus[b]==='home');
+ if(homeLockList.length){_bAny=true;
+  colB+='<div class="C" style="border-color:rgba(239,68,68,.3)"><div style="font-size:15px;font-weight:700;color:var(--rd);margin-bottom:6px">🔐 מנעול לא של הישיבה</div>';
+  homeLockList.forEach(function(nm){colB+='<div style="font-size:14.4px;color:var(--t0);padding:3px 0">'+es(nm)+'</div>';});
+  colB+='</div>';
+ }
+ if(!_bAny)colB+='<div class="C" style="text-align:center;color:var(--t2);font-size:14px;padding:24px">✨ אין פעולות חריגות פתוחות</div>';
+ // ── COL C: analytics + tasks + prints ──
+ var colC='';
+ if(D.pb.length){
+  if(!window._grPd)window._grPd='week';const gp=window._grPd;
+  const gpN=gp==='day'?1:gp==='week'?7:gp==='month'?30:9999;
+  const gDates=Object.keys(D.ph).sort((a,b)=>b.localeCompare(a)).slice(0,gpN).reverse();
+  if(gDates.length>=1){
+   colC+='<div class="C"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:15px;font-weight:700;color:var(--t0)">📊 אחוז הפקדות</span><div style="display:flex;gap:4px">'+['day','week','month','all'].map(p=>'<button class="fb'+(gp===p?' on':'')+'" style="font-size:11.4px;padding:3px 8px" onclick="window._grPd=\''+p+'\';rr()">'+(p==='day'?'יום':p==='week'?'שבוע':p==='month'?'חודש':'הכל')+'</button>').join('')+'</div></div>';
+   colC+='<div style="display:flex;align-items:flex-end;gap:4px;min-height:120px;overflow-x:auto;overflow-y:visible;padding-top:4px">';
+   gDates.forEach(d=>{const ph=(D.ph||{})[d];if(!ph)return;const tot=(ph.dp?ph.dp.length:0)+(ph.m?ph.m.length:0);const dep=ph.dp?ph.dp.length:0;const pct=tot>0?Math.round(dep/tot*100):0;const bh=Math.max(8,Math.round(pct*0.8));const dn=DN[new Date(d).getDay()];
+    colC+='<div style="flex:1 1 0;min-width:24px;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:10.5px;font-weight:700;color:'+(pct>=80?'var(--gr)':pct>=50?'var(--am)':'var(--rd)')+'">'+pct+'%</div><div style="width:100%;height:'+bh+'px;background:'+(pct>=80?'var(--gr)':pct>=50?'var(--am)':'var(--rd)')+';border-radius:4px;opacity:.65"></div><div style="font-size:9.6px;color:var(--t2)">'+dn.charAt(0)+"\'</div></div>";});
+   colC+='</div></div>';
+  }
+ }
+ // Open tasks
+ if(otk>0){colC+='<div class="sl">📋 משימות פתוחות</div>';
+  D.tk.filter(t=>!t.dn).forEach(t=>{
+   const hasAlert=t.alertAt&&new Date(t.alertAt)>new Date();
+   colC+='<div class="C" style="'+(hasAlert?'border-color:rgba(234,179,8,.3)':'')+'">';
+   colC+='<div style="display:flex;justify-content:space-between;align-items:center"><div style="flex:1;font-size:15px;color:var(--t0)">'+es(t.tx)+'</div>';
+   colC+='<button style="padding:4px 8px;border-radius:6px;background:var(--grd);border:1px solid rgba(34,197,94,.2);color:var(--gr);font-size:12px;font-weight:700;cursor:pointer" onclick="markTaskDone(\''+t.id+'\')">✅</button></div>';
+   if(t.ps)colC+='<div style="font-size:12px;color:var(--t2)">👤 '+es(t.ps)+'</div>';
+   if(t.alertAt)colC+='<div style="font-size:12px;color:var(--am)">🔔 '+new Date(t.alertAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+'</div>';
+   colC+='</div>';
+  });
+ }
+ const doneTk=D.tk.filter(t=>t.dn);
+ if(doneTk.length){colC+='<div class="sl" style="cursor:pointer" onclick="window._showDoneTk=!window._showDoneTk;rr()">✅ הושלמו ('+doneTk.length+') '+(window._showDoneTk?'▲':'▼')+'</div>';
+  if(window._showDoneTk)doneTk.slice(-5).reverse().forEach(t=>{colC+='<div class="C" style="opacity:.6"><div style="font-size:14px;color:var(--t2);text-decoration:line-through">'+es(t.tx)+'</div></div>';});
+ }
+ // Printables drawer (collapsed by default)
+ colC+='<div class="C" style="cursor:pointer" onclick="window._printOpen=!window._printOpen;rr()"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;font-size:15px;color:var(--t0)">🖨 הדפסות מוכנות</span><span style="font-size:13px;color:var(--t2)">'+(window._printOpen?'▲':'▼')+'</span></div></div>';
+ if(window._printOpen){
+  colC+='<div class="sl">מסמכים מוכנים</div>';
+  colC+='<div class="C" style="padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+  var _docs=[
+   {u:'assets/pninia_hours.pdf',t:'⏰ זמני פתיחה'},
+   {u:'assets/phone_deposits.pdf',t:'📱 זמני הפקדות'},
+   {u:'assets/karteesee_ahraeem.pdf',t:'🎫 כרטיסי אחראים'},
+   {u:'assets/hitchayvut_shmirat_rechush.pdf',t:'📝 התחייבות רכוש'},
+   {u:'assets/heerat_nikayon.pdf',t:'🧹 הערת ניקיון'},
+   {u:'assets/bakasha_maavar_cheder.pdf',t:'🏠 בקשה למעבר חדר'}
+  ];
+  _docs.forEach(function(d){colC+='<button style="padding:11px 8px;border-radius:9px;background:var(--s3);border:1px solid var(--bm);color:var(--t0);font-size:13px;font-weight:600;cursor:pointer;text-align:right" onclick="window.open(\''+d.u+'\',\'_blank\')">'+d.t+'</button>';});
+  colC+='</div></div>';
+  colC+='<div class="sl">רשימת שמות עם משבצות</div>';
+  colC+='<div class="C" style="padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+  colC+='<button style="padding:11px;border-radius:9px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:13.5px;font-weight:700;cursor:pointer" onclick="printBoyRoster(\'room\')">🏠 לפי חדרים</button>';
+  colC+='<button style="padding:11px;border-radius:9px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:13.5px;font-weight:700;cursor:pointer" onclick="printBoyRoster(\'alpha\')">🔤 לפי א״ב</button>';
+  colC+='</div><div style="font-size:11.4px;color:var(--t2);margin-top:8px;text-align:center">כל שם עם משבצת ריקה לסימון.</div></div>';
+ }
+ // ── Assemble ──
+ let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:20.4px;color:var(--t0)">🏠 דשבורד</span><div style="width:60px"></div></div><div class="S home-dash" style="padding:10px 12px 100px">';
+ h+=hero;
+ h+='<div class="hm-body"><section class="hm-col hm-col-a">'+colA+'</section><section class="hm-col hm-col-b">'+colB+'</section><section class="hm-col hm-col-c">'+colC+'</section></div>';
+ h+='<div id="reportPreview"></div>';
+ if(D._lastAutoBackup)h+='<div style="text-align:center;margin-top:10px;font-size:12px;color:var(--t2)">💾 גיבוי אוטומטי: '+fm(D._lastAutoBackup)+'</div>';
+ h+='</div></div>';
+ return h;
 }
-// Auto backup status
-if(D._lastAutoBackup){h+='<div style="text-align:center;margin-top:10px;font-size:12.0px;color:var(--t2)">💾 גיבוי אוטומטי: '+fm(D._lastAutoBackup)+'</div>'}
-
-
-h+='</div></div>';
-// dedicated scan entry point - most important daily action, so front and
-// centre rather than buried in the printouts drawer
-h+='<div class="C" style="margin-top:8px;cursor:pointer;background:var(--pud);border-color:rgba(167,139,250,.35)" onclick="go(\'scan\')">'
- +'<div style="display:flex;align-items:center;gap:12px">'
- +'<div style="font-size:28px">📷</div>'
- +'<div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--pu)">סרוק דוח יומי</div>'
- +'<div style="font-size:12.4px;color:var(--t1)">צלם את הדף המודפס — האפליקציה תזהה את התאריך</div></div>'
- +'<div style="color:var(--pu);font-size:20px">›</div></div></div>';
-// ═══ Printable documents (pre-made PDFs + roster) — collapsed by default so
-// they don't dominate the dashboard; user opens with a single tap
-h+='<div class="C" style="margin-top:6px;cursor:pointer" onclick="window._printOpen=!window._printOpen;rr()"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;font-size:15.6px;color:var(--t0)">🖨 הדפסות</span><span style="font-size:13.2px;color:var(--t2)">'+(window._printOpen?'▲':'▼')+'</span></div></div>';
-if(window._printOpen){
-h+='<div class="sl" style="margin-top:8px">מסמכים מוכנים</div>';
-h+='<div class="C" style="padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
-var _docs=[
- {u:'assets/pninia_hours.pdf',t:'⏰ זמני פתיחה'},
- {u:'assets/phone_deposits.pdf',t:'📱 זמני הפקדות'},
- {u:'assets/karteesee_ahraeem.pdf',t:'🎫 כרטיסי אחראים'},
- {u:'assets/hitchayvut_shmirat_rechush.pdf',t:'📝 התחייבות רכוש'},
- {u:'assets/heerat_nikayon.pdf',t:'🧹 הערת ניקיון'},
- {u:'assets/bakasha_maavar_cheder.pdf',t:'🏠 בקשה למעבר חדר'}
-];
-_docs.forEach(function(d){
- h+='<button style="padding:12px 8px;border-radius:10px;background:var(--s3);border:1px solid var(--bm);color:var(--t0);font-size:13.8px;font-weight:600;cursor:pointer;text-align:right" onclick="window.open(\''+d.u+'\',\'_blank\')">'+d.t+'</button>';
-});
-h+='</div></div>';
-// Roster print - names with empty checkboxes, either grouped by room or A-Z
-h+='<div class="sl" style="margin-top:10px">רשימת שמות עם משבצות</div>';
-h+='<div class="C" style="padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
-h+='<button style="padding:12px;border-radius:10px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:14.4px;font-weight:700;cursor:pointer" onclick="printBoyRoster(\'room\')">🏠 לפי חדרים</button>';
-h+='<button style="padding:12px;border-radius:10px;background:var(--pud);border:1px solid rgba(167,139,250,.3);color:var(--pu);font-size:14.4px;font-weight:700;cursor:pointer" onclick="printBoyRoster(\'alpha\')">🔤 לפי א״ב</button>';
-h+='</div><div style="font-size:11.4px;color:var(--t2);margin-top:8px;text-align:center">מעודכן לפי הבחורים הפעילים כרגע. כל שם עם משבצת ריקה לסימון.</div></div>';
-}
-return h}
 // ═══ Printable roster (used by the dashboard buttons above) ═══
 // A/B modes: "room" = grouped by room number, one table per room, matching
 // the daily/cleaning report look; "alpha" = single alphabetical list by
