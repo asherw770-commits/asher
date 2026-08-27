@@ -3213,14 +3213,27 @@ if(ed.lights_10sh)window._rptActions.push(function(){ed.lights_10sh.forEach(func
 if(ed.bowls_5sh)window._rptActions.push(function(){ed.bowls_5sh.forEach(function(n){_mkTask(n,'5ש','איחור קערה וספל');});});
 window._rptActions.push(function(){var ac=D.pb.filter(iA);var _rd=(window._rptDate)||tdEve();D.ph[_rd]={dp:ac.filter(function(b){return D.pt[b]===true;}),m:ac.filter(function(b){return D.pt[b]!==true;}),t:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};snapDayStatus(_rd,'eve');});
 closeManualEdit();confirmReport();}
-function confirmReport(){
+async function confirmReport(){
+ const p=document.getElementById('reportPreview');
+ // Safety backup BEFORE applying scan actions so "בטל את הסריקה" can revert
+ // if the OMR result turns out to have false positives. window._lastScanBackupId
+ // is what undoLastScan() will look up in /backups.
+ window._lastScanBackupId=null;
+ try{
+  if(p)p.innerHTML='<div class="C" style="margin-top:8px;text-align:center;color:var(--go);font-size:15.6px;font-weight:700">💾 שומר גיבוי בטיחות…</div>';
+  window._lastScanBackupId=await _backupNow('before-scan-'+td());
+ }catch(e){
+  if(!confirm('⚠️ יצירת גיבוי הבטיחות נכשלה — עדיין להחיל את הסריקה? (לא ניתן יהיה לבטל)'))return;
+ }
  if(window._rptActions)window._rptActions.forEach(fn=>fn());
  sv();rr();
- const p=document.getElementById('reportPreview');
  if(!p)return;
  const kitTasks=D.wt.filter(t=>t.pk&&t.pk.includes('קיט')&&t.status==='waiting');
  const kitNames=kitTasks.length?kitTasks.map(t=>t.nm).filter((v,i,a)=>a.indexOf(v)===i):[];
  var h='<div class="C" style="margin-top:8px;text-align:center;color:var(--go);font-size:16.8px;font-weight:700">✅ כל הנתונים עודכנו!</div>';
+ if(window._lastScanBackupId){
+  h+='<button style="width:100%;padding:11px;margin-top:6px;border-radius:10px;background:var(--rdd);border:1px solid rgba(239,68,68,.35);color:var(--rd);font-size:14.4px;font-weight:800;cursor:pointer" onclick="undoLastScan()">⏪ בטל את הסריקה האחרונה</button>';
+ }
  if(kitNames.length){
   h+='<div class="C" style="margin-top:8px;border-color:rgba(245,158,11,.4);background:var(--amd)">'
    +'<div style="font-size:15.6px;font-weight:800;color:var(--am);margin-bottom:8px">📖 הוספו קיטים — הדפס טבלה:</div>'
@@ -3229,6 +3242,29 @@ function confirmReport(){
    +'</div></div>';
  }
  p.innerHTML=h;
+}
+// Restore the safety backup taken before the last confirmed scan. One-click
+// revert for when OMR misidentified marks and the user wants to start over.
+async function undoLastScan(){
+ var id=window._lastScanBackupId;
+ if(!id){alert('אין סריקה אחרונה זמינה לביטול');return;}
+ if(!confirm('לבטל את הסריקה האחרונה ולחזור למצב שהיה לפני שלחצת "אשר"?'))return;
+ try{
+  var doc=await _fbBackupsCol.doc(id).get();
+  if(!doc.exists){alert('הגיבוי לא נמצא — אולי כבר נמחק');return;}
+  var body=doc.data();if(!body||!body.data)throw new Error('גיבוי לא תקין');
+  var restored=body.data;
+  restored._updatedAt=Date.now();
+  restored._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');
+  if(D._approvedDevices)restored._approvedDevices=D._approvedDevices;
+  if(D._pendingDevices)restored._pendingDevices=D._pendingDevices;
+  if(D._pushSubs)restored._pushSubs=D._pushSubs;
+  D=restored;
+  _mergePhotos();sv();try{flushSv();}catch(e){}
+  window._lastScanBackupId=null;window._rptActions=null;
+  rr();
+  showBanner('⏪ הסריקה בוטלה — המצב שוחזר',3500);
+ }catch(e){alert('הביטול נכשל: '+((e&&e.message)||e));}
 }
 
 function schedTalkIssues(nm){
@@ -4880,16 +4916,23 @@ document.addEventListener('paste',function(ev){
   var items=(ev.clipboardData&&ev.clipboardData.items)||[];
   for(var i=0;i<items.length;i++){
    var it=items[i];
-   if(it.kind==='file'&&it.type&&it.type.indexOf('image/')===0){
-    var f=it.getAsFile();if(!f)continue;
-    var rd=new FileReader();
-    rd.onload=function(e){
-     window._croppedImg=e.target.result;
-     if(typeof scanCropped==='function')scanCropped();
-    };
-    rd.readAsDataURL(f);
-    ev.preventDefault();
-    return;
+   if(it.kind==='file'){
+    if(it.type==='application/pdf'){
+     ev.preventDefault();
+     alert('PDF שהודבק אינו נתמך עדיין בסריקה. במק: פתח את ה-PDF ב-Preview → Cmd+Shift+4 לצילום החלק הרלוונטי → Cmd+V כאן. או שמור את העמוד כ-PNG (File → Export) והדבק שוב.');
+     return;
+    }
+    if(it.type&&it.type.indexOf('image/')===0){
+     var f=it.getAsFile();if(!f)continue;
+     var rd=new FileReader();
+     rd.onload=function(e){
+      window._croppedImg=e.target.result;
+      if(typeof scanCropped==='function')scanCropped();
+     };
+     rd.readAsDataURL(f);
+     ev.preventDefault();
+     return;
+    }
    }
   }
  }catch(e){/* clipboard access can fail on some browsers - skip silently */}
@@ -4902,7 +4945,12 @@ document.addEventListener('paste',function(ev){
 if(navigator.serviceWorker){
  navigator.serviceWorker.addEventListener('message',function(ev){
   if(ev.data&&ev.data.type==='share-file'&&ev.data.dataUrl){
-   window._croppedImg=ev.data.dataUrl;
+   var du=ev.data.dataUrl;
+   if(du.indexOf('data:application/pdf')===0){
+    alert('PDF שותף לאפליקציה — עדיין לא נתמך בסריקה. באפליקציית המדפסת: שנה את פורמט הפלט מ-PDF ל-JPEG/PNG ושתף שוב.');
+    return;
+   }
+   window._croppedImg=du;
    setTimeout(function(){if(typeof scanCropped==='function')scanCropped();},200);
   }
  });
