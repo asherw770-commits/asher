@@ -1262,13 +1262,20 @@ function rHm(){
  colA+='<div class="hm-actrow hm-actrow-single"><button class="hm-actbtn hm-actbtn-wide" style="background:var(--bld);border-color:rgba(59,130,246,.3);color:var(--bl)" onclick="go(\'locks\')">🔐 עדכון מנעולים</button></div>';
  colA+='<div class="hm-actrow hm-actrow-single"><button class="hm-actbtn hm-actbtn-wide" style="background:var(--pud);border-color:rgba(167,139,250,.3);color:var(--pu)" onclick="go(\'sleeptbl\')">🛏 טבלת שינה</button></div>';
  colA+='</div></div>';
- // Scan card
- colA+='<div class="C" style="cursor:pointer;background:var(--pud);border-color:rgba(167,139,250,.35)" onclick="go(\'scan\')">'
-  +'<div style="display:flex;align-items:center;gap:12px">'
+ // Scan card - primary click opens the auto-detect camera modal (real-time
+ // corner detection + best-of-3 capture); the small link falls back to the
+ // full scan page with native photo picker + Tesseract date detection for
+ // cases where the phone's live camera framing doesn't lock on the corners.
+ colA+='<div class="C" style="background:var(--pud);border-color:rgba(167,139,250,.35)">'
+  +'<div style="display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openCamera()">'
   +'<div style="font-size:28px">📷</div>'
   +'<div style="flex:1"><div style="font-size:15px;font-weight:700;color:var(--pu)">סרוק דוח יומי</div>'
-  +'<div style="font-size:12px;color:var(--t1)">האפליקציה תזהה תאריך + סימונים</div></div>'
-  +'<div style="color:var(--pu);font-size:20px">›</div></div></div>';
+  +'<div style="font-size:12px;color:var(--t1)">מכוון אוטומטית · לוכד 3 פריימים · בוחר הכי טוב</div></div>'
+  +'</div>'
+  +'<div style="border-top:1px solid rgba(167,139,250,.15);margin-top:10px;padding-top:6px;display:flex;gap:6px">'
+  +'<button style="flex:1;padding:6px 8px;border-radius:8px;background:transparent;border:1px solid rgba(167,139,250,.25);color:var(--pu);font-size:12px;cursor:pointer" onclick="event.stopPropagation();go(\'scan\')">📁 העלה תמונה מהגלריה</button>'
+  +'</div>'
+  +'</div>';
  // ── COL B: live workflow (things needing attention right now) ──
  var colB='';
  var _bAny=false;
@@ -1976,12 +1983,61 @@ function camTick(){
 function camShoot(){
  try{
   var v=document.getElementById('camV'),cv=document.getElementById('camC');
-  var f=_camGray(cv,v,4000); if(!f){closeCamera();return;}
-  var img=cv.toDataURL('image/jpeg',0.95);
-  closeCamera();
-  window._croppedImg=img;
-  scanCropped();
+  if(!v||!cv){closeCamera();return;}
+  // Best-of-3 capture: take three snapshots ~130ms apart. Even a rock-steady
+  // phone can lose one frame to camera auto-focus / auto-exposure hunting or
+  // a momentary hand tremor - three chances mean the OMR pipeline gets to
+  // pick the frame it can score highest instead of gambling on one shot.
+  var frames=[];
+  function grab(){
+   try{var f=_camGray(cv,v,4000);if(f)frames.push(cv.toDataURL('image/jpeg',0.95));}catch(e){}
+  }
+  var msg=document.getElementById('camMsg');
+  if(msg)msg.textContent='📸 סורק 3 פריימים...';
+  grab();
+  setTimeout(function(){grab();
+   setTimeout(function(){grab();
+    closeCamera();
+    if(!frames.length)return;
+    if(frames.length===1){window._croppedImg=frames[0];scanCropped();return;}
+    _pickBestFrameAndScan(frames);
+   },130);
+  },130);
  }catch(err){closeCamera();}
+}
+// Score every captured frame with the full OMR pipeline and route the one
+// with the most confident hits into the normal scanCropped() flow. Frames
+// that fail detection score 0; ties go to the earliest frame.
+function _pickBestFrameAndScan(frames){
+ var results=new Array(frames.length),done=0;
+ var pv=document.getElementById('reportPreview');
+ if(pv)pv.innerHTML='<div class="C" style="margin-top:8px;text-align:center"><div style="color:var(--go)">🔍 בוחר את הפריים הטוב ביותר...</div></div>';
+ frames.forEach(function(dataUrl,idx){
+  var im=new Image();
+  im.onload=function(){
+   try{
+    var cv2=document.createElement('canvas');cv2.width=im.width;cv2.height=im.height;
+    var cx=cv2.getContext('2d');cx.drawImage(im,0,0);
+    var W=cv2.width,H=cv2.height;
+    var id=cx.getImageData(0,0,W,H);
+    var g=new Uint8Array(W*H);
+    for(var i=0;i<W*H;i++)g[i]=Math.round((id.data[i*4]*299+id.data[i*4+1]*587+id.data[i*4+2]*114)/1000);
+    var r=scanWithBestGrid(g,W,H);
+    results[idx]={hits:r?(r._hits||0):0,unsure:r?(r._unsure?r._unsure.length:0):999,url:dataUrl};
+   }catch(e){results[idx]={hits:0,unsure:999,url:dataUrl};}
+   done++;
+   if(done===frames.length)_finishBestFrame(results);
+  };
+  im.onerror=function(){results[idx]={hits:0,unsure:999,url:dataUrl};done++;if(done===frames.length)_finishBestFrame(results);};
+  im.src=dataUrl;
+ });
+}
+function _finishBestFrame(results){
+ // sort: most hits first, tiebreak on fewer unsure
+ results.sort(function(a,b){if(b.hits!==a.hits)return b.hits-a.hits;return a.unsure-b.unsure;});
+ var best=results[0];
+ window._croppedImg=best.url;
+ scanCropped();
 }
 function scanCropped(){
 if(!window._croppedImg)return;
