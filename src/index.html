@@ -1023,6 +1023,54 @@ function df(){return{pb:[...NM],pt:{},ph:{},ps:{},wt:[],wh:[],cs:NM.map(n=>({id:
 let pg='home';var _sp={};
 function _saveScroll(){var s=document.querySelector('.S');if(s)_sp[pg]=s.scrollTop;}
 function _restoreScroll(){var k=pg;setTimeout(function(){var s=document.querySelector('.S');if(s)s.scrollTop=_sp[k]||0;},0);}
+// Biometric (WebAuthn / Face ID / Touch ID) gate for the conversations page.
+// Per-device: each authenticator has its own credentials, so registration is
+// stored in localStorage (not synced across devices via Firestore). Falls
+// through to the PIN keypad on unsupported browsers, unregistered devices,
+// or auth failures.
+function _bioLSKey(){try{return 'yeshBio_'+_getDeviceId();}catch(e){return 'yeshBio_default';}}
+function _b64u2ab(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';var b=atob(s);var ar=new Uint8Array(b.length);for(var i=0;i<b.length;i++)ar[i]=b.charCodeAt(i);return ar.buffer;}
+function _ab2b64u(b){var s='';var a=new Uint8Array(b);for(var i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');}
+async function bioAvailable(){try{return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());}catch(e){return false;}}
+function bioIsRegistered(){try{return !!localStorage.getItem(_bioLSKey());}catch(e){return false;}}
+async function bioRegister(){
+ if(!(await bioAvailable()))throw new Error('bio-unavailable');
+ var uid=crypto.getRandomValues(new Uint8Array(16));
+ var ch=crypto.getRandomValues(new Uint8Array(32));
+ var cred=await navigator.credentials.create({publicKey:{
+  challenge:ch,
+  rp:{name:'ישיבה',id:location.hostname},
+  user:{id:uid,name:'asher',displayName:'אשר'},
+  pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+  authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},
+  timeout:60000,
+  attestation:'none'
+ }});
+ localStorage.setItem(_bioLSKey(),JSON.stringify({id:_ab2b64u(cred.rawId),uid:_ab2b64u(uid),at:Date.now()}));
+ return true;
+}
+async function bioAuth(){
+ var raw;try{raw=localStorage.getItem(_bioLSKey());}catch(e){return false;}
+ if(!raw)return false;
+ var st;try{st=JSON.parse(raw);}catch(e){return false;}
+ var ch=crypto.getRandomValues(new Uint8Array(32));
+ await navigator.credentials.get({publicKey:{
+  challenge:ch,
+  allowCredentials:[{type:'public-key',id:_b64u2ab(st.id)}],
+  userVerification:'required',
+  timeout:60000
+ }});
+ return true;
+}
+function bioForget(){try{localStorage.removeItem(_bioLSKey());}catch(e){}}
+async function bioSetupToggle(enable){
+ if(!enable){
+  if(!confirm('לבטל את הפתיחה עם Face ID / Touch ID במכשיר הזה?'))return;
+  bioForget();rr();return;
+ }
+ if(!(await bioAvailable())){alert('המכשיר הזה לא תומך ב-Face ID / Touch ID באתרים.');return;}
+ try{await bioRegister();rr();}catch(e){alert('הרישום לא הצליח: '+(e.message||e));}
+}
 function go(p){_saveScroll();flushSv();
  if(p==='phones'&&pg!=='phones'){
   // opening the deposits page fresh - default to whichever tab matches the
@@ -1030,6 +1078,23 @@ function go(p){_saveScroll();flushSv();
   // time they open the app during their actual deposit-checking window
   var hr=new Date().getHours();
   pT=(hr>=12&&hr<20)?'afternoon':'tonight';
+ }
+ if(p==='pin'){
+  // biometric gate: if the user set up Face ID / Touch ID on this device,
+  // try that first and jump straight to conversations on success. Any
+  // failure (canceled prompt, timeout, unsupported browser) falls through
+  // to the standard PIN keypad below.
+  (async function(){
+   if(bioIsRegistered()){
+    try{
+     await bioAuth();
+     pV='';pE=false;pg='cv';rr();_restoreScroll();
+     return;
+    }catch(e){/* fall through to PIN */}
+   }
+   pg=p;rr();_restoreScroll();
+  })();
+  return;
  }
  pg=p;rr();_restoreScroll();}
 function keepScroll(fn){var s=document.querySelector('.S');var t=s?s.scrollTop:0;fn();_sp[pg]=t;
@@ -1315,7 +1380,17 @@ else h+='<div style="font-size:14.4px;color:var(--t2)">אין בחורים בא�
 h+='</div>';
 
 h+='</div></div>';
-h+='<div class="C"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:8px">🔑 קוד נעילה</div><div style="display:flex;gap:8px"><input class="inp" id="pinInp" value="'+(D.pin||'1234')+'" style="width:100px;text-align:center;font-size:21.6px;letter-spacing:6px" maxlength="4"><button style="padding:8px 16px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="D.pin=document.getElementById(\'pinInp\').value;sv();alert(\'נשמר!\')">שמור</button></div></div>';
+h+='<div class="C"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:8px">🔑 קוד נעילה</div><div style="display:flex;gap:8px"><input class="inp" id="pinInp" value="'+(D.pin||'1234')+'" style="width:100px;text-align:center;font-size:21.6px;letter-spacing:6px" maxlength="4"><button style="padding:8px 16px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="D.pin=document.getElementById(\'pinInp\').value;sv();alert(\'נשמר!\')">שמור</button></div>';
+var _bioReg=bioIsRegistered();
+h+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)"><div style="font-weight:700;font-size:15.6px;color:var(--t0);margin-bottom:4px">🔐 Face ID / Touch ID</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:8px">כדי לפתוח את השיחות בלי להזין קוד. מוגדר לכל מכשיר בנפרד.</div>';
+if(_bioReg){
+ h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><div style="font-size:13.2px;color:var(--gr);font-weight:700;flex:1;min-width:100%">✓ מופעל במכשיר הזה</div>'
+  +'<button style="padding:8px 14px;border-radius:8px;background:var(--rdd);border:1px solid var(--rd);color:var(--rd);font-size:14.4px;font-weight:700;cursor:pointer" onclick="bioSetupToggle(false)">בטל</button>'
+  +'<button style="padding:8px 14px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14.4px;font-weight:700;cursor:pointer" onclick="bioSetupToggle(true)">רשום מחדש</button></div>';
+}else{
+ h+='<button style="padding:10px 16px;border-radius:8px;background:var(--go);border:none;color:#0a0f1c;font-size:15.6px;font-weight:700;cursor:pointer" onclick="bioSetupToggle(true)">🔐 הפעל במכשיר הזה</button>';
+}
+h+='</div></div>';
 
 // Backup & Restore
 // push-notification enable/disable (iOS 16.4+ PWA + Chrome/Safari desktop)
@@ -4315,8 +4390,20 @@ D.tk.push({id:uid(),tx,ps:ps||'',dt:td(),dn:false,alertAt});sv();rr()}
 
 // ═══ PIN ═══
 let pV='',pE=false,pSh=false;
-function rPn(){return'<div class="P" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:80px"><div style="margin-bottom:30px;text-align:center"><div style="font-size:48.0px;margin-bottom:8px">🔒</div><div style="font-size:21.6px;font-weight:700;color:var(--t0)">שיחות</div><div style="font-size:14.4px;color:var(--t2);margin-top:4px">הכנס קוד</div></div><div class="pd" style="'+(pSh?'animation:shake .5s':'')+'">'+[0,1,2,3].map(i=>'<div class="pdt'+(i<pV.length?(pE?' err':' on'):'')+'"></div>').join('')+'</div><div style="color:var(--rd);font-size:15.6px;min-height:18px;margin-bottom:12px">'+(pE?'קוד שגוי':'')+'</div><div class="pk">'+[1,2,3,4,5,6,7,8,9,null,0,'⌫'].map(d=>d===null?'<button class="pkb e"></button>':d==='⌫'?'<button class="pkb" style="font-size:24.0px" onclick="pDl()">⌫</button>':'<button class="pkb" onclick="pDg(\''+d+'\')">'+d+'</button>').join('')+'</div></div>'}
-function pDg(d){if(pV.length>=4)return;pV+=d;pE=false;if(pV.length===4){setTimeout(()=>{if(pV===(D.pin||'1234')){pV='';go('cv')}else{pE=true;pSh=true;rr();setTimeout(()=>{pSh=false;pV='';rr()},600)}},200)}else rr()}
+function rPn(){
+ var bioBtn=bioIsRegistered()?'<button style="width:100%;max-width:280px;margin-top:20px;padding:14px;border-radius:12px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:16.8px;font-weight:700;cursor:pointer" onclick="bioTry()">🔐 פתח עם Face ID / Touch ID</button>':'';
+ return'<div class="P" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:80px"><div style="margin-bottom:30px;text-align:center"><div style="font-size:48.0px;margin-bottom:8px">🔒</div><div style="font-size:21.6px;font-weight:700;color:var(--t0)">שיחות</div><div style="font-size:14.4px;color:var(--t2);margin-top:4px">הכנס קוד</div></div><div class="pd" style="'+(pSh?'animation:shake .5s':'')+'">'+[0,1,2,3].map(i=>'<div class="pdt'+(i<pV.length?(pE?' err':' on'):'')+'"></div>').join('')+'</div><div style="color:var(--rd);font-size:15.6px;min-height:18px;margin-bottom:12px">'+(pE?'קוד שגוי':'')+'</div><div class="pk">'+[1,2,3,4,5,6,7,8,9,null,0,'⌫'].map(d=>d===null?'<button class="pkb e"></button>':d==='⌫'?'<button class="pkb" style="font-size:24.0px" onclick="pDl()">⌫</button>':'<button class="pkb" onclick="pDg(\''+d+'\')">'+d+'</button>').join('')+'</div>'+bioBtn+'</div>'}
+async function bioTry(){try{await bioAuth();pV='';pE=false;pg='cv';rr();}catch(e){pE=true;rr();setTimeout(function(){pE=false;rr();},1500);}}
+function pDg(d){if(pV.length>=4)return;pV+=d;pE=false;if(pV.length===4){setTimeout(async ()=>{if(pV===(D.pin||'1234')){pV='';
+ // First-time PIN success on a bio-capable device: offer to register so
+ // future entries can skip the keypad. Best-effort; skip silently if the
+ // user declines or the platform rejects the WebAuthn prompt.
+ if(!bioIsRegistered() && await bioAvailable()){
+  if(confirm('להפעיל Face ID / Touch ID לפתיחת שיחות במכשיר הזה?')){
+   try{await bioRegister();}catch(e){/* user canceled - ok */}
+  }
+ }
+ go('cv')}else{pE=true;pSh=true;rr();setTimeout(()=>{pSh=false;pV='';rr()},600)}},200)}else rr()}
 function pDl(){pV=pV.slice(0,-1);pE=false;rr()}
 // ═══ CONVERSATIONS (LTR, numbers from left) ═══
 let cvI=null,cvV='list',cvTm=0,cvPd='day';
