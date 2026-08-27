@@ -54,3 +54,30 @@ self.addEventListener('notificationclick', function(event) {
 // intercepting push events without needing a reload
 self.addEventListener('install', function() { self.skipWaiting(); });
 self.addEventListener('activate', function(e) { e.waitUntil(self.clients.claim()); });
+
+// ─── Web Share Target intercept ───
+// Browsers POST the shared file to /?ingest=share (see manifest.webmanifest).
+// The service worker catches the POST, reads the file into a data URL, stashes
+// it in the target client's sessionStorage, then redirects to /?ingest=share
+// so the page can pick it up on load and route it into the scan preview.
+self.addEventListener('fetch', function(event) {
+  var url = new URL(event.request.url);
+  if (event.request.method === 'POST' && url.pathname === '/' && url.searchParams.get('ingest') === 'share') {
+    event.respondWith((async function() {
+      try {
+        var form = await event.request.formData();
+        var file = form.get('file');
+        if (file && file.size) {
+          var buf = await file.arrayBuffer();
+          var bytes = new Uint8Array(buf);
+          var bin = '';
+          for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+          var b64 = 'data:' + (file.type || 'image/jpeg') + ';base64,' + btoa(bin);
+          var cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+          for (var c of cs) c.postMessage({ type: 'share-file', dataUrl: b64 });
+        }
+      } catch (e) { /* ignore, still redirect */ }
+      return Response.redirect('/?ingest=share', 303);
+    })());
+  }
+});

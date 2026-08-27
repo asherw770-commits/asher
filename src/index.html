@@ -4799,6 +4799,44 @@ e.innerHTML='<div class="O" onclick="document.getElementById(\'phmov\').innerHTM
 window._appBoot=function(){
 ld();
 try{_pinMigrateIfNeeded();}catch(e){}
+// ─── Paste-image handler ─── zero-file scan path for Mac users: they scan
+// in Preview / Image Capture (any AirScan printer), Cmd+A → Cmd+C, then
+// Cmd+V anywhere in the app. No file picker, no browsing. Routes the
+// pasted image straight into the existing scanCropped() pipeline so the
+// preview + confirm screen is unchanged.
+document.addEventListener('paste',function(ev){
+ try{
+  var items=(ev.clipboardData&&ev.clipboardData.items)||[];
+  for(var i=0;i<items.length;i++){
+   var it=items[i];
+   if(it.kind==='file'&&it.type&&it.type.indexOf('image/')===0){
+    var f=it.getAsFile();if(!f)continue;
+    var rd=new FileReader();
+    rd.onload=function(e){
+     window._croppedImg=e.target.result;
+     if(typeof scanCropped==='function')scanCropped();
+    };
+    rd.readAsDataURL(f);
+    ev.preventDefault();
+    return;
+   }
+  }
+ }catch(e){/* clipboard access can fail on some browsers - skip silently */}
+});
+// ─── Web Share Target handler ─── when the user shares a PDF/image from
+// another app to Yeshiva (Android/desktop; iOS support is limited), the
+// service worker POSTs the file to /?ingest=share and messages this
+// client with the data URL. Route straight into the scan pipeline so the
+// existing preview + confirm screen handles it.
+if(navigator.serviceWorker){
+ navigator.serviceWorker.addEventListener('message',function(ev){
+  if(ev.data&&ev.data.type==='share-file'&&ev.data.dataUrl){
+   window._croppedImg=ev.data.dataUrl;
+   setTimeout(function(){if(typeof scanCropped==='function')scanCropped();},200);
+  }
+ });
+}
+try{if(location.search.indexOf('ingest=share')>=0)history.replaceState({},'','/');}catch(e){}
 // deep-link handling from notification taps: /?page=phones&t=tonight and
 // /?snooze=1 are the URLs the push payload embeds. Snooze runs a POST to
 // /api/snooze (fallback for iOS where the notification action button may
