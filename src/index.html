@@ -4524,10 +4524,18 @@ function markTaskDone(id){D.tk.forEach(t=>{if(t.id===id)t.dn=new Date().toISOStr
 // they land even when the app is closed and don't clutter the UI when open
 function checkTaskAlerts(){
  if(!D||!D.tk)return;
+ // Client-side redundant check. The primary path is the server cron
+ // /api/task-alerts (every 10 min) which fires even when no device is
+ // open. Client also checks so an active device catches the alert at the
+ // exact minute rather than waiting up to 10 min for the next cron sweep.
+ // Both sides share D._notifiedTasks[taskId] to avoid double-firing.
+ if(!D._notifiedTasks)D._notifiedTasks={};
  D.tk.filter(function(t){return!t.dn&&t.alertAt;}).forEach(function(t){
+  if(D._notifiedTasks[t.id])return;
   var at=new Date(t.alertAt),now=new Date();
-  if(Math.abs(now-at)<60000&&!_alerted['tk_'+t.id]){
-   _alerted['tk_'+t.id]=true;
+  if(now>=at&&(now-at)<60000){
+   D._notifiedTasks[t.id]=new Date().toISOString();
+   sv({bg:true});
    try{fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'🔔 תזכורת משימה',body:t.tx||'',tag:'task-'+t.id,url:'/?page=tasks'})}).catch(function(){});}catch(e){}
   }
  });
@@ -4872,7 +4880,13 @@ function saveTaskModal(id){
  }else{
   D.tk.push({id:uid(),tx:tx,ps:ps,dt:td(),dn:false,alertAt:alertAt});
  }
- sv();closeTaskModal();rr();
+ sv();
+ // Force an immediate push to Firestore instead of waiting for the 1500ms
+ // debounce - tasks are cross-device coordination surfaces, the user
+ // expects "I added it here → I see it there" latency to be sub-second,
+ // not 1.5s+ per hop plus another 500ms for the snapshot round trip.
+ try{flushSv();}catch(e){}
+ closeTaskModal();rr();
 }
 
 // ═══ PIN ═══
