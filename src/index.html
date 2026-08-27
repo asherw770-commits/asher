@@ -1082,6 +1082,18 @@ async function _pinSet(pin){
  if('pin' in D)delete D.pin;
  sv();
 }
+// Gate a sensitive action (like changing the PIN) behind authentication.
+// Order: 1) Face ID / Touch ID if registered on this device; 2) current-PIN
+// prompt as fallback. Returns true on success, false on cancel/wrong PIN.
+async function requireAuth(reason){
+ if(bioIsRegistered()){
+  try{await bioAuth();return true;}catch(e){/* fall through to PIN prompt */}
+ }
+ var pin=window.prompt('אימות '+(reason||'')+' — הזן את הקוד הנוכחי:');
+ if(pin===null)return false;
+ if(!(await _pinCheck(pin.trim()))){alert('קוד שגוי');return false;}
+ return true;
+}
 // Migrate legacy plaintext D.pin → D._pinHash on load. Runs once when a
 // document with the old shape is opened; subsequent loads see only the hash.
 async function _pinMigrateIfNeeded(){
@@ -1410,7 +1422,7 @@ else h+='<div style="font-size:14.4px;color:var(--t2)">אין בחורים בא�
 h+='</div>';
 
 h+='</div></div>';
-h+='<div class="C"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:8px">🔑 קוד נעילה</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:8px">הקוד מוסתר. להחליף — הזן קוד חדש בן 4 ספרות ולחץ שמור.</div><div style="display:flex;gap:8px;align-items:center"><input class="inp" id="pinInp" type="password" inputmode="numeric" autocomplete="new-password" placeholder="••••" value="" style="width:110px;text-align:center;font-size:21.6px;letter-spacing:6px" maxlength="4"><button style="padding:8px 16px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="(async function(){var v=(document.getElementById(\'pinInp\').value||\'\').trim();if(!/^[0-9]{4}$/.test(v)){alert(\'הזן בדיוק 4 ספרות\');return;}await _pinSet(v);document.getElementById(\'pinInp\').value=\'\';alert(\'הקוד עודכן\');})()">שמור</button></div>';
+h+='<div class="C"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:8px">🔑 קוד נעילה</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:8px">הקוד מוסתר. להחליף — הזן קוד חדש בן 4 ספרות ולחץ שמור.</div><div style="display:flex;gap:8px;align-items:center"><input class="inp" id="pinInp" type="password" inputmode="numeric" autocomplete="new-password" placeholder="••••" value="" style="width:110px;text-align:center;font-size:21.6px;letter-spacing:6px" maxlength="4"><button style="padding:8px 16px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="(async function(){var v=(document.getElementById(\'pinInp\').value||\'\').trim();if(!/^[0-9]{4}$/.test(v)){alert(\'הזן בדיוק 4 ספרות\');return;}if(!(await requireAuth(\'להחלפת הקוד\')))return;await _pinSet(v);document.getElementById(\'pinInp\').value=\'\';alert(\'הקוד עודכן\');})()">שמור</button></div>';
 var _bioReg=bioIsRegistered();
 h+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)"><div style="font-weight:700;font-size:15.6px;color:var(--t0);margin-bottom:4px">🔐 Face ID / Touch ID</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:8px">כדי לפתוח את השיחות בלי להזין קוד. מוגדר לכל מכשיר בנפרד.</div>';
 if(_bioReg){
