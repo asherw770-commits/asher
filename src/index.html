@@ -3673,8 +3673,25 @@ h+='td:first-child{white-space:nowrap;overflow:hidden}';
 // Slightly darker zebra so alternating rows read clearly at a distance
 h+='tbody tr:nth-child(even) td,table tr:nth-child(even) td{background:#dde2e8;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
 h+='td:first-child{font-weight:600;color:#000}';
+// ─── Registration marks for OMR ───
+// Four small filled black squares at the corners of the sheet. Purely for
+// scanner calibration — every scan needs these anchors so measureOMR() can
+// pin every cell's pixel position, and so the camera engine (_omrMarks)
+// can find and homography-map the 4 corners of the printed page. The
+// top-left mark (.tl) is intentionally larger so the engine can identify
+// page orientation even if the phone is held rotated. No data content is
+// added or moved — these are pixel-scale visual anchors only.
+h+='.reg{position:absolute;background:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact;z-index:100}';
+h+='.reg.tl{top:1.5mm;left:1.5mm;width:6mm;height:6mm}';
+h+='.reg.tr{top:1.5mm;right:1.5mm;width:4.5mm;height:4.5mm}';
+h+='.reg.bl{bottom:1.5mm;left:1.5mm;width:4.5mm;height:4.5mm}';
+h+='.reg.br{bottom:1.5mm;right:1.5mm;width:4.5mm;height:4.5mm}';
 h+='</style></head><body>';
 h+='<div id="sheet">';
+// Registration marks for OMR calibration - anchor 4 corners of the printed
+// sheet. Must live inside #sheet (which is the coordinate space measureOMR
+// uses) so the .tl/.tr/.bl/.br boundingRects give the correct A/B/C corners.
+h+='<div class="reg tl"></div><div class="reg tr"></div><div class="reg bl"></div><div class="reg br"></div>';
 h+='<div id="mmprobe" style="position:absolute;width:100mm;height:0;visibility:hidden"></div>';
 h+='<div id="pg">';
 // header row: date on the right, barcode above the tables so every column
@@ -3811,7 +3828,13 @@ D._reportGrid[td()]={
  }
 };
 sv();
-printHTML(h,'\u05d3\u05d5\u05d7 \u05d9\u05d5\u05de\u05d9');
+// Route the print through measureOMR \u2014 it renders the HTML in a hidden
+// iframe first to measure the pixel position (px/py/pw/ph) of every OMR
+// cell relative to the 4 .reg anchor squares, stores those measurements in
+// D._omrGrid + D._omrGrids[today], and only then calls printHTML() itself.
+// Without this pass, the scan pipeline has no cell coordinates to score
+// against and OMR silently returns nothing.
+measureOMR(h,grid);
 if(D.reportTalks&&D.reportTalks.length){D.reportTalks=[];sv();}
 }
 function showBoyWr(nm){
