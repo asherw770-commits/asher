@@ -76,4 +76,11 @@ if (fs.existsSync(assetsSrc)) {
   console.log('Copied', fs.readdirSync(assetsSrc).length, 'assets to dist/assets/.');
 }
 
+// PWA manifest for "Add to Home Screen" install (icons, name, colors)
+const manifestSrc = path.join(__dirname, 'src', 'manifest.webmanifest');
+if (fs.existsSync(manifestSrc)) {
+  fs.copyFileSync(manifestSrc, path.join(distDir, 'manifest.webmanifest'));
+  console.log('Copied manifest.webmanifest to dist/.');
+}
+
 console.log('Build complete: dist/index.html written with Firebase config injected.');

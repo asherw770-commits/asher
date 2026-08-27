@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a2235"/>
+      <stop offset="1" stop-color="#0a0f1c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+  <rect x="16" y="16" width="992" height="992" rx="212" ry="212" fill="none" stroke="#c9a84c" stroke-width="8" stroke-opacity="0.35"/>
+  <text x="512" y="770" font-size="720" text-anchor="middle" font-family="Apple Color Emoji">🏫</text>
+</svg>
