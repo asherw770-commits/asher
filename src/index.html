@@ -544,9 +544,19 @@ function _backupNow(label){
 // If backup fails, refuses to proceed (safer to bail than to lose data).
 async function _withSafetyBackup(label,friendlyName,action){
  try{
-  showBanner('💾 יוצר גיבוי בטיחות: '+friendlyName+'...',4000);
+  // Only surface the "creating safety backup" toast ONCE per day - the
+  // backup itself runs every time (data safety is non-negotiable), but the
+  // banner is silenced after the first time so repeated confirmations
+  // don't spam the user with 3-4 backup banners per session.
+  var today=td();
+  var showToast=(D._lastSafetyBannerDate!==today);
+  if(showToast)showBanner('💾 יוצר גיבוי בטיחות: '+friendlyName+'...',3000);
   var id=await _backupNow(label);
-  if(id)showBanner('✅ גיבוי נשמר: '+id+' — ניתן לשחזור מהגדרות',3500);
+  if(id&&showToast){
+   showBanner('✅ גיבוי נשמר — ניתן לשחזור מהגדרות',3000);
+   D._lastSafetyBannerDate=today;
+   try{sv({bg:true});}catch(e){}
+  }
  }catch(e){
   if(!confirm('⚠️ יצירת גיבוי הבטיחות נכשלה ('+((e&&e.message)||e)+').\n\nלהמשיך בכל זאת? (הפעולה עלולה למחוק נתונים ללא אפשרות שחזור)'))return false;
  }
