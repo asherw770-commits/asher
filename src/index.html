@@ -4536,7 +4536,9 @@ function checkTaskAlerts(){
   if(now>=at&&(now-at)<60000){
    D._notifiedTasks[t.id]=new Date().toISOString();
    sv({bg:true});
-   try{fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'🔔 תזכורת משימה',body:t.tx||'',tag:'task-'+t.id,url:'/?page=tasks'})}).catch(function(){});}catch(e){}
+   var _tTitle=t.tx?('🔔 '+t.tx):'🔔 תזכורת';
+   var _tBody=t.ps?('👤 '+t.ps):'';
+   try{fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:_tTitle,body:_tBody,tag:'task-'+t.id,url:'/?page=tasks'})}).catch(function(){});}catch(e){}
   }
  });
 }

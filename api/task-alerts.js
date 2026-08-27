@@ -68,10 +68,10 @@ module.exports = async (req, res) => {
   try {
     const { tk, notified } = await loadTasks();
     const now = Date.now();
-    // Fire for tasks whose alertAt is in the last 15 minutes and not yet
-    // notified. 15 min window matches the cron cadence (10 min) with a
-    // little slack for scheduling drift.
-    const windowMs = 15 * 60 * 1000;
+    // Fire for tasks whose alertAt is in the last 2 minutes and not yet
+    // notified. Tight window keeps the alert at the exact minute the user
+    // asked for (cron now runs every minute).
+    const windowMs = 2 * 60 * 1000;
     const fired = [];
     for (const t of tk) {
       if (!t || t.dn || !t.alertAt) continue;
@@ -80,13 +80,13 @@ module.exports = async (req, res) => {
       if (isNaN(at)) continue;
       const delta = now - at;
       if (delta < 0 || delta > windowMs) continue;
-      // fire
+      // fire — put the task content as the title (iOS shows it in bold) so
+      // the notification READS AS the reminder itself, not "reminder from
+      // <app>: <content>". Body deliberately empty for clean single-line UX.
+      const title = t.tx ? ('🔔 ' + t.tx) : '🔔 תזכורת';
+      const body = t.ps ? ('👤 ' + t.ps) : '';
       try {
-        await sendToAll(
-          '🔔 תזכורת משימה',
-          t.tx || '',
-          { tag: 'task-' + t.id, url: '/?page=tasks' }
-        );
+        await sendToAll(title, body, { tag: 'task-' + t.id, url: '/?page=tasks' });
         notified[t.id] = new Date().toISOString();
         fired.push({ id: t.id, tx: t.tx });
       } catch (e) {
