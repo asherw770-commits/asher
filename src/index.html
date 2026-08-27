@@ -1063,6 +1063,36 @@ async function bioAuth(){
  return true;
 }
 function bioForget(){try{localStorage.removeItem(_bioLSKey());}catch(e){}}
+// PIN hashing: never store the PIN in plaintext (Firestore rules are open,
+// so anyone with the project id could read it). SHA-256 with a fixed salt -
+// not brute-force-proof for a 4-digit code, but hides it from casual view
+// and prevents accidental leaks in exports/backups.
+async function _pinHash(pin){
+ var enc=new TextEncoder().encode('yeshiva-pin-salt-v1|'+String(pin||''));
+ var buf=await crypto.subtle.digest('SHA-256',enc);
+ return _ab2b64u(buf);
+}
+async function _pinCheck(pin){
+ if(D._pinHash){return (await _pinHash(pin))===D._pinHash;}
+ // Legacy path: plaintext D.pin still there (migration hasn't run yet).
+ return String(pin||'')===String(D.pin||'1234');
+}
+async function _pinSet(pin){
+ D._pinHash=await _pinHash(pin);
+ if('pin' in D)delete D.pin;
+ sv();
+}
+// Migrate legacy plaintext D.pin → D._pinHash on load. Runs once when a
+// document with the old shape is opened; subsequent loads see only the hash.
+async function _pinMigrateIfNeeded(){
+ if(!D._pinHash && typeof D.pin==='string'){
+  try{
+   D._pinHash=await _pinHash(D.pin);
+   delete D.pin;
+   sv();
+  }catch(e){console.error('pin migration failed',e);}
+ }
+}
 async function bioSetupToggle(enable){
  if(!enable){
   if(!confirm('לבטל את הפתיחה עם Face ID / Touch ID במכשיר הזה?'))return;
@@ -1380,7 +1410,7 @@ else h+='<div style="font-size:14.4px;color:var(--t2)">אין בחורים בא�
 h+='</div>';
 
 h+='</div></div>';
-h+='<div class="C"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:8px">🔑 קוד נעילה</div><div style="display:flex;gap:8px"><input class="inp" id="pinInp" value="'+(D.pin||'1234')+'" style="width:100px;text-align:center;font-size:21.6px;letter-spacing:6px" maxlength="4"><button style="padding:8px 16px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="D.pin=document.getElementById(\'pinInp\').value;sv();alert(\'נשמר!\')">שמור</button></div>';
+h+='<div class="C"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:8px">🔑 קוד נעילה</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:8px">הקוד מוסתר. להחליף — הזן קוד חדש בן 4 ספרות ולחץ שמור.</div><div style="display:flex;gap:8px;align-items:center"><input class="inp" id="pinInp" type="password" inputmode="numeric" autocomplete="new-password" placeholder="••••" value="" style="width:110px;text-align:center;font-size:21.6px;letter-spacing:6px" maxlength="4"><button style="padding:8px 16px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="(async function(){var v=(document.getElementById(\'pinInp\').value||\'\').trim();if(!/^[0-9]{4}$/.test(v)){alert(\'הזן בדיוק 4 ספרות\');return;}await _pinSet(v);document.getElementById(\'pinInp\').value=\'\';alert(\'הקוד עודכן\');})()">שמור</button></div>';
 var _bioReg=bioIsRegistered();
 h+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)"><div style="font-weight:700;font-size:15.6px;color:var(--t0);margin-bottom:4px">🔐 Face ID / Touch ID</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:8px">כדי לפתוח את השיחות בלי להזין קוד. מוגדר לכל מכשיר בנפרד.</div>';
 if(_bioReg){
@@ -4394,7 +4424,7 @@ function rPn(){
  var bioBtn=bioIsRegistered()?'<button style="width:100%;max-width:280px;margin-top:20px;padding:14px;border-radius:12px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:16.8px;font-weight:700;cursor:pointer" onclick="bioTry()">🔐 פתח עם Face ID / Touch ID</button>':'';
  return'<div class="P" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:80px"><div style="margin-bottom:30px;text-align:center"><div style="font-size:48.0px;margin-bottom:8px">🔒</div><div style="font-size:21.6px;font-weight:700;color:var(--t0)">שיחות</div><div style="font-size:14.4px;color:var(--t2);margin-top:4px">הכנס קוד</div></div><div class="pd" style="'+(pSh?'animation:shake .5s':'')+'">'+[0,1,2,3].map(i=>'<div class="pdt'+(i<pV.length?(pE?' err':' on'):'')+'"></div>').join('')+'</div><div style="color:var(--rd);font-size:15.6px;min-height:18px;margin-bottom:12px">'+(pE?'קוד שגוי':'')+'</div><div class="pk">'+[1,2,3,4,5,6,7,8,9,null,0,'⌫'].map(d=>d===null?'<button class="pkb e"></button>':d==='⌫'?'<button class="pkb" style="font-size:24.0px" onclick="pDl()">⌫</button>':'<button class="pkb" onclick="pDg(\''+d+'\')">'+d+'</button>').join('')+'</div>'+bioBtn+'</div>'}
 async function bioTry(){try{await bioAuth();pV='';pE=false;pg='cv';rr();}catch(e){pE=true;rr();setTimeout(function(){pE=false;rr();},1500);}}
-function pDg(d){if(pV.length>=4)return;pV+=d;pE=false;if(pV.length===4){setTimeout(async ()=>{if(pV===(D.pin||'1234')){pV='';
+function pDg(d){if(pV.length>=4)return;pV+=d;pE=false;if(pV.length===4){setTimeout(async ()=>{if(await _pinCheck(pV)){pV='';
  // First-time PIN success on a bio-capable device: offer to register so
  // future entries can skip the keypad. Best-effort; skip silently if the
  // user declines or the platform rejects the WebAuthn prompt.
@@ -4656,6 +4686,7 @@ e.innerHTML='<div class="O" onclick="document.getElementById(\'phmov\').innerHTM
 // ═══ INIT ═══
 window._appBoot=function(){
 ld();
+try{_pinMigrateIfNeeded();}catch(e){}
 // deep-link handling from notification taps: /?page=phones&t=tonight and
 // /?snooze=1 are the URLs the push payload embeds. Snooze runs a POST to
 // /api/snooze (fallback for iOS where the notification action button may
