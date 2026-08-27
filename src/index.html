@@ -274,11 +274,58 @@ async function disableNotifications(){
 }
 async function sendTestNotification(){
  try{
-  var r=await fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'✅ בדיקה',body:'התראות עובדות! מ-'+new Date().toLocaleTimeString('he-IL')})});
+  var r=await fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   title:'🏫 בדיקת התראות',
+   body:'התראות עובדות! נשלח מ-'+new Date().toLocaleTimeString('he-IL'),
+   tag:'diag-test',
+   url:'/'
+  })});
   var t=await r.text();
   if(!r.ok){alert('נכשל: '+r.status+' '+t.slice(0,200));return;}
-  alert('נשלחה התראת בדיקה. אמורה להגיע לכל המכשירים הרשומים תוך שניות.');
+  // Server response includes {sent, failed, pruned}. Report exact numbers
+  // so the user knows immediately whether the dispatch actually reached
+  // any active subscriptions, not just "sent (maybe)".
+  var j={};try{j=JSON.parse(t)||{};}catch(e){}
+  var stats=j.stats||j.result||j;
+  var sent=stats.sent||0,failed=stats.failed||0,pruned=stats.pruned||0;
+  var msg='📤 התראת בדיקה נשלחה\n\n'
+   +'✅ הגיעה ל: '+sent+' מכשירים\n'
+   +(failed?'⚠️ נכשלו: '+failed+' מכשירים\n':'')
+   +(pruned?'🧹 נוקו מנויים מתים: '+pruned+'\n':'')
+   +'\nאם לא הגיעה — בדוק שההתראות מופעלות במכשיר (הגדרות iOS → ניהול ישיבה → התראות → אפשר).';
+  alert(msg);
  }catch(e){alert('שגיאה בשליחה: '+(e.message||e));}
+}
+// Diagnostic: report the exact state of push on THIS device - notification
+// permission, service worker registration, push subscription. Helps the
+// user (and me) figure out why notifications aren't arriving.
+async function diagnosePush(){
+ var lines=[];
+ lines.push('🔍 אבחון התראות במכשיר הזה');
+ lines.push('');
+ lines.push('📱 סוג מכשיר: '+_getDeviceName());
+ lines.push('📲 מותקן כ-PWA: '+(_pwaInstalled()?'כן ✅':'לא — חובה להוסיף למסך הבית'));
+ if(typeof Notification!=='undefined'){
+  lines.push('🔔 הרשאה: '+Notification.permission+(Notification.permission==='granted'?' ✅':' ❌'));
+ }else{lines.push('🔔 API של התראות: לא זמין ❌');}
+ try{
+  var reg=(navigator.serviceWorker)?await navigator.serviceWorker.getRegistration():null;
+  lines.push('⚙️ Service Worker: '+(reg?'רשום ✅':'לא רשום ❌'));
+  if(reg){
+   var sub=await reg.pushManager.getSubscription();
+   lines.push('📡 מנוי push: '+(sub?'קיים ✅':'לא קיים ❌'));
+   if(sub){
+    var key=sub.endpoint;
+    var known=D._pushSubs&&D._pushSubs[key];
+    lines.push('☁️ רשום ב-Firestore: '+(known?'כן ✅ מ-'+new Date(known.at).toLocaleString('he-IL'):'לא — לחץ שוב "הפעל התראות"'));
+    lines.push('');
+    lines.push('endpoint: '+key.slice(0,60)+'...');
+   }
+  }
+ }catch(e){lines.push('❌ שגיאה: '+(e.message||e));}
+ lines.push('');
+ lines.push('📊 סה"כ מנויים על כל המכשירים: '+Object.keys(D._pushSubs||{}).length);
+ alert(lines.join('\n'));
 }
 // iOS PWAs cache the initial HTML in their own webkit container and DO NOT
 // honor Cache-Control headers reliably - once installed to the home screen
@@ -1491,6 +1538,7 @@ h+='</div></div>';
  h+='<button style="padding:10px;border-radius:8px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:14.4px;font-weight:700;cursor:pointer" '+(_pushCount?'':'disabled ')+'onclick="disableNotifications()">🔕 בטל התראות במכשיר זה</button>';
  h+='</div>';
  h+='<button style="width:100%;padding:9px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:13.2px;font-weight:600;cursor:'+(_pushCount?'pointer':'not-allowed')+'" '+(_pushCount?'':'disabled ')+'onclick="sendTestNotification()">🔔 שלח התראת בדיקה לכל המכשירים</button>';
+ h+='<button style="width:100%;padding:9px;margin-top:6px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:13.2px;font-weight:600;cursor:pointer" onclick="diagnosePush()">🔍 בדוק מצב התראות במכשיר הזה</button>';
  h+='<div style="font-size:12.0px;color:var(--t2);margin-top:8px">'+(_pushCount?'✓ '+_pushCount+' מכשיר'+(_pushCount>1?'ים':'')+' רשומים':'לא רשומים מכשירים עדיין')+'</div>';
  h+='</div>';
 }

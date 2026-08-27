@@ -6,7 +6,10 @@
 self.addEventListener('push', function(event) {
   var data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) {}
-  var title = data.title || 'עדכון פנימייה';
+  // Fallback title if the push payload is malformed / missing a title field.
+  // Shown by iOS as the notification header, so it needs to look like the app
+  // itself (not some generic "dormitory" leftover).
+  var title = data.title || '🏫 ניהול ישיבה';
   var body = data.body || '';
   var opts = {
     body: body,

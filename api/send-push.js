@@ -10,7 +10,13 @@ module.exports = async (req, res) => {
   }
   try {
     const body = typeof req.body === 'object' ? req.body : JSON.parse(req.body || '{}');
-    const result = await sendToAll(body.title || 'התראה', body.body || '');
+    // Pass through tag/url/actions so the client can send a fully-formed
+    // notification (including a proper title) - avoids the SW fallback path.
+    const opts = {};
+    if (body.tag) opts.tag = body.tag;
+    if (body.url) opts.url = body.url;
+    if (body.actions) opts.actions = body.actions;
+    const result = await sendToAll(body.title || '🏫 ניהול ישיבה', body.body || '', opts);
     res.status(200).json(result);
   } catch (e) {
     res.status(500).json({ error: String(e && e.message || e) });
