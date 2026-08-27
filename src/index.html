@@ -386,21 +386,64 @@ function _cloudBackupIfNeeded(){
   D._lastCloudBackup=today;
   sv();
   window._cloudBackupInFlight=false;
-  // prune anything older than 30 days
-  _fbBackupsCol.orderBy('date','desc').limit(60).get().then(function(qs){
-   var toDelete=[];
-   qs.forEach(function(doc,i){if(i>=30)toDelete.push(doc.id);});
+  // prune older backups: keep the last 30 daily + last 30 safety backups
+  // (safety backups have a suffix after the date - "_before-..." - so we can
+  // separate them by id shape when deciding what to prune)
+  _fbBackupsCol.orderBy('date','desc').limit(200).get().then(function(qs){
+   var daily=[],safety=[];
+   qs.forEach(function(doc){(doc.id.indexOf('_')>10?safety:daily).push(doc.id);});
+   var toDelete=daily.slice(30).concat(safety.slice(30));
    toDelete.forEach(function(id){_fbBackupsCol.doc(id).delete().catch(function(){});});
   }).catch(function(){});
  }).catch(function(e){window._cloudBackupInFlight=false;console.error('Cloud backup failed',e);});
 }
+// On-demand safety backup. Writes the CURRENT D (about to be overwritten
+// or destroyed) to /backups/{YYYY-MM-DD_HH-MM_label} so we always have an
+// undoable snapshot before any risky/destructive action - accepting a
+// cloud state that would delete local data, restoring an old backup on
+// top of live data, wiping localStorage on a device, mass deletes, etc.
+// Returns a Promise that resolves with the backup id.
+function _backupNow(label){
+ if(typeof _fbBackupsCol==='undefined')return Promise.resolve(null);
+ label=String(label||'safety').replace(/[^a-z0-9\-]/gi,'-').slice(0,40);
+ var now=new Date();
+ var stamp=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')
+  +'_'+String(now.getHours()).padStart(2,'0')+'-'+String(now.getMinutes()).padStart(2,'0')+'-'+String(now.getSeconds()).padStart(2,'0');
+ var id=stamp+'_'+label;
+ var split=_splitPhotos(D);
+ var body={
+  date:id,
+  savedAt:now.toISOString(),
+  writerBuild:(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown'),
+  label:label,
+  reason:label,
+  pbCount:Array.isArray(D.pb)?D.pb.length:0,
+  wtCount:Array.isArray(D.wt)?D.wt.length:0,
+  cxCount:Array.isArray(D.cx)?D.cx.length:0,
+  phDays:Object.keys(D.ph||{}).length,
+  data:split.stripped
+ };
+ return _fbBackupsCol.doc(id).set(body).then(function(){return id;});
+}
+// Guard for destructive actions: takes a safety backup, then runs `action`.
+// If backup fails, refuses to proceed (safer to bail than to lose data).
+async function _withSafetyBackup(label,friendlyName,action){
+ try{
+  showBanner('💾 יוצר גיבוי בטיחות: '+friendlyName+'...',4000);
+  var id=await _backupNow(label);
+  if(id)showBanner('✅ גיבוי נשמר: '+id+' — ניתן לשחזור מהגדרות',3500);
+ }catch(e){
+  if(!confirm('⚠️ יצירת גיבוי הבטיחות נכשלה ('+((e&&e.message)||e)+').\n\nלהמשיך בכל זאת? (הפעולה עלולה למחוק נתונים ללא אפשרות שחזור)'))return false;
+ }
+ try{await action();return true;}catch(e){alert('שגיאה: '+((e&&e.message)||e));return false;}
+}
 function _listCloudBackups(){
- return _fbBackupsCol.orderBy('date','desc').limit(30).get().then(function(qs){
-  var out=[];qs.forEach(function(doc){var d=doc.data();out.push({id:doc.id,date:d.date,savedAt:d.savedAt,pbCount:d.pbCount,wtCount:d.wtCount,cxCount:d.cxCount,phDays:d.phDays});});return out;
+ return _fbBackupsCol.orderBy('date','desc').limit(100).get().then(function(qs){
+  var out=[];qs.forEach(function(doc){var d=doc.data();out.push({id:doc.id,date:d.date,savedAt:d.savedAt,pbCount:d.pbCount,wtCount:d.wtCount,cxCount:d.cxCount,phDays:d.phDays,label:d.label,reason:d.reason,isSafety:doc.id.indexOf('_')>10});});return out;
  });
 }
 function _restoreCloudBackup(dateISO){
- _fbBackupsCol.doc(dateISO).get().then(function(doc){
+ _fbBackupsCol.doc(dateISO).get().then(async function(doc){
   if(!doc.exists){alert('לא נמצא גיבוי לתאריך זה');return;}
   var body=doc.data();
   if(!body||!body.data){alert('גיבוי לא תקין');return;}
@@ -409,19 +452,21 @@ function _restoreCloudBackup(dateISO){
    +'• '+body.wtCount+' משימות\n'
    +'• '+body.cxCount+' שיחות\n'
    +'• '+body.phDays+' ימי הפקדות\n\n'
-   +'לשחזר?  ⚠️ כל הנתונים הנוכחיים יוחלפו!';
+   +'לשחזר?  ⚠️ כל הנתונים הנוכחיים יוחלפו (יישמר גיבוי בטיחות של המצב הנוכחי לפני השחזור)';
   if(!confirm(summary))return;
-  var restored=body.data;
-  restored._updatedAt=Date.now();
-  restored._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');
-  // preserve current device approvals so we don't lock ourselves out
-  if(D._approvedDevices)restored._approvedDevices=D._approvedDevices;
-  if(D._pendingDevices)restored._pendingDevices=D._pendingDevices;
-  if(D._pushSubs)restored._pushSubs=D._pushSubs;
-  D=restored;
-  _mergePhotos();
-  sv();rr();
-  showBanner('✅ שוחזר מ-'+dateISO,4000);
+  await _withSafetyBackup('before-restore-'+dateISO,'לפני שחזור מ-'+dateISO,async function(){
+   var restored=body.data;
+   restored._updatedAt=Date.now();
+   restored._writerBuild=(typeof _BUILD_STAMP!=='undefined'?_BUILD_STAMP:'unknown');
+   // preserve current device approvals so we don't lock ourselves out
+   if(D._approvedDevices)restored._approvedDevices=D._approvedDevices;
+   if(D._pendingDevices)restored._pendingDevices=D._pendingDevices;
+   if(D._pushSubs)restored._pushSubs=D._pushSubs;
+   D=restored;
+   _mergePhotos();
+   sv();rr();
+   showBanner('✅ שוחזר מ-'+dateISO,4000);
+  });
  }).catch(function(e){alert('שגיאה: '+(e.message||e));});
 }
 function _openBackupsList(){
@@ -429,8 +474,8 @@ function _openBackupsList(){
  if(!el){el=document.createElement('div');el.id='backupsOv';document.body.appendChild(el);}
  el.innerHTML='<div class="O" onclick="_closeBackupsList()"><div class="M" onclick="event.stopPropagation()" style="max-height:80vh;overflow-y:auto">'
   +'<div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div>'
-  +'<div style="padding:8px 16px 14px"><div style="font-size:18px;font-weight:800;color:var(--go);text-align:center">☁️ גיבויים אוטומטיים בענן</div>'
-  +'<div style="font-size:12.5px;color:var(--t2);text-align:center;margin-top:4px">נשמר אוטומטית פעם ביום · 30 ימים אחרונים</div></div>'
+  +'<div style="padding:8px 16px 14px"><div style="font-size:18px;font-weight:800;color:var(--go);text-align:center">☁️ גיבויים בענן</div>'
+  +'<div style="font-size:12.5px;color:var(--t2);text-align:center;margin-top:4px">אוטומטי פעם ביום + לפני כל פעולה שעלולה למחוק נתונים</div></div>'
   +'<div id="backupsList" style="padding:0 12px 20px"><div style="text-align:center;padding:20px;color:var(--t2)">טוען...</div></div>'
   +'</div></div>';
  _listCloudBackups().then(function(list){
@@ -438,10 +483,16 @@ function _openBackupsList(){
   if(!list.length){body='<div style="text-align:center;color:var(--t2);padding:20px">אין גיבויים עדיין. גיבוי אוטומטי נוצר בשמירה הראשונה של כל יום.</div>';}
   else{list.forEach(function(b){
    var savedLocal=b.savedAt?new Date(b.savedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-   var hebDate=hF(b.date);
-   body+='<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:10px;background:var(--s1);border:1px solid var(--bd)">'
-    +'<div style="flex:1;min-width:0"><div style="font-size:14.4px;font-weight:700;color:var(--t0)">'+es(hebDate)+'</div>'
-    +'<div style="font-size:11.6px;color:var(--t2)">'+es(b.date)+' · '+es(savedLocal)+'</div>'
+   var displayDate=b.isSafety?b.date.slice(0,10):b.date;
+   var hebDate=hF(displayDate);
+   var reasonLabel=b.reason?b.reason.replace(/-/g,' '):'';
+   var chipHtml=b.isSafety
+    ?'<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--amd);color:var(--am);font-size:10.5px;font-weight:800;margin-right:6px">🛟 בטיחות</span>'
+    :'<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:var(--grd);color:var(--gr);font-size:10.5px;font-weight:800;margin-right:6px">📆 יומי</span>';
+   body+='<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:10px;background:var(--s1);border:1px solid '+(b.isSafety?'rgba(245,158,11,.25)':'var(--bd)')+'">'
+    +'<div style="flex:1;min-width:0"><div style="font-size:14.4px;font-weight:700;color:var(--t0);display:flex;align-items:center;flex-wrap:wrap">'+chipHtml+' '+es(hebDate)+'</div>'
+    +(b.isSafety&&reasonLabel?'<div style="font-size:12.6px;color:var(--am);font-weight:700;margin-top:2px">'+es(reasonLabel)+'</div>':'')
+    +'<div style="font-size:11.6px;color:var(--t2)">'+es(savedLocal)+'</div>'
     +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+b.pbCount+' בחורים · '+b.wtCount+' משימות · '+b.phDays+' ימי הפקדות</div>'
     +'</div>'
     +'<button style="padding:7px 12px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:12.6px;font-weight:800;cursor:pointer" onclick="_restoreCloudBackup(\''+b.date+'\');_closeBackupsList()">שחזר</button>'
@@ -1527,8 +1578,12 @@ function addBoy(){const nm=prompt('שם פרטי ושם משפחה:');if(!nm||!n
 function addBulk(){let e=document.getElementById('bkov');if(!e){e=document.createElement('div');e.id='bkov';document.body.appendChild(e)}
 e.innerHTML='<div class="O" onclick="document.getElementById(\'bkov\').innerHTML=\'\'"><div class="M" onclick="event.stopPropagation()"><div style="width:32px;height:3px;background:var(--s3);border-radius:2px;margin:10px auto"></div><div style="font-size:18.0px;font-weight:700;padding:8px 16px">הוספת בחורים מרובה</div><div style="padding:8px 16px 20px"><div style="font-size:14.4px;color:var(--t2);margin-bottom:6px">שם פרטי ושם משפחה בכל שורה:</div><textarea class="ta" id="bkta" rows="8" placeholder="יוסי כהן\nדוד לוי\nמשה ישראלי" style="direction:rtl;margin-bottom:10px"></textarea><button style="width:100%;padding:12px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:16.8px;font-weight:700;cursor:pointer" onclick="doBulkAdd()">הוסף הכל</button></div></div></div>'}
 function doBulkAdd(){const ta=document.getElementById('bkta');if(!ta)return;const lines=ta.value.split('\n').map(l=>l.trim()).filter(Boolean);let added=0,skip=0;lines.forEach(n=>{if(!n.includes(' ')){skip++;return}if(D.pb.includes(n)){skip++;return}D.pb.push(n);D.cs.push({id:uid(),name:n,urgent:false,notes:'',friends:'',cb:''});added++});sv();document.getElementById('bkov').innerHTML='';alert('נוספו '+added+' בחורים'+(skip>0?' ('+skip+' דולגו)':''));rr()}
-function rmBoyI(sortIdx){const srt=sortByRoomBed(D.pb);const n=srt[sortIdx];if(!n)return;if(!confirm('להסיר את '+n+'?'))return;rmBoyByName(n)}
-function rmBoyByName(n){D.pb=D.pb.filter(b=>b!==n);D.cs=D.cs.filter(s=>s.name!==n);D.wt=D.wt.filter(t=>t.nm!==n);D.wh=D.wh.filter(t=>t.nm!==n);D.ci=D.ci.filter(t=>t.sn!==n);delete D.ps[n];delete D.pt[n];sv();rr()}
+function rmBoyI(sortIdx){const srt=sortByRoomBed(D.pb);const n=srt[sortIdx];if(!n)return;if(!confirm('להסיר את '+n+'? (יישמר גיבוי בטיחות)'))return;rmBoyByName(n)}
+async function rmBoyByName(n){
+ await _withSafetyBackup('before-remove-'+n.replace(/\s+/g,'_'),'לפני מחיקת '+n,async function(){
+  D.pb=D.pb.filter(b=>b!==n);D.cs=D.cs.filter(s=>s.name!==n);D.wt=D.wt.filter(t=>t.nm!==n);D.wh=D.wh.filter(t=>t.nm!==n);D.ci=D.ci.filter(t=>t.sn!==n);delete D.ps[n];delete D.pt[n];sv();rr();
+ });
+}
 function editRoom(r){if(!D.rooms)D.rooms={};const cur=(D.rooms[r]||[]).join("\n");const v=prompt("חדר "+r+" — שם אחד בכל שורה:",cur);if(v===null)return;D.rooms[r]=v.split("\n").map(s=>s.trim()).filter(Boolean);sv();rr()}
 function expData(){try{const dt=hF(new Date).replace(/\s/g,'-');const payload={version:1,exportedAt:new Date().toISOString(),data:D};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='yeshiva-backup-'+dt+'.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);alert('הגיבוי הורד בהצלחה!')}catch(e){alert('שגיאה: '+e.message)}}
 function impData(input){
@@ -1570,7 +1625,15 @@ function impData(input){
  r.readAsText(f);
  input.value=''
 }
-function resetAll(){if(!confirm('האם אתה בטוח? כל הנתונים יימחקו לצמיתות!'))return;if(!confirm('בטוח בטוח? אין דרך חזרה!'))return;localStorage.removeItem(K);D=df();sv();rr();alert('כל הנתונים נמחקו. האפליקציה מתחילה מאפס.')}
+async function resetAll(){
+ if(!confirm('האם אתה בטוח? כל הנתונים יימחקו לצמיתות!'))return;
+ if(!confirm('בטוח בטוח? אין דרך חזרה! (גיבוי בטיחות יישמר לפני שהכל נמחק - יהיה ניתן לשחזור מהגדרות)'))return;
+ if(!(await requireAuth('לאיפוס מלא')))return;
+ await _withSafetyBackup('before-reset-all','לפני איפוס מלא',async function(){
+  localStorage.removeItem(K);D=df();sv();rr();
+  alert('כל הנתונים נמחקו. האפליקציה מתחילה מאפס. אם רצית לחזור - יש גיבוי לפני האיפוס בהגדרות → גיבויים.');
+ });
+}
 
 // Lights out — auto add 10ש
 function addLO(nm){const exists=D.wt.some(t=>t.nm===nm&&t.rs==='lights'&&t.ca&&t.ca.slice(0,10)===td());if(exists)return;
@@ -4245,19 +4308,23 @@ function _showDataLossBanner(localCount,remoteCount,remote){
  +'<button style="padding:9px;border-radius:9px;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:12.6px;cursor:pointer" onclick="closeFloatingAlert()">התעלם לעכשיו</button>'
  +'</div></div>';
 }
-function _resolveDataLoss(choice){
+async function _resolveDataLoss(choice){
  closeFloatingAlert();
  if(choice==='keepLocal'){
-  // bump _updatedAt then push, which will overwrite the tiny cloud copy
-  sv();
-  showBanner('✅ הנתונים שלך נשמרו — הענן מתעדכן',3000);
+  await _withSafetyBackup('before-keep-local','לפני דחיפת המקומי לענן',async function(){
+   sv();
+   showBanner('✅ הנתונים שלך נשמרו — הענן מתעדכן',3000);
+  });
  }else if(choice==='acceptCloud'&&window._pendingRemote){
-  D={...df(),...window._pendingRemote};
-  heal();
-  _mergePhotos();
-  sv();
-  rr();
-  showBanner('הענן הוחל — נתונים מקומיים נמחקו',3000);
+  var pending=window._pendingRemote;
+  await _withSafetyBackup('before-accept-cloud','לפני מחיקה לטובת הענן',async function(){
+   D={...df(),...pending};
+   heal();
+   _mergePhotos();
+   sv();
+   rr();
+   showBanner('הענן הוחל — נתונים מקומיים נמחקו (יש גיבוי בהגדרות)',4500);
+  });
  }
  window._pendingRemote=null;
 }
