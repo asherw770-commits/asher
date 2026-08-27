@@ -1546,7 +1546,7 @@ h+='<div class="C" style="margin-top:10px"><div style="font-weight:700;font-size
 // Reset all
 h+='<div class="C" style="margin-top:10px;border-color:rgba(239,68,68,.25)"><div style="font-weight:700;font-size:16.8px;color:var(--rd);margin-bottom:6px">🗑 איפוס מלא</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:10px">מוחק את כל הנתונים ומתחיל מאפס. הפעולה בלתי הפיכה!</div><button style="width:100%;padding:10px;border-radius:8px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:14.4px;font-weight:700;cursor:pointer" onclick="resetAll()">🗑 אפס הכל</button></div>';
 // build version - lets you check "am I on the latest deploy or a cached copy?"
-h+='<div style="text-align:center;margin-top:14px;font-size:11px;color:var(--t2);opacity:.7">build '+es(_BUILD_STAMP)+'</div>';
+h+='<div style="text-align:center;margin-top:14px;font-size:11px;color:var(--t2);opacity:.5">גרסה '+es(_BUILD_STAMP)+'</div>';
 h+='</div></div></div>';return h}
 let _srtBoys=[];
 function rStPreSort(){_srtBoys=[...D.pb].sort(sLN)}
@@ -1943,7 +1943,7 @@ function openCamera(){
  +'</div><canvas id="camC" style="display:none"></canvas></div>';
  var v=document.getElementById('camV');
  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:2560},height:{ideal:1440}},audio:false})
-  .then(function(st){_cam.stream=st;v.srcObject=st;_cam.ok=0;
+  .then(function(st){_cam.stream=st;v.srcObject=st;_cam.ok=0;_cam.startedAt=Date.now();
     _cam.timer=setInterval(camTick,450);
     document.getElementById('camMsg').textContent='כוון את הדף כך שכל ארבע הפינות ייכנסו למסגרת';})
   .catch(function(){
@@ -1970,13 +1970,21 @@ function camTick(){
   var f=_camGray(cv,v,900); if(!f)return;
   var m=_omrMarks(f.g,f.W,f.H);
   var msg=document.getElementById('camMsg'),gd=document.getElementById('camGuide');
+  if(!_cam.startedAt)_cam.startedAt=Date.now();
+  var secondsWaiting=Math.floor((Date.now()-_cam.startedAt)/1000);
   if(m){_cam.ok++;
    gd.style.borderColor='rgba(34,197,94,.95)';gd.style.borderStyle='solid';
    msg.textContent=_cam.ok>=2?'✓ נעול — סורק…':'ארבע הפינות זוהו — החזק יציב';
    if(_cam.ok>=2){clearInterval(_cam.timer);_cam.timer=null;camShoot();}
   }else{_cam.ok=0;
    gd.style.borderColor='rgba(255,255,255,.45)';gd.style.borderStyle='dashed';
-   msg.textContent='מחפש את ארבע פינות הדף — הרחק מעט וודא שהדף מואר';
+   if(secondsWaiting>=10){
+    msg.innerHTML='<div style="color:#fca">⚠️ לא מוצא סימני עוגן.<br><span style="font-size:13px">אם הדף מלפני העדכון — הדפס דוח חדש (יראה 4 ריבועים שחורים בפינות) ואז חזור.</span></div>';
+   }else if(secondsWaiting>=5){
+    msg.textContent='מחפש 4 ריבועים שחורים בפינות הדף — הרחק והוסף אור';
+   }else{
+    msg.textContent='מחפש את ארבע פינות הדף — הרחק מעט וודא שהדף מואר';
+   }
   }
  }catch(err){}
 }
@@ -2747,26 +2755,33 @@ function _loadTesseract(){
 function _setScanStatus(html){var e=document.getElementById('scanResult');if(e)e.innerHTML=html;}
 async function handleScanImage(input){
  var f=input.files&&input.files[0];if(!f)return;
- var url=URL.createObjectURL(f);
  var prev=document.getElementById('scanPreview');
+ var url=URL.createObjectURL(f);
  if(prev)prev.innerHTML='<div class="C" style="padding:8px"><img src="'+url+'" style="width:100%;border-radius:8px;display:block"></div>';
- _setScanStatus('<div class="C" style="text-align:center;padding:14px;color:var(--t1)">⏳ טוען מנוע זיהוי...</div>');
+ _setScanStatus('<div class="C" style="text-align:center;padding:14px;color:var(--t1)">⏳ מזהה סימונים על הדף...</div>');
  try{
-  var T=await _loadTesseract();
-  _setScanStatus('<div class="C" style="text-align:center;padding:14px;color:var(--t1)">⏳ מזהה טקסט בתמונה... 0%</div>');
-  var res=await T.recognize(url,'eng',{logger:function(m){
-   if(m.status==='recognizing text'){_setScanStatus('<div class="C" style="text-align:center;padding:14px;color:var(--t1)">⏳ מזהה טקסט... '+Math.round(m.progress*100)+'%</div>');}
-  }});
-  var text=(res&&res.data&&res.data.text)||'';
-  var m=text.match(/(20\d{2})-?(0\d|1[0-2])-?(\d{2})/);
-  if(m){
-   var dateISO=m[1]+'-'+m[2]+'-'+m[3];
-   _showScanDateFound(dateISO,text);
-  }else{
-   _setScanStatus('<div class="C" style="border-color:rgba(239,68,68,.35)"><div style="font-size:15px;font-weight:700;color:var(--rd);margin-bottom:6px">לא זוהה תאריך</div>'
-    +'<div style="font-size:13px;color:var(--t1);line-height:1.6">התמונה לא הייתה מספיק ברורה, או שהמצלמה לא תפסה את שורת התאריך שמעל הטבלאות. נסה שוב עם תמונה חדה יותר של החלק העליון של הדף.</div>'
-    +'<details style="margin-top:8px;font-size:12px;color:var(--t2)"><summary>מה נקרא בתמונה</summary><pre style="white-space:pre-wrap;font-size:11px;margin-top:6px;max-height:120px;overflow-y:auto">'+es(text.slice(0,500))+'</pre></details></div>');
-  }
+  // Route the uploaded scan through the same OMR pipeline the camera uses.
+  // scanCropped runs _omrMarks → homography → _omrScan on the .reg-anchored
+  // grid, and renders the preview + confirm UI inside #reportPreview.
+  var reader=new FileReader();
+  reader.onload=function(ev){
+   window._croppedImg=ev.target.result;
+   _setScanStatus('');
+   var pre=document.getElementById('reportPreview');
+   if(pre)pre.innerHTML='<div class="C" style="text-align:center;padding:14px;color:var(--go)">🔍 סורק ומזהה סימונים...</div>';
+   scanCropped();
+   setTimeout(function(){
+    // If scanCropped didn't produce a preview within a moment (no anchors +
+    // no fallback hits), the printout probably predates the current OMR
+    // system. Guide the user to reprint instead of leaving them stuck.
+    var pv=document.getElementById('reportPreview');
+    if(pv&&pv.innerHTML.indexOf('אשר ועדכן')===-1&&pv.innerHTML.indexOf('הראה בדיוק מה זוהה')===-1){
+     _setScanStatus('<div class="C" style="border-color:rgba(245,158,11,.4);background:var(--amd)"><div style="font-size:15px;font-weight:800;color:var(--am);margin-bottom:6px">⚠️ לא זוהו סימני עוגן</div>'
+      +'<div style="font-size:13px;color:var(--t1);line-height:1.65">כנראה הדף שסרקת הודפס לפני עדכון המערכת. חזור לדשבורד, לחץ 🖨 הדפס דוח יומי — הדוח החדש יכיל 4 ריבועים שחורים קטנים בפינות שמאפשרים זיהוי אוטומטי. מלא את הדף החדש בעט, ואז סרוק שוב.</div></div>');
+    }
+   },2500);
+  };
+  reader.readAsDataURL(f);
  }catch(e){
   _setScanStatus('<div class="C" style="border-color:rgba(239,68,68,.35);color:var(--rd)">שגיאה: '+es(e.message||String(e))+'</div>');
  }
@@ -2784,7 +2799,7 @@ function _showScanDateFound(dateISO,rawText){
   +(isFuture?'<div style="color:var(--rd);font-size:12px;margin-top:6px">⚠️ תאריך עתידי — כנראה זיהוי שגוי</div>':(isToday?'':'<div style="color:var(--am);font-size:12px;margin-top:6px">ℹ️ לא תאריך של היום</div>'))
   +(hasSnap?'':'<div style="color:var(--am);font-size:11.6px;margin-top:6px;line-height:1.5">⚠️ אין נתוני מבנה לתאריך זה — יש להדפיס את הדוח קודם דרך האפליקציה כדי לאפשר זיהוי אוטומטי</div>')
   +'<div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">'
-  +(hasSnap?'<button style="width:100%;padding:12px;border-radius:10px;background:var(--pu);color:#fff;border:none;font-size:14.8px;font-weight:800;cursor:pointer" onclick="_scanStartDetection(\''+dateISO+'\')">🔍 זהה סימונים אוטומטית (חדש)</button>':'')
+  +(hasSnap?'<button style="width:100%;padding:12px;border-radius:10px;background:var(--pu);color:#fff;border:none;font-size:14.8px;font-weight:800;cursor:pointer" onclick="_scanStartDetection(\''+dateISO+'\')">🔍 זהה סימונים אוטומטית</button>':'')
   +'<button style="width:100%;padding:12px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:14.4px;font-weight:700;cursor:pointer" onclick="_scanEditDate(\''+dateISO+'\')">📝 עדכן ידנית לתאריך זה</button>'
   +'</div>'
   +'</div>';
@@ -3007,12 +3022,7 @@ function rScan(){
   +'</div>';
  h+='<div id="scanPreview"></div>';
  h+='<div id="scanResult" style="margin-top:12px"></div>';
- h+='<div class="C" style="margin-top:12px;background:var(--s2);border-color:var(--bd)">'
-  +'<div style="font-size:13px;color:var(--t2);line-height:1.65">'
-  +'<b style="color:var(--t1)">🔬 שלבי הפיתוח:</b><br>'
-  +'✅ <b>שלב 1</b> (עכשיו) — זיהוי התאריך מהתמונה + פתיחת עמוד עדכון<br>'
-  +'⏳ <b>שלב 2</b> (בהמשך) — זיהוי אוטומטי של תאי הסימון (מסומן/ריק) ועדכון הנתונים לפי הדוח המודפס<br>'
-  +'</div></div>';
+ h+='<div id="reportPreview"></div>';
  h+='</div></div>';
  return h;
 }
