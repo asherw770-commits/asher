@@ -3891,14 +3891,11 @@ function friendlyUntil(iso){
  return'\u05e2\u05d3 '+d.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})+' '+tod;
 }
 function returnAllPhones(){if(!D._returnDue)return;D._returnDue={};sv();rr();}
-function checkAfAlert(){
-if(!D)return;
-const now=new Date(),h2=now.getHours();
-if(h2>=15&&h2<21&&!(D.phA&&(D.phA||{})[td()])){
-  const el=document.getElementById('afAlert');
-  if(!el){const d=document.createElement('div');d.id='afAlert';d.style.cssText='position:fixed;top:60px;left:10px;right:10px;z-index:9999;padding:12px;border-radius:10px;background:var(--am);color:#0a0f1c;font-family:Heebo;text-align:center;font-weight:700;font-size:16.8px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4)';d.textContent='📱 לא עדכנת הפקדות צהריים!';d.onclick=()=>{d.remove();pT="afternoon";go("phones")};document.body.appendChild(d)}
-}else{const el=document.getElementById('afAlert');if(el)el.remove()}}
-setInterval(checkAfAlert,30000);
+// "לא עדכנת הפקדות צהריים" floating banner removed at user's request -
+// the 15:13 push notification (cron ?t=af) already covers this reminder,
+// no need for an in-app floater on top of that.
+function checkAfAlert(){var el=document.getElementById('afAlert');if(el)el.remove();}
+checkAfAlert();
 function schedTalk(nm){
 const when=prompt('מתי לתזכר שיחה עם '+nm+'? (HH:MM)','09:00');
 if(!when)return;
