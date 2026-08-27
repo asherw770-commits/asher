@@ -2287,7 +2287,22 @@ if(r&&r._marks){
  if(r._skew>0.35)h+='<div style="font-size:13.2px;color:var(--am);background:var(--amd);border-radius:8px;padding:7px;margin-bottom:6px">\u26a0\ufe0f הדף צולם בזווית חדה — כדאי לבדוק את הרשימה או לצלם שוב</div>';
  if(r._unsure&&r._unsure.length)h+='<div style="font-size:13.2px;color:var(--am);background:var(--amd);border-radius:8px;padding:7px;margin-bottom:6px">\u26a0\ufe0f '+r._unsure.length+' סימונים גבוליים — בדוק אותם ב\u05e2\u05e8\u05d5\u05da \u05d9\u05d3\u05e0\u05d9\u05ea</div>';
 }
-if(!changes.length)h+='<div style="font-size:15.6px;color:var(--t2)">⚠️ לא נמצאו סימונים</div>';
+if(!changes.length){
+ // Zero-hits case: don't offer to "approve" an empty scan - that just applies
+ // nothing and confuses the user. Instead give them a clear diagnostic +
+ // one-click retry with the camera.
+ h+='<div style="background:var(--rdd);border:1px solid rgba(239,68,68,.4);border-radius:10px;padding:12px;margin-bottom:8px">'
+  +'<div style="font-size:15.6px;font-weight:800;color:var(--rd);margin-bottom:6px">⚠️ לא זוהו סימונים על הדף</div>'
+  +'<div style="font-size:13.2px;color:var(--t1);line-height:1.55">אפשריים גורמים: (1) הדף הזה הודפס לפני עדכון המערכת ואין בו 4 ריבועי עוגן שחורים בפינות · (2) התמונה יצאה מטושטשת · (3) התאורה חלשה. לחץ 🔍 להראות בדיוק מה נמצא ומה נכשל.</div></div>';
+ h+='<img src="'+imgB64+'" style="width:100%;border-radius:8px;margin:8px 0;max-height:200px;object-fit:contain">';
+ window._lastScanImg=imgB64;window._lastScanResult=r;
+ h+='<button style="width:100%;padding:10px;border-radius:9px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:14.4px;font-weight:700;cursor:pointer;margin-bottom:6px" onclick="showScanDebug()">🔍 הראה בדיוק מה נמצא (או לא)</button>';
+ h+='<button style="width:100%;padding:12px;border-radius:10px;background:var(--go);color:#0a0f1c;border:none;font-size:16.8px;font-weight:700;cursor:pointer;margin-bottom:6px" onclick="cancelReport();openCamera()">📷 סרוק שוב</button>';
+ h+='<button style="width:100%;padding:12px;border-radius:10px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:14.4px;font-weight:700;cursor:pointer" onclick="cancelReport()">סגור</button>';
+ prev.innerHTML=h+'</div>';
+ window._rptActions=null;
+ return;
+}
 changes.forEach(ch=>{h+='<div style="font-size:14.4px;color:var(--t0);padding:6px;border:1px solid var(--bd);border-radius:8px;margin-bottom:4px;background:var(--s3)">'+ch+'</div>'});
 h+='<img src="'+imgB64+'" style="width:100%;border-radius:8px;margin:8px 0;max-height:200px;object-fit:contain">';
 window._lastScanImg=imgB64;window._lastScanResult=r;
