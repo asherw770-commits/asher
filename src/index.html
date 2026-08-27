@@ -1125,12 +1125,18 @@ async function bioRegister(){
  if(!(await bioAvailable()))throw new Error('bio-unavailable');
  var uid=crypto.getRandomValues(new Uint8Array(16));
  var ch=crypto.getRandomValues(new Uint8Array(32));
+ // authenticatorAttachment:'platform' + residentKey:'discouraged' keeps the
+ // credential BOUND to this device's built-in authenticator (Mac Touch ID,
+ // iPhone Face ID/Touch ID). Without 'discouraged' Safari/Chrome may create
+ // an iCloud-synced passkey and later offer to authenticate via the user's
+ // iPhone via QR/Bluetooth instead of using the Mac's own Touch ID -
+ // exactly the wrong UX for a single-user desktop.
  var cred=await navigator.credentials.create({publicKey:{
   challenge:ch,
   rp:{name:'ישיבה',id:location.hostname},
   user:{id:uid,name:'asher',displayName:'אשר'},
   pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
-  authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},
+  authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged',requireResidentKey:false},
   timeout:60000,
   attestation:'none'
  }});
@@ -1142,9 +1148,11 @@ async function bioAuth(){
  if(!raw)return false;
  var st;try{st=JSON.parse(raw);}catch(e){return false;}
  var ch=crypto.getRandomValues(new Uint8Array(32));
+ // transports:'internal' pins the prompt to this device's built-in
+ // authenticator - blocks the "use your phone" cross-device dialog on Mac
  await navigator.credentials.get({publicKey:{
   challenge:ch,
-  allowCredentials:[{type:'public-key',id:_b64u2ab(st.id)}],
+  allowCredentials:[{type:'public-key',id:_b64u2ab(st.id),transports:['internal']}],
   userVerification:'required',
   timeout:60000
  }});
@@ -4535,11 +4543,32 @@ if(d&&t)alertAt=new Date(d+'T'+t+':00').toISOString()}
 D.tk.push({id:uid(),tx,ps:ps||'',dt:td(),dn:false,alertAt});sv();rr()}
 
 // ═══ PIN ═══
-let pV='',pE=false,pSh=false;
+let pV='',pE=false,pSh=false,pShowKp=false;
 function rPn(){
- var bioBtn=bioIsRegistered()?'<button style="width:100%;max-width:280px;margin-top:20px;padding:14px;border-radius:12px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:16.8px;font-weight:700;cursor:pointer" onclick="bioTry()">🔐 פתח עם Face ID / Touch ID</button>':'';
- return'<div class="P" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:80px"><div style="margin-bottom:30px;text-align:center"><div style="font-size:48.0px;margin-bottom:8px">🔒</div><div style="font-size:21.6px;font-weight:700;color:var(--t0)">שיחות</div><div style="font-size:14.4px;color:var(--t2);margin-top:4px">הכנס קוד</div></div><div class="pd" style="'+(pSh?'animation:shake .5s':'')+'">'+[0,1,2,3].map(i=>'<div class="pdt'+(i<pV.length?(pE?' err':' on'):'')+'"></div>').join('')+'</div><div style="color:var(--rd);font-size:15.6px;min-height:18px;margin-bottom:12px">'+(pE?'קוד שגוי':'')+'</div><div class="pk">'+[1,2,3,4,5,6,7,8,9,null,0,'⌫'].map(d=>d===null?'<button class="pkb e"></button>':d==='⌫'?'<button class="pkb" style="font-size:24.0px" onclick="pDl()">⌫</button>':'<button class="pkb" onclick="pDg(\''+d+'\')">'+d+'</button>').join('')+'</div>'+bioBtn+'</div>'}
-async function bioTry(){try{await bioAuth();pV='';pE=false;pg='cv';rr();}catch(e){pE=true;rr();setTimeout(function(){pE=false;rr();},1500);}}
+ var reg=bioIsRegistered();
+ // Big biometric button is the DEFAULT action — matches "unlock like a
+ // phone". If not registered on this device yet, the button offers to set
+ // it up right now (Mac Touch ID / iPhone Face ID / etc.) with no PIN
+ // required first. The PIN keypad only appears if the user asks for it or
+ // if biometric is unavailable/failed.
+ var bioBtn=reg
+  ?'<button style="width:100%;max-width:320px;padding:18px;border-radius:14px;background:var(--go);border:none;color:#0a0f1c;font-size:18px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px" onclick="bioTry()"><span style="font-size:24px">🔐</span> פתח עם Face ID / Touch ID</button>'
+  :'<button style="width:100%;max-width:320px;padding:18px;border-radius:14px;background:var(--go);border:none;color:#0a0f1c;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px" onclick="bioSetupFromLock()"><span style="font-size:22px">🔐</span> הפעל Face ID / Touch ID במכשיר הזה</button>';
+ var kpToggle=reg?'<button style="margin-top:14px;padding:8px 14px;border-radius:8px;background:transparent;border:1px solid var(--bm);color:var(--t2);font-size:13.2px;cursor:pointer" onclick="pShowKp=true;rr()">... או להזין קוד</button>':'';
+ var kp=(pShowKp||!reg)
+  ?'<div style="width:100%;max-width:320px;margin-top:18px"><div class="pd" style="'+(pSh?'animation:shake .5s':'')+'">'+[0,1,2,3].map(i=>'<div class="pdt'+(i<pV.length?(pE?' err':' on'):'')+'"></div>').join('')+'</div><div style="color:var(--rd);font-size:15.6px;min-height:18px;margin-bottom:12px;text-align:center">'+(pE?'קוד שגוי':'')+'</div><div class="pk">'+[1,2,3,4,5,6,7,8,9,null,0,'⌫'].map(d=>d===null?'<button class="pkb e"></button>':d==='⌫'?'<button class="pkb" style="font-size:24.0px" onclick="pDl()">⌫</button>':'<button class="pkb" onclick="pDg(\''+d+'\')">'+d+'</button>').join('')+'</div></div>'
+  :'';
+ return'<div class="P" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:80px"><div style="margin-bottom:24px;text-align:center"><div style="font-size:48.0px;margin-bottom:8px">🔒</div><div style="font-size:21.6px;font-weight:700;color:var(--t0)">שיחות</div></div>'+bioBtn+(reg&&!pShowKp?kpToggle:'')+kp+'</div>'}
+async function bioTry(){try{await bioAuth();pV='';pE=false;pShowKp=false;pg='cv';rr();}catch(e){pE=true;pShowKp=true;rr();setTimeout(function(){pE=false;rr();},1500);}}
+// Enroll biometric directly from the lock screen when this device has no
+// credential yet - no PIN required first. The OS's own auth sheet (Touch
+// ID / Face ID) gates the enrollment. Falls back to the PIN keypad if
+// biometric isn't available or the user cancels the OS prompt.
+async function bioSetupFromLock(){
+ if(!(await bioAvailable())){pShowKp=true;rr();alert('המכשיר הזה לא תומך ב-Face ID / Touch ID באתרים. השתמש בקוד.');return;}
+ try{await bioRegister();await bioAuth();pV='';pE=false;pShowKp=false;pg='cv';rr();}
+ catch(e){pShowKp=true;rr();}
+}
 function pDg(d){if(pV.length>=4)return;pV+=d;pE=false;if(pV.length===4){setTimeout(async ()=>{if(await _pinCheck(pV)){pV='';
  // First-time PIN success on a bio-capable device: offer to register so
  // future entries can skip the keypad. Best-effort; skip silently if the
