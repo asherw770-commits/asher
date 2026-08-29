@@ -255,7 +255,15 @@ async function enableNotifications(){
   }
   var perm=await Notification.requestPermission();
   if(perm!=='granted'){alert('לא אישרת התראות. אפשר לשנות בהגדרות הדפדפן/מכשיר.');return;}
-  var reg=await navigator.serviceWorker.register('/sw.js');
+  // Register the new SW filename (sw-v3.js). Renaming was necessary because
+  // iOS aggressively caches the old sw.js and kept using its old fallback
+  // title ('עדכון פנימייה'). A fresh filename forces iOS to fetch new SW,
+  // unregister the old one, and apply the new push handler with proper
+  // titles. updateViaCache:'none' bypasses HTTP cache too.
+  // Also unregister any leftover /sw.js still living from before the rename.
+  try{var _oldReg=await navigator.serviceWorker.getRegistration('/');if(_oldReg&&_oldReg.active&&_oldReg.active.scriptURL&&_oldReg.active.scriptURL.endsWith('/sw.js'))await _oldReg.unregister();}catch(e){}
+  var reg=await navigator.serviceWorker.register('/sw-v3.js',{updateViaCache:'none'});
+  try{await reg.update();}catch(e){}
   await navigator.serviceWorker.ready;
   // reuse an existing subscription if there is one, otherwise create fresh
   var sub=await reg.pushManager.getSubscription();

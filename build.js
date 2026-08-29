@@ -58,11 +58,11 @@ fs.writeFileSync(distPath, html, 'utf8');
 
 // service worker for web push - must be served at root scope so it can
 // intercept push events for the whole PWA
-const swSrc = path.join(__dirname, 'src', 'sw.js');
+const swSrc = path.join(__dirname, 'src', 'sw-v3.js');
 if (fs.existsSync(swSrc)) {
   const sw = applyReplacements(fs.readFileSync(swSrc, 'utf8'));
-  fs.writeFileSync(path.join(distDir, 'sw.js'), sw, 'utf8');
-  console.log('Wrote dist/sw.js with Firebase config injected.');
+  fs.writeFileSync(path.join(distDir, 'sw-v3.js'), sw, 'utf8');
+  console.log('Wrote dist/sw-v3.js with Firebase config injected.');
 }
 
 // copy static assets (printable PDFs the app links to from the dashboard)
