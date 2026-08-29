@@ -140,21 +140,9 @@ button,input,textarea,select{font-family:'Heebo',sans-serif;outline:none}
     Hero: clock left, date+status right, side by side.
     Body: three columns of unrelated content, top-aligned so a tall
     "live workflow" list doesn't stretch neighbours. */
- .home-dash .hm-hero{display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:22px 28px;background:linear-gradient(135deg,var(--s2) 0%,var(--s1) 100%);border:1px solid var(--bm);border-radius:18px;margin-bottom:14px;direction:rtl;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+ .home-dash .hm-hero{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;padding:20px 24px;background:linear-gradient(135deg,var(--s2),var(--s1));border:1px solid var(--bm);border-radius:16px;margin-bottom:14px;direction:rtl}
  .home-dash .hm-hero-clock{text-align:center;padding-left:24px;border-left:1px solid var(--bd)}
- .home-dash .hm-hero-clock #hmClk{font-size:64px!important;background:linear-gradient(180deg,var(--go),#e6c363);-webkit-background-clip:text;background-clip:text;color:transparent!important}
  .home-dash .hm-hero-date{padding-right:8px}
- /* KPI row - 4 big metric cards spanning full width below hero */
- .home-dash .hm-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;direction:rtl}
- .home-dash .hm-kpi{background:linear-gradient(160deg,var(--s2),var(--s1));border:1px solid var(--bm);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;transition:transform .15s,border-color .15s,box-shadow .15s;position:relative;overflow:hidden}
- .home-dash .hm-kpi::before{content:'';position:absolute;top:0;right:0;left:0;height:3px;background:var(--go);opacity:.35}
- .home-dash .hm-kpi-clickable{cursor:pointer}
- .home-dash .hm-kpi-clickable:hover{transform:translateY(-2px);border-color:var(--bm);box-shadow:0 6px 16px rgba(0,0,0,.25)}
- .home-dash .hm-kpi-icon{font-size:22px;line-height:1;margin-bottom:6px}
- .home-dash .hm-kpi-num{font-size:36px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;margin-bottom:4px}
- .home-dash .hm-kpi-of{font-size:16px;font-weight:600;color:var(--t2);margin-right:2px}
- .home-dash .hm-kpi-lbl{font-size:13px;color:var(--t1);font-weight:600;margin-bottom:6px}
- .home-dash .hm-kpi-hint{font-size:12px;font-weight:600;margin-top:auto}
  .home-dash .hm-body{display:grid;grid-template-columns:0.95fr 1.05fr 1.15fr;gap:14px;align-items:start;direction:rtl}
  .home-dash .hm-col{display:flex;flex-direction:column;gap:8px;min-width:0}
  .home-dash .hm-col > *{margin-bottom:0!important}
@@ -1344,17 +1332,14 @@ function rHm(){
  else hero+='<div style="margin-top:8px">'+cH('var(--gr)','var(--grd)','✓ יום ישיבה')+'</div>';
  if(_nx&&!_off){var _dd=Math.round((new Date(_nx)-new Date(_t))/864e5);hero+='<div style="font-size:12px;color:var(--t2);margin-top:6px">החופשה הבאה: '+(YOFF[_nx]||isSchoolHoliday(_nx))+' · בעוד '+_dd+' ימים</div>';}
  hero+='</div></div>';
- // ── KPI ROW: big prominent metric cards, spans full width below hero ──
- var depPct=ac.length?Math.round(dc/ac.length*100):0;
- var depCol=depPct>=80?'var(--gr)':depPct>=50?'var(--am)':'var(--rd)';
- var kpis='<div class="hm-kpis">';
- kpis+='<div class="hm-kpi hm-kpi-clickable" onclick="go(\'phones\')"><div class="hm-kpi-icon" style="color:'+depCol+'">📱</div><div class="hm-kpi-num" style="color:'+depCol+'">'+dc+'<span class="hm-kpi-of">/'+ac.length+'</span></div><div class="hm-kpi-lbl">הפקידו טלפון</div>'+(mc>0?'<div class="hm-kpi-hint" style="color:var(--rd)">'+mc+' חסרים</div>':'<div class="hm-kpi-hint" style="color:var(--gr)">הכל הפקידו ✓</div>')+'</div>';
- kpis+='<div class="hm-kpi hm-kpi-clickable" onclick="go(\'writing\')"><div class="hm-kpi-icon" style="color:'+(wLt>0?'var(--rd)':wWt>0?'var(--am)':'var(--gr)')+'">📝</div><div class="hm-kpi-num" style="color:'+(wLt>0?'var(--rd)':wWt>0?'var(--am)':'var(--gr)')+'">'+(wWt+wLt)+'</div><div class="hm-kpi-lbl">משימות כתיבה</div>'+(wLt>0?'<div class="hm-kpi-hint" style="color:var(--rd)">'+wLt+' באיחור</div>':wWt>0?'<div class="hm-kpi-hint" style="color:var(--am)">'+wWt+' ממתינות</div>':'<div class="hm-kpi-hint" style="color:var(--gr)">אין פתוחות ✓</div>')+'</div>';
- kpis+='<div class="hm-kpi hm-kpi-clickable" onclick="go(\'tasks\')"><div class="hm-kpi-icon" style="color:'+(otk>0?'var(--am)':'var(--gr)')+'">📋</div><div class="hm-kpi-num" style="color:'+(otk>0?'var(--am)':'var(--gr)')+'">'+otk+'</div><div class="hm-kpi-lbl">משימות פתוחות</div>'+(otk>0?'<div class="hm-kpi-hint" style="color:var(--t2)">לחץ לצפייה</div>':'<div class="hm-kpi-hint" style="color:var(--gr)">הכל סגור ✓</div>')+'</div>';
- kpis+='<div class="hm-kpi"><div class="hm-kpi-icon" style="color:var(--bl)">👥</div><div class="hm-kpi-num" style="color:var(--bl)">'+D.pb.length+'</div><div class="hm-kpi-lbl">בחורים רשומים</div><div class="hm-kpi-hint" style="color:var(--t2)">'+ac.length+' פעילים היום</div></div>';
- kpis+='</div>';
- // ── COL A: daily actions ──
+ // ── COL A: stats + daily actions ──
  var colA='';
+ colA+='<div class="hm-stats">';
+ colA+='<div class="C hm-stat" style="cursor:pointer" onclick="go(\'phones\')"><div class="hm-stat-l">📱 הפקדות</div><div class="hm-stat-r">'+cH('var(--gr)','var(--grd)',dc+'')+cH('var(--rd)','var(--rdd)',mc+' חסר')+'</div></div>';
+ colA+='<div class="C hm-stat" style="cursor:pointer" onclick="go(\'writing\')"><div class="hm-stat-l">📝 כתיבה</div><div class="hm-stat-r">'+cH('var(--am)','var(--amd)',wWt+' ממתין')+cH('var(--rd)','var(--rdd)',wLt+' איחור')+'</div></div>';
+ colA+='<div class="C hm-stat" style="cursor:pointer" onclick="go(\'tasks\')"><div class="hm-stat-l">📋 משימות</div><div class="hm-stat-r">'+cH(otk>0?'var(--am)':'var(--gr)',otk>0?'var(--amd)':'var(--grd)',otk>0?otk+' פתוחות':'✓ אין')+'</div></div>';
+ colA+='<div class="C hm-stat"><div class="hm-stat-l">👥 בחורים</div><div class="hm-stat-r">'+cH('var(--t0)','var(--s3)',D.pb.length+' רשומים')+'</div></div>';
+ colA+='</div>';
  // Daily actions grouped in a single card with mini-sections
  colA+='<div class="C hm-actions"><div class="hm-actions-title">🗓 פעולות היום</div>';
  colA+='<div class="hm-actgrid">';
@@ -1476,7 +1461,6 @@ function rHm(){
  // ── Assemble ──
  let h='<div class="P"><div class="H"><span style="font-weight:800;font-size:20.4px;color:var(--t0)">🏠 דשבורד</span><div style="width:60px"></div></div><div class="S home-dash" style="padding:10px 12px 100px">';
  h+=hero;
- h+=kpis;
  h+='<div class="hm-body"><section class="hm-col hm-col-a">'+colA+'</section><section class="hm-col hm-col-b">'+colB+'</section><section class="hm-col hm-col-c">'+colC+'</section></div>';
  h+='<div id="reportPreview"></div>';
  if(D._lastAutoBackup)h+='<div style="text-align:center;margin-top:10px;font-size:12px;color:var(--t2)">💾 גיבוי אוטומטי: '+fm(D._lastAutoBackup)+'</div>';
