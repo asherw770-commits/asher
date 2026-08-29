@@ -269,10 +269,16 @@ async function enableNotifications(){
   // device. Was letting the user accumulate 2-3 stale endpoints per phone
   // (from previous enable/disable cycles or PWA reinstalls) — each cron
   // fire hit ALL of them, so the same notification arrived 2-3 times.
+  // Match on deviceId (new entries) AND on user-agent string (legacy
+  // entries without deviceId), so old duplicates from before this fix
+  // also get cleaned out on the next enable.
   var myId=_getDeviceId();
+  var myUA=navigator.userAgent.slice(0,80);
   Object.keys(D._pushSubs).forEach(function(k){
-   var e=D._pushSubs[k];
-   if(k!==key && e && e.deviceId===myId) delete D._pushSubs[k];
+   if(k===key)return;
+   var e=D._pushSubs[k];if(!e)return;
+   if(e.deviceId===myId){delete D._pushSubs[k];return;}
+   if(!e.deviceId && e.device===myUA){delete D._pushSubs[k];return;}
   });
   D._pushSubs[key]={sub:subJson,device:navigator.userAgent.slice(0,80),deviceId:myId,at:Date.now()};
   sv();

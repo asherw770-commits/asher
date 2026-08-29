@@ -68,7 +68,16 @@ async function sendToAll(title, body, opts) {
     const sub = subs[key] && subs[key].sub;
     if (!sub || !sub.endpoint) { deadKeys.push(key); continue; }
     try {
-      await webpush.sendNotification(sub, payload);
+      // TTL=86400 (24h): if the device is offline/asleep, Apple's push server
+      // will retry delivery for a day instead of dropping after the default
+      // 4h. urgency='high' bypasses iOS's "save battery, delay push" mode so
+      // the reminder wakes the phone instantly even from a locked/idle state.
+      // These headers are what makes a closed PWA actually receive the push.
+      await webpush.sendNotification(sub, payload, {
+        TTL: 86400,
+        urgency: 'high',
+        topic: (opts && opts.tag ? String(opts.tag).slice(0, 32).replace(/[^A-Za-z0-9]/g, '') : undefined)
+      });
       result.sent++;
     } catch (e) {
       result.failed++;
