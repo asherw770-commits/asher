@@ -4538,24 +4538,10 @@ function markTaskDone(id){D.tk.forEach(t=>{if(t.id===id)t.dn=new Date().toISOStr
 // task-deadline reminders — send as a push instead of an in-app toast so
 // they land even when the app is closed and don't clutter the UI when open
 function checkTaskAlerts(){
- if(!D||!D.tk)return;
- // Client-side redundant check. The primary path is the server cron
- // /api/task-alerts (every 10 min) which fires even when no device is
- // open. Client also checks so an active device catches the alert at the
- // exact minute rather than waiting up to 10 min for the next cron sweep.
- // Both sides share D._notifiedTasks[taskId] to avoid double-firing.
- if(!D._notifiedTasks)D._notifiedTasks={};
- D.tk.filter(function(t){return!t.dn&&t.alertAt;}).forEach(function(t){
-  if(D._notifiedTasks[t.id])return;
-  var at=new Date(t.alertAt),now=new Date();
-  if(now>=at&&(now-at)<60000){
-   D._notifiedTasks[t.id]=new Date().toISOString();
-   sv({bg:true});
-   var _tTitle=t.tx?('🔔 '+t.tx):'🔔 תזכורת';
-   var _tBody=t.ps?('👤 '+t.ps):'';
-   try{fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:_tTitle,body:_tBody,tag:'task-'+t.id,url:'/?page=tasks'})}).catch(function(){});}catch(e){}
-  }
- });
+ // Client-side firing DISABLED. Server cron (cron-job.org → /api/task-alerts,
+ // every minute) is now the sole trigger. Client used to fire too, and ~30s
+ // apart from the server — iOS was showing both instead of deduping by tag.
+ return;
 }
 function closeBanner(){var b=document.getElementById('floatBanner');if(b)b.remove();}
 function showBanner(msg,dur){
