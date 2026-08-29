@@ -16,7 +16,17 @@ self.addEventListener('push', function(event) {
     icon: '/assets/icon-192.png',
     badge: '/assets/icon-192.png',
     tag: data.tag || 'yeshiva-push',
-    data: data
+    data: data,
+    // Sound + vibration: silent:false ensures iOS/Android plays the default
+    // notification sound (system-configured per app). Vibrate pattern is
+    // ignored on iOS PWAs but works on Android/desktop Chrome. renotify:
+    // true forces the notification to alert again even if a previous one
+    // with the same tag exists — otherwise a repeat push replaces silently.
+    silent: false,
+    vibrate: [200, 100, 200, 100, 400],
+    renotify: true,
+    requireInteraction: false,
+    timestamp: Date.now()
   };
   // iOS 16.4+ can render actions; if not shown, tapping the notification
   // still opens the app which handles snooze via URL param fallback

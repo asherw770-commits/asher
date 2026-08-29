@@ -265,7 +265,16 @@ async function enableNotifications(){
   var subJson=sub.toJSON();
   var key=subJson.endpoint;
   if(!D._pushSubs)D._pushSubs={};
-  D._pushSubs[key]={sub:subJson,device:navigator.userAgent.slice(0,80),at:Date.now()};
+  // Dedupe: remove any OTHER subscription entries that belong to the same
+  // device. Was letting the user accumulate 2-3 stale endpoints per phone
+  // (from previous enable/disable cycles or PWA reinstalls) — each cron
+  // fire hit ALL of them, so the same notification arrived 2-3 times.
+  var myId=_getDeviceId();
+  Object.keys(D._pushSubs).forEach(function(k){
+   var e=D._pushSubs[k];
+   if(k!==key && e && e.deviceId===myId) delete D._pushSubs[k];
+  });
+  D._pushSubs[key]={sub:subJson,device:navigator.userAgent.slice(0,80),deviceId:myId,at:Date.now()};
   sv();
   alert('✅ התראות הופעלו בהצלחה!\nהמכשיר הזה רשום ויקבל התראות.');
  }catch(e){alert('שגיאה: '+(e.code||e.message||e));}

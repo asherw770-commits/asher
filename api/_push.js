@@ -52,7 +52,19 @@ async function sendToAll(title, body, opts) {
   const payload = JSON.stringify(Object.assign({ title: title, body: body }, opts || {}));
   const result = { sent: 0, failed: 0, pruned: 0 };
   const deadKeys = [];
+  // Per-device dedupe: if two entries share the same deviceId, keep only
+  // the newest (latest `at`). Legacy entries without deviceId are treated
+  // as unique so we don't accidentally drop them.
+  const bestByDevice = {};
   for (const key of Object.keys(subs)) {
+    const e = subs[key]; if (!e) continue;
+    const did = e.deviceId || ('_legacy:' + key);
+    const at = e.at || 0;
+    if (!bestByDevice[did] || bestByDevice[did].at < at) bestByDevice[did] = { key, at };
+  }
+  const allowedKeys = new Set(Object.values(bestByDevice).map(x => x.key));
+  for (const key of Object.keys(subs)) {
+    if (!allowedKeys.has(key)) { deadKeys.push(key); continue; }
     const sub = subs[key] && subs[key].sub;
     if (!sub || !sub.endpoint) { deadKeys.push(key); continue; }
     try {
