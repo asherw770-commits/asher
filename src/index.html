@@ -4279,7 +4279,10 @@ const bed=(D.boyBed||{})[nm]||'';
 const st=gS(nm);
 const stLbl=st==='conf'?'📵 מוחרם':st==='np'?'ללא טלפון':st==='away'?'🏠 לא נמצא':'✓ פעיל';
 const stClr=st==='conf'?'var(--rd)':st==='np'?'var(--t2)':st==='away'?'var(--am)':'var(--gr)';
-let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px">'+aH(nm,44,15)+'<div><div style="font-size:21.6px;font-weight:800;color:var(--t0)">'+es(nm)+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap">'+(room?'<span style="font-size:12.0px;color:var(--t2);background:var(--s3);padding:2px 7px;border-radius:8px">חדר '+es(room)+(bed?' · מיטה '+es(bed):'')+'</span>':'')+'<span style="font-size:12.0px;color:'+stClr+';background:var(--s3);padding:2px 7px;border-radius:8px;font-weight:700">'+stLbl+'</span></div></div></div></div>';
+const _inact=isInactive(nm);
+let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:10px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px">'+aH(nm,44,15)+'<div><div style="font-size:21.6px;font-weight:800;color:var(--t0)">'+es(nm)+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap">'+(room?'<span style="font-size:12.0px;color:var(--t2);background:var(--s3);padding:2px 7px;border-radius:8px">חדר '+es(room)+(bed?' · מיטה '+es(bed):'')+'</span>':'')+'<span style="font-size:12.0px;color:'+stClr+';background:var(--s3);padding:2px 7px;border-radius:8px;font-weight:700">'+stLbl+'</span>'+(_inact?'<span style="font-size:12px;color:var(--am);background:var(--amd);padding:2px 7px;border-radius:8px;font-weight:700">📴 לא פעיל</span>':'')+'</div></div></div>'
+ +'<button style="padding:7px 12px;border-radius:8px;background:'+(_inact?'var(--grd)':'var(--amd)')+';border:1px solid '+(_inact?'rgba(34,197,94,.35)':'rgba(245,158,11,.35)')+';color:'+(_inact?'var(--gr)':'var(--am)')+';font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="toggleInactive(\''+jq(nm)+'\')">'+(_inact?'🟢 החזר לפעיל':'📴 סמן כלא פעיל')+'</button>'
+ +'</div>';
 // ===== NEW hero: overall reliability ring + quick-facts chip strip =====
 // computed independently and up front, kept simple on purpose so it can't
 // disagree with the detailed sections further down (same underlying data,
@@ -5079,6 +5082,18 @@ return sLN(a.name,b.name)}).forEach(s=>{const ls3=lS(s.id),sc2=D.cx.filter(x=>x.
 h+='<div class="C" style="cursor:pointer" onclick="cvI=\''+s.id+'\';cvV=\'stud\';go(\'cv\')"><div style="display:flex;align-items:center;gap:9px">'+aH(s.name,32,11)+'<div style="flex:1"><div style="font-size:16.8px;font-weight:500;color:var(--t0)">'+s.name+'</div><div style="font-size:13.2px;color:var(--t2)">'+sc2+' שיחות'+(ls3?' · '+fmR(ls3.dt):'')+'</div></div></div></div>'});
 h+='</div></div>';return h}
 h+='<div class="S" style="padding:8px 12px 100px;direction:rtl">';
+// Copy-all-conversations toolbar — mirrors the per-boy one, but the image
+// bundles conversations for every boy in the selected period.
+{var _capAll=window._cvCopyAllPeriod||'week';
+ h+='<div class="C" style="margin-bottom:8px;padding:10px 12px">'
+  +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+  +'<div style="font-size:13.2px;font-weight:700;color:var(--t1)">📸 העתק שיחות של כולם:</div>'
+  +'<div style="display:flex;gap:4px;flex-wrap:wrap">'
+  +[['week','שבוע'],['month','חודש'],['3month','3 חודשים'],['all','הכל']].map(function(p){return '<button class="fb'+(_capAll===p[0]?' on':'')+'" style="font-size:12.6px;padding:5px 10px" onclick="window._cvCopyAllPeriod=\''+p[0]+'\';rr()">'+p[1]+'</button>';}).join('')
+  +'</div>'
+  +'<button style="margin-right:auto;padding:7px 14px;border-radius:8px;background:var(--go);border:none;color:#0a0f1c;font-size:13.2px;font-weight:800;cursor:pointer" onclick="copyAllConversationsAsImage(\''+_capAll+'\')">📸 העתק</button>'
+  +'</div></div>';
+}
 h+=cvDash();
 // Dashboard - open tasks
 const openCI=D.ci.filter(i=>i.st==='open').sort((a,b)=>{if(a.mvb&&!b.mvb)return 1;if(!a.mvb&&b.mvb)return -1;if(a.mvb&&b.mvb)return a.mvb-b.mvb;return 0});
@@ -5098,7 +5113,10 @@ h+='</div></div>';return h}
 function rCSt(s){const sx=[...D.cx].filter(x=>x.si===s.id).sort((a,b)=>b.dt.localeCompare(a.dt)),ls2=sx[0]||null,tm=sx.reduce((a,e)=>a+(e.du||0),0);
 let h='<div class="P" style="direction:ltr"><div class="H" style="direction:rtl"><button class="B" onclick="cvV=\'list\';go(\'cv\')">← חזור</button><span style="font-weight:800;font-size:20.4px;color:var(--t0)">'+s.name+'</span><div style="width:60px"></div></div><div class="S" style="padding:8px 12px 100px;direction:rtl">';
 const isArch2=!!(D.archive&&D.archive.includes(s.name));
-h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:8px"><div style="width:42px;height:42px;border-radius:50%;background:var(--gd);border:2px solid var(--go);color:var(--go);font-size:21.6px;font-weight:700;display:flex;align-items:center;justify-content:center">'+s.name[0]+'</div><div style="flex:1"><div style="font-weight:700;font-size:21.6px">'+s.name+'</div><div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">'+cH('var(--go)','var(--gd)',sx.length+' שיחות')+cH('var(--go)','var(--gd)',tm+' דק׳')+(ls2?cH('var(--t2)','var(--s3)','אחרון: '+fm(ls2.dt)):'')+'</div></div></div>';
+var _inactS=isInactive(s.name);
+h+='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap"><div style="width:42px;height:42px;border-radius:50%;background:var(--gd);border:2px solid var(--go);color:var(--go);font-size:21.6px;font-weight:700;display:flex;align-items:center;justify-content:center">'+s.name[0]+'</div><div style="flex:1;min-width:150px"><div style="font-weight:700;font-size:21.6px">'+s.name+'</div><div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">'+cH('var(--go)','var(--gd)',sx.length+' שיחות')+cH('var(--go)','var(--gd)',tm+' דק׳')+(ls2?cH('var(--t2)','var(--s3)','אחרון: '+fm(ls2.dt)):'')+(_inactS?cH('var(--am)','var(--amd)','📴 לא פעיל'):'')+'</div></div>'
+ +'<button style="padding:7px 12px;border-radius:8px;background:'+(_inactS?'var(--grd)':'var(--amd)')+';border:1px solid '+(_inactS?'rgba(34,197,94,.35)':'rgba(245,158,11,.35)')+';color:'+(_inactS?'var(--gr)':'var(--am)')+';font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="toggleInactive(\''+jq(s.name)+'\')">'+(_inactS?'🟢 החזר לפעיל':'📴 סמן כלא פעיל')+'</button>'
+ +'</div>';
 // Notes
 h+='<div class="C" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-weight:700;font-size:15.6px;color:var(--t0)">📒 הערות</span><button style="background:none;border:none;color:var(--go);cursor:pointer;font-size:14.4px;font-weight:600" onclick="var n=prompt(\'הערות:\',\''+es(s.notes).replace(/'/g,"\\'")+'\');if(n!==null){D.cs.forEach(x=>{if(x.id===\''+s.id+'\')x.notes=n});sv();rr()}">ערוך</button></div>'+(s.notes?'<div style="font-size:15.6px;color:var(--t1)">'+es(s.notes)+'</div>':'<div style="font-size:15.6px;color:var(--t2)">אין הערות</div>')+'</div>';
 // Star cards
@@ -5188,6 +5206,75 @@ function _loadH2C(){
   s.onerror=function(){rej(new Error('לא הצלחתי לטעון html2canvas'));};
   document.head.appendChild(s);
  });
+}
+// Copy ALL boys' conversations for a period into one big mobile-shaped
+// image. Boys are grouped by name; only boys with at least one
+// conversation in the period appear. Same clipboard + fallback flow as
+// the per-boy version.
+async function copyAllConversationsAsImage(period){
+ var cutoff=null;
+ if(period==='week'){var d=new Date();d.setDate(d.getDate()-7);cutoff=isoLocal(d);}
+ else if(period==='month'){var d=new Date();d.setDate(d.getDate()-30);cutoff=isoLocal(d);}
+ else if(period==='3month'){var d=new Date();d.setDate(d.getDate()-90);cutoff=isoLocal(d);}
+ // Group conversations by boy
+ var byBoy={};
+ (D.cx||[]).forEach(function(x){
+  if(cutoff&&x.dt<cutoff)return;
+  var st=(D.cs||[]).find(function(s){return s.id===x.si;});
+  if(!st)return;
+  if(!byBoy[st.id])byBoy[st.id]={name:st.name,sessions:[]};
+  byBoy[st.id].sessions.push(x);
+ });
+ var boys=Object.values(byBoy).map(function(g){g.sessions.sort(function(a,b){return b.dt.localeCompare(a.dt);});return g;});
+ boys.sort(function(a,b){return sLN(a.name,b.name);});
+ if(!boys.length){alert('אין שיחות בטווח הזה');return;}
+ showBanner('📸 מכין תמונה של '+boys.length+' בחורים...',3000);
+ try{var h2c=await _loadH2C();}catch(e){alert('לא הצלחתי לטעון את המנוע: '+(e.message||e));return;}
+ var wrap=document.createElement('div');
+ wrap.style.cssText='position:fixed;left:-9999px;top:0;width:390px;background:#f4efe6;padding:16px;font-family:Heebo,Arial,sans-serif;direction:rtl;color:#111;box-sizing:border-box';
+ var pdLbl={week:'שבוע אחרון',month:'חודש אחרון','3month':'3 חודשים אחרונים',all:'הכל'}[period]||period;
+ var totalSess=boys.reduce(function(a,g){return a+g.sessions.length;},0);
+ var html='<div style="background:#c9a84c;color:#0a0f1c;padding:14px 14px;border-radius:12px 12px 0 0;text-align:center">'
+  +'<div style="font-size:22px;font-weight:800">💬 שיחות</div>'
+  +'<div style="font-size:12px;font-weight:600;opacity:.85;margin-top:4px">'+es(pdLbl)+' · '+boys.length+' בחורים · '+totalSess+' שיחות</div>'
+  +'</div>';
+ html+='<div style="background:#fff;padding:0 12px 12px;border-radius:0 0 12px 12px">';
+ boys.forEach(function(g,gi){
+  html+='<div style="padding:10px 0;'+(gi<boys.length-1?'border-bottom:2px solid #c9a84c':'')+'">'
+   +'<div style="font-size:16px;font-weight:800;color:#c9a84c;margin-bottom:6px">'+es(g.name)+' <span style="font-size:11px;color:#6b7280;font-weight:600">('+g.sessions.length+' שיחות)</span></div>';
+  g.sessions.forEach(function(ss,si){
+   html+='<div style="padding:8px 0 6px;'+(si<g.sessions.length-1?'border-bottom:1px solid #e5e7eb':'')+'">'
+    +'<div style="font-size:12px;font-weight:700;color:#374151">📅 '+es(fm(ss.dt))+(ss.du?' · '+ss.du+' דק׳':'')+'</div>';
+   if(ss.sm)html+='<div style="font-size:13px;color:#111;margin-top:4px;line-height:1.5;white-space:pre-wrap">'+es(ss.sm)+'</div>';
+   if(ss.np&&ss.np.length){
+    html+='<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #d1d5db"><div style="font-size:10px;font-weight:700;color:#c9a84c;margin-bottom:2px">🔍 לשיחה הבאה:</div>';
+    ss.np.forEach(function(p){html+='<div style="font-size:12px;color:#374151;margin-bottom:1px">• '+es(p)+'</div>';});
+    html+='</div>';
+   }
+   html+='</div>';
+  });
+  html+='</div>';
+ });
+ html+='</div>';
+ html+='<div style="text-align:center;font-size:10px;color:#6b7280;margin-top:8px">ניהול ישיבה · '+new Date().toLocaleDateString('he-IL')+'</div>';
+ wrap.innerHTML=html;
+ document.body.appendChild(wrap);
+ try{
+  var canvas=await h2c(wrap,{backgroundColor:'#f4efe6',scale:2,logging:false,useCORS:true});
+  canvas.toBlob(async function(blob){
+   if(!blob){alert('שגיאה בהמרת תמונה');document.body.removeChild(wrap);return;}
+   try{
+    await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+    showBanner('✅ התמונה הועתקה — הדבק בוואטסאפ',4000);
+   }catch(e){
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download='כל-השיחות-'+period+'.png';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    showBanner('⬇️ התמונה הורדה',4000);
+   }
+   document.body.removeChild(wrap);
+  },'image/png');
+ }catch(e){document.body.removeChild(wrap);alert('שגיאה: '+(e.message||e));}
 }
 async function copyConversationsAsImage(sid,period){
  var s=D.cs.find(function(x){return x.id===sid;});
