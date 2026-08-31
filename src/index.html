@@ -943,7 +943,7 @@ function heal(){
  ['pb','wt','wh','cs','cx','ci','tk','archive'].forEach(function(k){
   if(!Array.isArray(D[k])){D[k]=Array.isArray(d[k])?d[k]:[];fixed++;}
  });
- ['pt','ptA','ph','phA','ps','boyRoom','boyBed','rooms','_confiscate','_returnDue','_confCount','phLate','phLateA','bwLate','loOut','_omrGrids','prt','lockStatus','upperLock','sleepTables','_sleepAlerts','cleanStatus','roomClean','floorLateAM','floorLatePM','dayStatus','reportTalks','_barcodeMap']
+ ['pt','ptA','ph','phA','ps','boyRoom','boyBed','rooms','_confiscate','_returnDue','_confCount','phLate','phLateA','bwLate','loOut','roomTalk','_omrGrids','prt','lockStatus','upperLock','sleepTables','_sleepAlerts','cleanStatus','roomClean','floorLateAM','floorLatePM','dayStatus','reportTalks','_barcodeMap','_inactiveBoys']
   .forEach(function(k){
    if(D[k]===null||D[k]===undefined||typeof D[k]!=='object'||Array.isArray(D[k])){
     D[k]=(d[k]&&typeof d[k]==='object'&&!Array.isArray(d[k]))?d[k]:{};fixed++;}
@@ -1931,7 +1931,7 @@ function _omrScan(g,W,H,grid){
    if(X<0||Y<0||X>=W||Y>=H)return -1;return g[Y*W+X];};
  var res={phones_deposited:[],phones_late:[],phones_home:[],writing_done:[],
    afternoon_10sh:[],lights_outside:[],lights_10sh:[],bowls_ok:[],bowls_late:[],
-   bowls_5sh:[],extra_chapters:[]};
+   bowls_5sh:[],extra_chapters:[],room_talk:[]};
  var hit=0,tot=0,unsure=[];
  grid.forEach(function(gi){
   if(gi.px==null||gi.pw==null)return; tot++;
@@ -1997,6 +1997,7 @@ function _omrScan(g,W,H,grid){
   else if(t==='bw_late')res.bowls_late.push(gi.name);
   else if(t==='bw_5sh')res.bowls_5sh.push(gi.name);
   else if(t==='ex_ch')res.extra_chapters.push({name:gi.name,chapter:gi.ch});
+  else if(t==='room_talk')res.room_talk.push(gi.name);
  });
  res._marks=true; res._cells=tot; res._hits=hit; res._unsure=unsure;
  res._rot=m.rot||0;
@@ -2163,7 +2164,7 @@ const img=new Image();img.onload=function(){
   const grid=D._omrGrid||[];
   const result={phones_deposited:[],phones_late:[],phones_home:[],writing_done:[],
     afternoon_10sh:[],lights_outside:[],lights_10sh:[],bowls_ok:[],bowls_late:[],
-    bowls_5sh:[],extra_chapters:[]};
+    bowls_5sh:[],extra_chapters:[],room_talk:[]};
   
   grid.forEach(gi=>{
     const tX=gi.px*W,tY=gi.py*H;
@@ -2271,7 +2272,7 @@ const img=new Image();img.onload=function(){
   // For each grid item, find the matching cell and check if marked
   const result={phones_deposited:[],phones_late:[],phones_home:[],writing_done:[],
     afternoon_10sh:[],lights_outside:[],lights_10sh:[],bowls_ok:[],bowls_late:[],
-    bowls_5sh:[],extra_chapters:[]};
+    bowls_5sh:[],extra_chapters:[],room_talk:[]};
   
   // Match by approximate position
   grid.forEach(gi=>{
@@ -2360,6 +2361,8 @@ actions.push(function(){r.bowls_5sh.forEach(function(nm){_mk(nm,'5ש','איחו�
 // 6. Extra chapters
 if(r.extra_chapters&&r.extra_chapters.length){changes.push('📝 פרקים נוספים: '+r.extra_chapters.map(e=>e.name+' ('+e.chapter+')').join(', '));
 actions.push(function(){r.extra_chapters.forEach(function(ec){_mk(ec.name,ec.chapter,'פרק נוסף',today);});});}
+if(r.room_talk&&r.room_talk.length){changes.push('🌙 דיברו בחדר אחרי כיבוי אורות: '+r.room_talk.join(', '));
+actions.push(function(){if(!D.roomTalk)D.roomTalk={};D.roomTalk[today]=r.room_talk.slice();});}
 // Show confirmation with preview
 const prev=document.getElementById('reportPreview');
 if(!prev)return;
@@ -2518,6 +2521,12 @@ function applyManual(e,dateISO){
    D.wt.forEach(function(t){if(t.id===id){t.status='done';t.doneAt=new Date().toISOString();}});
    D.wh.forEach(function(t){if(t.id===id){t.status='done';t.doneAt=new Date().toISOString();}});});
  (e.extra_chapters||[]).forEach(function(x){_mk(x.name,x.chapter,'פרק נוסף',dateISO);});
+ // Room-talking after lights out: overwrite the day's entry so re-editing
+ // the same date doesn't accumulate stale names from a previous save.
+ if(e.room_talk&&e.room_talk.length){
+  if(!D.roomTalk)D.roomTalk={};
+  D.roomTalk[day]=e.room_talk.slice();
+ }
  (e.home||e.phones_away||[]).forEach(function(b){if(D.pb.includes(b))D.ps[b]={type:'away'};});
  // only recompute/overwrite D.ph[day] when this save actually touched phone
  // data - otherwise a save that only edited bowls/lights/writing was silently
@@ -2550,7 +2559,7 @@ var MANSEC=[
 ];
 var MANG=[{k:'phones',t:'הפקדות טלפונים'},{k:'after',t:'לא הפקידו צהריים'},
  {k:'bowls',t:'קערה וספל'},{k:'lights',t:'כיבוי אורות'},
- {k:'status',t:'סטטוס'},{k:'writing',t:'משימות כתיבה'},{k:'extra',t:'פרקים נוספים'}];
+ {k:'status',t:'סטטוס'},{k:'writing',t:'משימות כתיבה'},{k:'roomtalk',t:'🌙 דיברו בחדר אחרי כיבוי אורות'},{k:'extra',t:'פרקים נוספים'}];
 var manG='phones';
 function ME(){if(!window._manualEdits)window._manualEdits={};return window._manualEdits;}
 function manHas(k,n){var e=ME()[k];return !!(e&&e.indexOf(n)>=0);}
@@ -2565,6 +2574,7 @@ function manTogT(id){var e=ME();if(!e.writing_done)e.writing_done=[];
  var i=e.writing_done.indexOf(id);if(i>=0)e.writing_done.splice(i,1);else e.writing_done.push(id);keepScroll(rr);}
 function manTogCh(n,ch){var e=ME();if(!e.extra)e.extra=[];var key=n+'|'+ch;
  var i=e.extra.indexOf(key);if(i>=0)e.extra.splice(i,1);else e.extra.push(key);keepScroll(rr);}
+function manTogRoomTalk(n){var e=ME();if(!e.room_talk)e.room_talk=[];var i=e.room_talk.indexOf(n);if(i>=0)e.room_talk.splice(i,1);else e.room_talk.push(n);keepScroll(rr);}
 function manGrp(g){manG=g;keepScroll(rr);}
 function manClear(){window._manualEdits={};keepScroll(rr);}
 function manCount(){var e=ME(),n=0;for(var k in e)if(e[k]&&e[k].length)n+=e[k].length;return n;}
@@ -3236,6 +3246,29 @@ function rMan(){
    +'<div style="font-size:13.2px;color:'+(on?'var(--gr)':'var(--t2)')+';font-weight:700">'+(on?'הביא':'טרם')+'</div></div>';});
   if(pend.length)h+='</div>';
  }
+ else if(manG==='roomtalk'){
+  // New: "Talked in room after lights out" — grouped by room, each boy
+  // gets a single X toggle. Stored under e.room_talk = [name,...] which
+  // applyManual pushes into D.roomTalk[date].
+  var lastRoomRt=null;
+  boys.forEach(function(b){
+   var rm=(D.boyRoom||{})[b]||'—';
+   if(rm!==lastRoomRt){
+    if(lastRoomRt!==null)h+='</div>';
+    lastRoomRt=rm;
+    h+='<div style="font-size:13.2px;font-weight:700;color:var(--t2);margin:10px 2px 5px">חדר '+rm+'</div>';
+    h+='<div class="dcolgrid3">';
+   }
+   var on=(e.room_talk||[]).indexOf(b)>=0;
+   var _histRt=Object.keys(D.roomTalk||{}).filter(function(dt){return(D.roomTalk[dt]||[]).indexOf(b)>=0;}).length;
+   h+='<div onclick="manTogRoomTalk(\''+jq(b)+'\')" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:11px;margin-bottom:6px;border-radius:10px;background:'+(on?'var(--amd)':'var(--s1)')+';border:1px solid '+(on?'rgba(245,158,11,.5)':'var(--bd)')+'">'
+    +'<div style="width:26px;height:26px;border-radius:6px;border:2px solid '+(on?'var(--am)':'var(--bm)')+';background:'+(on?'var(--am)':'transparent')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:16.8px;font-weight:700">'+(on?'✕':'')+'</div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:15.6px;font-weight:600;color:var(--t0)">'+es(b)+'</div>'
+    +(_histRt?'<div style="font-size:12px;color:var(--am);margin-top:2px">🌙 '+_histRt+' פעמים דיבר בעבר</div>':'')
+    +'</div></div>';
+  });
+  if(lastRoomRt!==null)h+='</div>';
+ }
  else if(manG==='extra'){
   var chs=['א','ב','יח','קיט','5ש','10ש'];
   var lastRoomEx=null;
@@ -3870,12 +3903,18 @@ h+='</table></div>';COLS.push(h.slice(_cm));h=h.slice(0,_cm);}
 h+='<div class="col fillcol"><div class="tt">\u05db\u05d9\u05d1\u05d5\u05d9 \u05d0\u05d5\u05e8\u05d5\u05ea</div><table class="big k2"><tr><th style="text-align:right">\u05e9\u05dd</th><th>\u05d7\u05d5\u05e5</th><th>10\u05e9</th></tr>';
 boys.forEach(function(b){h+='<tr><td>'+es(b)+'</td><td'+OM({type:'lo_out',name:b})+' class="cb">\u05d7\u05d5\u05e5</td><td'+OM({type:'lo_10sh',name:b})+' class="cb">10\u05e9</td></tr>';});
 h+='</table></div>';COLS.push(h.slice(_cm));h=h.slice(0,_cm);}
-// Col 6: Extra
+// Col 6: Room talking after lights out \u2014 boys grouped by room, one X
+// checkbox per boy for the ok/talked mark. Replaces the old "\u05e4\u05e8\u05e7\u05d9\u05dd \u05e0\u05d5\u05e1\u05e4\u05d9\u05dd"
+// table at user request.
 {_cm=h.length;
-h+='<div class="col fillcol col-ke"><div class="tt">\u05e4\u05e8\u05e7\u05d9\u05dd \u05e0\u05d5\u05e1\u05e4\u05d9\u05dd</div><table class="big k6 ke"><tr><th style="text-align:right">\u05e9\u05dd</th><th>\u05d0</th><th>\u05d1</th><th>\u05d9\u05d7</th><th>\u05e7\u05d9\u05d8</th><th>5\u05e9</th><th>10\u05e9</th></tr>';
-const exChs=['\u05d0','\u05d1','\u05d9\u05d7','\u05e7\u05d9\u05d8','5\u05e9','10\u05e9'];
-var exBoys=boys.slice();
-exBoys.forEach(function(b){var fam=splitName(b).family;h+='<tr><td>'+es(fam)+'</td>';exChs.forEach(function(ch){h+='<td'+OM({type:'ex_ch',name:b,ch:ch})+' class="cb">'+ch+'</td>';});h+='</tr>';});
+h+='<div class="col fillcol"><div class="tt">\u05d3\u05d9\u05d1\u05d5\u05e8\u05d9\u05dd \u05d1\u05d7\u05d3\u05e8 \u05d0\u05d7\u05e8\u05d9 \u05db\u05d9\u05d1\u05d5\u05d9 \u05d0\u05d5\u05e8\u05d5\u05ea</div><table class="big k6"><tr><th style="text-align:right">\u05e9\u05dd</th><th>\u2715</th></tr>';
+var byRoom={};
+boys.forEach(function(b){var r=(D.boyRoom||{})[b]||'\u2014';(byRoom[r]=byRoom[r]||[]).push(b);});
+var rooms=Object.keys(byRoom).sort(function(a,b){var na=parseInt(a,10),nb=parseInt(b,10);if(isNaN(na))return 1;if(isNaN(nb))return -1;return na-nb;});
+rooms.forEach(function(r){
+ h+='<tr><td colspan="2" style="background:#dde2e8;font-weight:800;text-align:right;font-size:.85em;padding:2px 4px">\u05d7\u05d3\u05e8 '+es(r)+'</td></tr>';
+ byRoom[r].forEach(function(b){h+='<tr><td>'+es(b)+'</td><td'+OM({type:'room_talk',name:b})+' class="cb">\u2715</td></tr>';});
+});
 h+='</table></div>';COLS.push(h.slice(_cm));h=h.slice(0,_cm);}
 h+='<div class="wrap">'+COLS[0]+'<div class="gapsp"></div>'+COLS[1]+'<div class="gapsp"></div>'+COLS[2]+'<div class="foldsp"></div>'+COLS[3]+'<div class="gapsp"></div>'+COLS[4]+'<div class="gapsp"></div>'+COLS[5]+'<div id="foldGuide" style="position:absolute;top:2mm;bottom:2mm;width:0;border-right:0.3mm dashed #c7ccd2"></div></div>';
 h+='</div>';
