@@ -40,22 +40,15 @@ module.exports = async (req, res) => {
     const t = (req.query && req.query.t) || 'af';
 
     if (t === 'pr') {
+      // Fires at 20:00 IL summer (17:00 UTC) on Sat/Sun/Mon/Tue/Wed —
+      // the evening before each Sunday-Thursday yeshiva day. Motzei
+      // Shabbat is covered by the same cron (Sat evening = Sun prep).
       await sendToAll(
-        '🖨 זמן להדפיס דוח יומי',
-        'בוקר טוב! הדפס את הדוח היומי לתחילת היום',
+        '🖨 הדפס דוח יומי למחר',
+        'הדפס עכשיו כדי שיהיה מוכן בבוקר',
         { tag: 'print-report', url: '/?action=print-report' }
       );
       return res.status(200).json({ ok: true, type: 'print' });
-    }
-
-    if (t === 'prS') {
-      // motzei shabbat: prep for tomorrow's opening day
-      await sendToAll(
-        '🖨 דוח יומי ליום ראשון',
-        'שבוע טוב! הדפס דוח יומי למחר',
-        { tag: 'print-report-sat', url: '/?action=print-report' }
-      );
-      return res.status(200).json({ ok: true, type: 'print-motzash' });
     }
 
     if (t === 'af') {

@@ -654,7 +654,10 @@ function _restoreCloudBackup(dateISO){
 }
 // Download a specific backup as a local JSON file, so the user can archive
 // off-cloud copies before, say, wiping the app or handing over the device.
-function _downloadCloudBackup(dateISO){
+async function _downloadCloudBackup(dateISO){
+ // Same gating as expData — a downloaded cloud backup contains the same
+ // full-state snapshot, so it needs the same auth prompt.
+ if(!(await requireAuth('להורדת גיבוי')))return;
  _fbBackupsCol.doc(dateISO).get().then(function(doc){
   if(!doc.exists){alert('לא נמצא גיבוי לתאריך זה');return;}
   var body=doc.data();
@@ -1645,7 +1648,14 @@ async function rmBoyByName(n){
  });
 }
 function editRoom(r){if(!D.rooms)D.rooms={};const cur=(D.rooms[r]||[]).join("\n");const v=prompt("חדר "+r+" — שם אחד בכל שורה:",cur);if(v===null)return;D.rooms[r]=v.split("\n").map(s=>s.trim()).filter(Boolean);sv();rr()}
-function expData(){try{const dt=hF(new Date).replace(/\s/g,'-');const payload={version:1,exportedAt:new Date().toISOString(),data:D};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='yeshiva-backup-'+dt+'.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);alert('הגיבוי הורד בהצלחה!')}catch(e){alert('שגיאה: '+e.message)}}
+async function expData(){
+ // Gated by requireAuth (Face ID / Touch ID / PIN) — the exported JSON
+ // contains every boy's name, room, deposit history, conversations, and
+ // notes; leaking it is meaningful, so we don't want anyone with physical
+ // access to a briefly unlocked device to be able to grab it.
+ if(!(await requireAuth('לייצוא גיבוי')))return;
+ try{const dt=hF(new Date).replace(/\s/g,'-');const payload={version:1,exportedAt:new Date().toISOString(),data:D};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='yeshiva-backup-'+dt+'.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);alert('הגיבוי הורד בהצלחה!')}catch(e){alert('שגיאה: '+e.message)}
+}
 function impData(input){
  const f=input.files&&input.files[0];if(!f)return;
  if(!confirm('ייבוא יחליף את כל הנתונים הקיימים. המשך?')){input.value='';return}
@@ -5212,6 +5222,8 @@ function _loadH2C(){
 // conversation in the period appear. Same clipboard + fallback flow as
 // the per-boy version.
 async function copyAllConversationsAsImage(period){
+ // Conversations contain sensitive personal notes; gate the export.
+ if(!(await requireAuth('לייצוא שיחות')))return;
  var cutoff=null;
  if(period==='week'){var d=new Date();d.setDate(d.getDate()-7);cutoff=isoLocal(d);}
  else if(period==='month'){var d=new Date();d.setDate(d.getDate()-30);cutoff=isoLocal(d);}
@@ -5277,6 +5289,7 @@ async function copyAllConversationsAsImage(period){
  }catch(e){document.body.removeChild(wrap);alert('שגיאה: '+(e.message||e));}
 }
 async function copyConversationsAsImage(sid,period){
+ if(!(await requireAuth('לייצוא שיחות')))return;
  var s=D.cs.find(function(x){return x.id===sid;});
  if(!s){alert('בחור לא נמצא');return;}
  var sx=D.cx.filter(function(x){return x.si===sid;}).sort(function(a,b){return b.dt.localeCompare(a.dt);});
