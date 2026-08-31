@@ -56,7 +56,8 @@ async function loadTasks() {
     cs: fromV(f.cs) || [],
     cx: fromV(f.cx) || [],
     notified: fromV(f._notifiedTasks) || {},
-    convNotified: fromV(f._convNotified) || {}
+    convNotified: fromV(f._convNotified) || {},
+    inactive: fromV(f._inactiveBoys) || {}
   };
 }
 async function writeConvNotified(convNotified) {
@@ -71,7 +72,8 @@ async function writeConvNotified(convNotified) {
 // Compute today's conversation slots (1st/2nd/3rd boys on the queue) using
 // the same sort the client uses: urgent > callback-due > oldest-conversation
 // first. Returns array of 3 boy names.
-function computeConvSlots(cs, cx) {
+function computeConvSlots(cs, cx, inactiveMap) {
+  inactiveMap = inactiveMap || {};
   function lastSess(id) {
     let latest = null;
     for (const s of cx) if (s.si === id) {
@@ -84,6 +86,7 @@ function computeConvSlots(cs, cx) {
   for (const s of cx) if (s.dt === today) talkedToday.add(s.si);
   const ord = cs.slice()
     .filter(s => !talkedToday.has(s.id))
+    .filter(s => !inactiveMap[s.name])
     .sort((a, b) => {
       if (a.urgent && !b.urgent) return -1;
       if (!a.urgent && b.urgent) return 1;
@@ -110,7 +113,7 @@ async function writeNotified(notified) {
 
 module.exports = async (req, res) => {
   try {
-    const { tk, cs, cx, notified, convNotified } = await loadTasks();
+    const { tk, cs, cx, notified, convNotified, inactive } = await loadTasks();
     const now = Date.now();
     // ─── Conversation-slot alerts ────────────────────────────────────────
     // 6 time windows per day (IL time). Each fires once per day thanks to
@@ -120,7 +123,7 @@ module.exports = async (req, res) => {
     const hh = nowIL.getUTCHours();
     const mm = nowIL.getUTCMinutes();
     const dateKey = nowIL.getUTCFullYear() + '-' + String(nowIL.getUTCMonth() + 1).padStart(2, '0') + '-' + String(nowIL.getUTCDate()).padStart(2, '0');
-    const convSlots = computeConvSlots(cs, cx);
+    const convSlots = computeConvSlots(cs, cx, inactive);
     // Reveal notifications: title generic, body prompts to open the app
     // (SW opens /?cvreveal=<slot> which the client renders as a big card).
     const revealHits = [

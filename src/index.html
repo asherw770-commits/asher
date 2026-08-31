@@ -4092,15 +4092,8 @@ h+='<div class="dcolgrid">';
 li.forEach(b=>{const dp=D.pt[b]===true,st=gS(b),s=sk(b),isConf=D&&D._confiscate&&D._confiscate[b]&&new Date(D._confiscate[b].until)>new Date();
 h+='<div class="R" style="background:'+(dp?'rgba(34,197,94,.04)':st!=='normal'?'var(--pud)':'var(--s1)')+';border:1px solid '+(dp?'rgba(34,197,94,.2)':!dp&&st==='normal'?'rgba(239,68,68,.15)':'var(--bd)')+';'+(!dp&&st==='normal'?'border-right:3px solid var(--rd)':'')+'">'+(st==='normal'?'<div style="cursor:pointer;display:flex;align-items:center;gap:9px;flex:1;min-width:0" onclick="tP(\''+jq(b)+'\')">'+aH(b,34,12)+'<div style="flex:1;min-width:0"><div style="font-size:16.8px;font-weight:500;color:var(--t0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+es(b)+'</div><div style="font-size:13.2px;color:'+(isConf?'var(--am)':dp?'var(--gr)':'var(--rd)')+';margin-top:1px">'+(isConf?'📵 מוחרם':dp?'✓ הפקיד':s>0?s+' ימים חוסר':'לא הפקיד')+'</div></div></div>':'<div style="display:flex;align-items:center;gap:9px;flex:1;min-width:0">'+aH(b,34,12)+'<div style="flex:1;min-width:0"><div style="font-size:16.8px;font-weight:500;color:var(--t0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+es(b)+'</div><div style="font-size:13.2px;color:'+(st==='conf'?'var(--pu)':st==='np'?'var(--t2)':st==='away'?'var(--am)':'var(--t2)')+';margin-top:1px">'+(st==='np'?'אין טלפון':st==='conf'?'מוחרם':st==='away'?'לא נמצא':'')+'</div></div></div>')+(s>0&&!dp&&st==='normal'?cH('var(--rd)','var(--rdd)',s+'י׳'):'')+'<div style="display:flex;gap:6px;align-items:center"><button style="padding:4px 8px;border-radius:8px;border:1px solid '+(st==='away'?'rgba(245,158,11,.4)':'var(--bm)')+';background:'+(st==='away'?'var(--amd)':'var(--s3)')+';font-size:13.2px;cursor:pointer;color:'+(st==='away'?'var(--am)':'var(--t2)')+';font-weight:'+(st==='away'?'700':'400')+'" onclick="event.stopPropagation();qSt(\''+jq(b)+'\',\'away\')">🏠 בית</button><button style="padding:4px 8px;border-radius:8px;border:1px solid '+(st==='np'?'rgba(100,116,139,.4)':'var(--bm)')+';background:'+(st==='np'?'rgba(100,116,139,.15)':'var(--s3)')+';font-size:13.2px;cursor:pointer;color:'+(st==='np'?'var(--t0)':'var(--t2)')+';font-weight:'+(st==='np'?'700':'400')+'" onclick="event.stopPropagation();qSt(\''+jq(b)+'\',\'np\')">📵 אין</button><button style="padding:4px 6px;border-radius:8px;border:1px solid var(--bm);background:var(--s3);font-size:13.2px;cursor:pointer;color:var(--t2)" onclick="event.stopPropagation();oPS(\''+jq(b)+'\')">⚙</button></div></div>'});
 h+='</div>'; // close dcolgrid
-if(liInactive.length){
- h+='<div style="margin-top:12px;padding-top:8px;border-top:1px dashed var(--bd)"><div style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--s3);border-radius:8px" onclick="window._inactOpen=!window._inactOpen;rr()"><span style="font-size:14px;color:var(--t2);font-weight:600">📴 לא פעילים ('+liInactive.length+')</span><span style="color:var(--t2)">'+(window._inactOpen?'▲':'▼')+'</span></div>';
- if(window._inactOpen){
-  h+='<div class="dcolgrid" style="margin-top:8px;opacity:.7">';
-  liInactive.forEach(function(b){h+='<div class="R" style="background:var(--s1);border:1px solid var(--bd)"><div style="flex:1;display:flex;align-items:center;gap:9px">'+aH(b,34,12)+'<div style="flex:1"><div style="font-size:15.6px;color:var(--t2)">'+es(b)+'</div><div style="font-size:12px;color:var(--t2)">📴 לא פעיל</div></div></div></div>';});
-  h+='</div>';
- }
- h+='</div>';
-}
+// Inactive boys are NOT shown on the phones page at all - they only live
+// under the conversations page → 'לא פעיל' tab as per user requirement.
 h+='<div style="display:flex;gap:6px;margin-top:8px"><button style="flex:1;height:44px;border-radius:12px;background:var(--bl);color:#fff;font-size:16.8px;font-weight:700;border:none;cursor:pointer" onclick="sPN()">💾 שמור</button><button style="height:44px;padding:0 10px;border-radius:12px;background:var(--rdd);color:var(--rd);font-size:12.0px;font-weight:600;border:1px solid rgba(239,68,68,.25);cursor:pointer" onclick="mAM()">סמן שאר כחסרים</button><button style="height:44px;padding:0 12px;border-radius:12px;background:var(--s3);color:var(--t2);font-size:14.4px;border:1px solid var(--bm);cursor:pointer" onclick="D.pt={};sv();rr()">אפס</button></div>'}
 if(pT==='afternoon'){
 if(!D.ptA)D.ptA={};
@@ -5045,7 +5038,7 @@ else h+='<div style="font-size:14.4px;color:var(--t2)">אין שיחות בתק�
 h+='</div>';return h}
 function rCL(){const tc=D.cx.filter(s=>s.dt===td()).length,uc=D.cs.filter(s=>s.urgent).length;
 const u=D.cs.filter(s=>s.urgent),cb=D.cs.filter(s=>!s.urgent&&s.cb&&s.cb<=td()),rs=D.cs.filter(s=>!s.urgent&&!(s.cb&&s.cb<=td())&&!cT(s.id)),dn=D.cs.filter(s=>!s.urgent&&!(s.cb&&s.cb<=td())&&cT(s.id));
-const ord=[...D.cs].sort((a,b)=>{
+const ord=[...D.cs].filter(function(s){return !isInactive(s.name);}).sort((a,b)=>{
 // Urgent always first
 if(a.urgent&&!b.urgent)return -1;if(!a.urgent&&b.urgent)return 1;
 // Callback next
@@ -5058,8 +5051,21 @@ if(da!==db)return da.localeCompare(db);// oldest first
 return sLN(a.name,b.name)});
 let h='<div class="P" style="direction:ltr"><div class="H" style="direction:rtl"><button class="B" onclick="go(\'phones\')">🔒 נעילה</button><span style="font-weight:800;font-size:20.4px;color:var(--t0)">שיחות</span><div style="width:60px"></div></div>';
 h+='<div style="display:flex;align-items:center;padding:6px 12px;background:var(--bg);border:1px solid var(--bd);margin:0 12px;border-radius:10px;direction:rtl"><div style="flex:1;text-align:center;font-size:15.6px;color:var(--t1)"><b>'+tc+'</b> היום</div><div style="width:1px;height:24px;background:var(--bd)"></div><div style="flex:1;text-align:center;font-size:15.6px;color:'+(uc>0?'var(--rd)':'var(--t1)')+'"><b>'+uc+'</b> דחופים</div><div style="width:1px;height:24px;background:var(--bd)"></div><div style="flex:1;text-align:center;font-size:15.6px;color:var(--t1)"><b>'+D.cs.length+'</b> בחורים</div></div>';
-h+='<div style="display:flex;gap:4px;margin:4px 12px 4px 16px">'+['current','archive'].map(t=>'<button class="fb'+((window._cvArc||false)===(t==="archive")?' on':'')+'" style="flex:1;font-size:14.4px;padding:6px" onclick="window._cvArc='+(t==="archive"?"true":"false")+';rr()">'+(t==='current'?'📋 שוטף':'📦 ארכיון')+'</button>').join('')+'</div>';
-if(window._cvArc&&D.archive&&D.archive.length){
+// Tabs: current | inactive | archive
+var _cvTab=window._cvTab||(window._cvArc?'archive':'current');
+h+='<div style="display:flex;gap:4px;margin:4px 12px 4px 16px">'+[['current','📋 שוטף'],['inactive','📴 לא פעיל'],['archive','📦 ארכיון']].map(function(t){return '<button class="fb'+(_cvTab===t[0]?' on':'')+'" style="flex:1;font-size:14.4px;padding:6px" onclick="window._cvTab=\''+t[0]+'\';window._cvArc='+(t[0]==='archive'?'true':'false')+';rr()">'+t[1]+'</button>';}).join('')+'</div>';
+if(_cvTab==='inactive'){
+ var inactStudents=D.cs.filter(function(s){return isInactive(s.name);});
+ h+='<div class="S" style="padding:8px 12px 100px;direction:rtl"><div class="sl">📴 לא פעילים ('+inactStudents.length+')</div>';
+ if(!inactStudents.length)h+='<div style="text-align:center;color:var(--t2);padding:20px;font-size:15px">אין בחורים לא-פעילים כרגע</div>';
+ h+='<div class="dcolgrid">';
+ inactStudents.sort(function(a,b){return sLN(a.name,b.name);}).forEach(function(s){
+  var ls3=lS(s.id),sc2=D.cx.filter(function(x){return x.si===s.id;}).length;
+  h+='<div class="C" style="opacity:.85"><div style="display:flex;align-items:center;gap:9px">'+aH(s.name,32,11)+'<div style="flex:1;cursor:pointer" onclick="cvI=\''+s.id+'\';cvV=\'stud\';go(\'cv\')"><div style="font-size:16.8px;font-weight:500;color:var(--t0)">'+es(s.name)+'</div><div style="font-size:13.2px;color:var(--t2)">'+sc2+' שיחות'+(ls3?' · '+fmR(ls3.dt):'')+'</div></div><button style="padding:7px 12px;border-radius:8px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:13px;font-weight:700;cursor:pointer" onclick="toggleInactive(\''+jq(s.name)+'\')">🟢 החזר לפעיל</button></div></div>';
+ });
+ h+='</div></div></div>';return h;
+}
+if(_cvTab==='archive'&&D.archive&&D.archive.length){
 const arcStudents=D.cs.filter(s=>D.archive&&D.archive.includes(s.name));
 h+='<div class="S" style="padding:8px 12px 100px;direction:rtl"><div class="sl">📦 ארכיון ('+arcStudents.length+')</div>';
 arcStudents.sort((a,b)=>{
@@ -5433,7 +5439,7 @@ function _computeConvSlots(){
  if(!D||!D.cs)return [null,null,null];
  var today=td();
  var talkedToday=new Set();(D.cx||[]).forEach(function(s){if(s.dt===today)talkedToday.add(s.si);});
- var ord=(D.cs||[]).filter(function(s){return !talkedToday.has(s.id);}).sort(function(a,b){
+ var ord=(D.cs||[]).filter(function(s){return !talkedToday.has(s.id)&&!isInactive(s.name);}).sort(function(a,b){
   if(a.urgent&&!b.urgent)return -1;if(!a.urgent&&b.urgent)return 1;
   var ac=a.cb&&a.cb<=today,bc=b.cb&&b.cb<=today;
   if(ac&&!bc)return -1;if(!ac&&bc)return 1;
