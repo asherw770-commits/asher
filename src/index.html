@@ -5123,6 +5123,19 @@ sTksOp.forEach(c=>{h+='<div style="display:flex;align-items:flex-start;gap:6px;p
 if(sTksDn.length)h+='<div style="font-size:12.0px;font-weight:700;color:var(--t2);margin-top:8px;margin-bottom:4px">הושלמו ('+sTksDn.length+')</div>'+sTksDn.map(c=>'<div style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;opacity:.5"><span style="font-size:14.4px">'+(c.tp==='task'?'✅':'❓')+'</span><div style="flex:1;font-size:14.4px;color:var(--t1);text-decoration:line-through">'+es(c.tx)+'</div><button style="padding:2px 6px;border-radius:5px;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:12.0px;cursor:pointer" onclick="ciReopen(\''+c.id+'\')">↺</button><button style="padding:2px 6px;border-radius:5px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:12.0px;cursor:pointer" onclick="ciDel(\''+c.id+'\')">🗑</button></div>').join('');
 h+='</div>'}
 h+='<div class="sl">היסטוריה</div>';
+// Copy-as-image toolbar: user picks a period, one click renders the
+// conversations of that period as a mobile-sized PNG and copies to the
+// clipboard for pasting into WhatsApp / any other chat.
+{var _cpPd=window._cvCopyPeriod||'month';
+ h+='<div class="C" style="margin-bottom:8px;padding:10px 12px">'
+  +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+  +'<div style="font-size:13.2px;font-weight:700;color:var(--t1)">📸 העתק כתמונה:</div>'
+  +'<div style="display:flex;gap:4px;flex-wrap:wrap">'
+  +[['week','שבוע'],['month','חודש'],['3month','3 חודשים'],['all','הכל']].map(function(p){return '<button class="fb'+(_cpPd===p[0]?' on':'')+'" style="font-size:12.6px;padding:5px 10px" onclick="window._cvCopyPeriod=\''+p[0]+'\';rr()">'+p[1]+'</button>';}).join('')
+  +'</div>'
+  +'<button style="margin-right:auto;padding:7px 14px;border-radius:8px;background:var(--go);border:none;color:#0a0f1c;font-size:13.2px;font-weight:800;cursor:pointer" onclick="copyConversationsAsImage(\''+s.id+'\',\''+_cpPd+'\')">📸 העתק</button>'
+  +'</div></div>';
+}
 if(!sx.length)h+='<div style="color:var(--t2);text-align:center;padding:20px;font-size:15.6px">אין שיחות</div>';
 sx.forEach(ss=>{h+='<div class="ss"><div style="display:flex;gap:6px;align-items:center"><span style="font-weight:700;font-size:14.4px;color:var(--t0)">'+fm(ss.dt)+' ('+fmR(ss.dt)+')</span>'+(ss.du>0?cH('var(--go)','var(--gd)',ss.du+' דק׳'):'')+'<div style="flex:1"></div><button style="padding:2px 6px;border-radius:5px;background:var(--bld);border:1px solid rgba(59,130,246,.2);color:var(--bl);font-size:12.0px;cursor:pointer" onclick="editSess(\''+ss.id+'\')">✏️ ערוך</button><button style="padding:2px 6px;border-radius:5px;background:var(--rdd);border:1px solid rgba(239,68,68,.2);color:var(--rd);font-size:12.0px;cursor:pointer" onclick="if(confirm(\'למחוק שיחה זו לצמיתות?\')){D.cx=D.cx.filter(x=>x.id!==\''+ss.id+'\');sv();rr()}">🗑 מחק</button></div>'+(ss.sm?'<div style="font-size:15.6px;color:var(--t1);margin-top:6px;line-height:1.7;white-space:pre-wrap">'+es(ss.sm)+'</div>':'')+(ss.np&&ss.np.length?'<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--bd)"><div style="font-size:12.0px;font-weight:700;color:var(--go);margin-bottom:3px">🔍 לשיחה הבאה:</div>'+ss.np.map(p=>'<div style="font-size:14.4px;color:var(--t1);margin-bottom:2px">• '+es(p)+'</div>').join('')+'</div>':'')+'</div>'});
 // Photos section
@@ -5154,6 +5167,75 @@ function ciDone(id){_presSc(()=>{D.ci.forEach(x=>{if(x.id===id)x.st='done'});sv(
 function ciReopen(id){_presSc(()=>{D.ci.forEach(x=>{if(x.id===id)x.st='open'});sv();rr()})}
 function ciDel(id){if(!confirm('למחוק משימה זו?'))return;_presSc(()=>{D.ci=D.ci.filter(x=>x.id!==id);sv();rr()})}
 function ciMvB(id){_presSc(()=>{D.ci.forEach(x=>{if(x.id===id)x.mvb=Date.now()});sv();rr()})}
+
+// ─── Copy conversations as image ───
+// Lazy-loads html2canvas from CDN on first use. Builds a mobile-width
+// (390px) offscreen div with the boy's conversations for the chosen
+// period, snapshots it via html2canvas, and copies the PNG to clipboard
+// so the user can paste it directly into WhatsApp.
+function _loadH2C(){
+ if(window.html2canvas)return Promise.resolve(window.html2canvas);
+ return new Promise(function(res,rej){
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+  s.onload=function(){res(window.html2canvas);};
+  s.onerror=function(){rej(new Error('לא הצלחתי לטעון html2canvas'));};
+  document.head.appendChild(s);
+ });
+}
+async function copyConversationsAsImage(sid,period){
+ var s=D.cs.find(function(x){return x.id===sid;});
+ if(!s){alert('בחור לא נמצא');return;}
+ var sx=D.cx.filter(function(x){return x.si===sid;}).sort(function(a,b){return b.dt.localeCompare(a.dt);});
+ // period filter
+ var cutoff=null;
+ if(period==='week'){var d=new Date();d.setDate(d.getDate()-7);cutoff=isoLocal(d);}
+ else if(period==='month'){var d=new Date();d.setDate(d.getDate()-30);cutoff=isoLocal(d);}
+ else if(period==='3month'){var d=new Date();d.setDate(d.getDate()-90);cutoff=isoLocal(d);}
+ var filtered=cutoff?sx.filter(function(x){return x.dt>=cutoff;}):sx;
+ if(!filtered.length){alert('אין שיחות בטווח הזה');return;}
+ showBanner('📸 מכין תמונה...',3000);
+ try{var h2c=await _loadH2C();}catch(e){alert('לא הצלחתי לטעון את המנוע: '+(e.message||e));return;}
+ // Build offscreen mobile-sized card. Direction:rtl, sans-serif.
+ var wrap=document.createElement('div');
+ wrap.style.cssText='position:fixed;left:-9999px;top:0;width:390px;background:#f4efe6;padding:16px;font-family:Heebo,Arial,sans-serif;direction:rtl;color:#111;box-sizing:border-box';
+ var pdLbl={week:'שבוע אחרון',month:'חודש אחרון','3month':'3 חודשים אחרונים',all:'הכל'}[period]||period;
+ var html='<div style="background:#c9a84c;color:#0a0f1c;padding:12px 14px;border-radius:12px 12px 0 0;text-align:center">'
+  +'<div style="font-size:22px;font-weight:800">💬 '+es(s.name)+'</div>'
+  +'<div style="font-size:12px;font-weight:600;opacity:.85;margin-top:4px">'+es(pdLbl)+' · '+filtered.length+' שיחות</div>'
+  +'</div>';
+ html+='<div style="background:#fff;padding:0 12px 12px;border-radius:0 0 12px 12px">';
+ filtered.forEach(function(ss,i){
+  html+='<div style="padding:10px 0;'+(i<filtered.length-1?'border-bottom:1px solid #e5e7eb':'')+'">'
+   +'<div style="font-size:13px;font-weight:700;color:#c9a84c">📅 '+es(fm(ss.dt))+' ('+es(fmR(ss.dt))+')'+(ss.du?' · '+ss.du+' דק׳':'')+'</div>';
+  if(ss.sm)html+='<div style="font-size:14px;color:#111;margin-top:6px;line-height:1.55;white-space:pre-wrap">'+es(ss.sm)+'</div>';
+  if(ss.np&&ss.np.length){html+='<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #d1d5db"><div style="font-size:11px;font-weight:700;color:#c9a84c;margin-bottom:2px">🔍 לשיחה הבאה:</div>';
+   ss.np.forEach(function(p){html+='<div style="font-size:13px;color:#374151;margin-bottom:1px">• '+es(p)+'</div>';});
+   html+='</div>';}
+  html+='</div>';
+ });
+ html+='</div>';
+ html+='<div style="text-align:center;font-size:10px;color:#6b7280;margin-top:8px">ניהול ישיבה · '+new Date().toLocaleDateString('he-IL')+'</div>';
+ wrap.innerHTML=html;
+ document.body.appendChild(wrap);
+ try{
+  var canvas=await h2c(wrap,{backgroundColor:'#f4efe6',scale:2,logging:false,useCORS:true});
+  canvas.toBlob(async function(blob){
+   if(!blob){alert('שגיאה בהמרת תמונה');document.body.removeChild(wrap);return;}
+   try{
+    await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+    showBanner('✅ התמונה הועתקה — הדבק בוואטסאפ',4000);
+   }catch(e){
+    // Fallback: trigger download
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download='שיחות-'+s.name+'-'+period+'.png';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    showBanner('⬇️ התמונה הורדה (הדפדפן לא תומך בהעתקה ישירה)',4000);
+   }
+   document.body.removeChild(wrap);
+  },'image/png');
+ }catch(e){document.body.removeChild(wrap);alert('שגיאה: '+(e.message||e));}
+}
 
 function toggleCard(nm,give){
 _presSc(()=>{
