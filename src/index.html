@@ -1351,20 +1351,9 @@ function rHm(){
  colA+='<div class="hm-actrow hm-actrow-single"><button class="hm-actbtn hm-actbtn-wide" style="background:var(--bld);border-color:rgba(59,130,246,.3);color:var(--bl)" onclick="go(\'locks\')">🔐 עדכון מנעולים</button></div>';
  colA+='<div class="hm-actrow hm-actrow-single"><button class="hm-actbtn hm-actbtn-wide" style="background:var(--pud);border-color:rgba(167,139,250,.3);color:var(--pu)" onclick="go(\'sleeptbl\')">🛏 טבלת שינה</button></div>';
  colA+='</div></div>';
- // Scan card - primary click opens the auto-detect camera modal (real-time
- // corner detection + best-of-3 capture); the small link falls back to the
- // full scan page with native photo picker + Tesseract date detection for
- // cases where the phone's live camera framing doesn't lock on the corners.
- colA+='<div class="C" style="background:var(--pud);border-color:rgba(167,139,250,.35)">'
-  +'<div style="display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openCamera()">'
-  +'<div style="font-size:28px">📷</div>'
-  +'<div style="flex:1"><div style="font-size:15px;font-weight:700;color:var(--pu)">סרוק דוח יומי</div>'
-  +'<div style="font-size:12px;color:var(--t1)">מכוון אוטומטית · לוכד 3 פריימים · בוחר הכי טוב</div></div>'
-  +'</div>'
-  +'<div style="border-top:1px solid rgba(167,139,250,.15);margin-top:10px;padding-top:6px;display:flex;gap:6px">'
-  +'<button style="flex:1;padding:6px 8px;border-radius:8px;background:transparent;border:1px solid rgba(167,139,250,.25);color:var(--pu);font-size:12px;cursor:pointer" onclick="event.stopPropagation();go(\'scan\')">📁 העלה תמונה מהגלריה</button>'
-  +'</div>'
-  +'</div>';
+ // Scan card removed at user request — updating the report is done manually
+ // via the "✏️ עדכן" button. Scan flow still exists (openCamera) but not
+ // linked from the dashboard for now.
  // ── COL B: live workflow (things needing attention right now) ──
  var colB='';
  var _bAny=false;
