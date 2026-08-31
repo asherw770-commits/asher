@@ -47,11 +47,55 @@ function toV(v) {
 }
 
 async function loadTasks() {
-  const resp = await fetch(FS_BASE + '/shared/main?mask.fieldPaths=tk&mask.fieldPaths=_notifiedTasks');
+  const resp = await fetch(FS_BASE + '/shared/main');
   if (!resp.ok) throw new Error('load failed: ' + resp.status);
   const doc = await resp.json();
   const f = doc.fields || {};
-  return { tk: fromV(f.tk) || [], notified: fromV(f._notifiedTasks) || {} };
+  return {
+    tk: fromV(f.tk) || [],
+    cs: fromV(f.cs) || [],
+    cx: fromV(f.cx) || [],
+    notified: fromV(f._notifiedTasks) || {},
+    convNotified: fromV(f._convNotified) || {}
+  };
+}
+async function writeConvNotified(convNotified) {
+  const url = FS_BASE + '/shared/main?updateMask.fieldPaths=_convNotified';
+  const resp = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: { _convNotified: toV(convNotified) } })
+  });
+  if (!resp.ok) throw new Error('write convNotified failed: ' + resp.status);
+}
+// Compute today's conversation slots (1st/2nd/3rd boys on the queue) using
+// the same sort the client uses: urgent > callback-due > oldest-conversation
+// first. Returns array of 3 boy names.
+function computeConvSlots(cs, cx) {
+  function lastSess(id) {
+    let latest = null;
+    for (const s of cx) if (s.si === id) {
+      if (!latest || s.dt > latest.dt) latest = s;
+    }
+    return latest;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const talkedToday = new Set();
+  for (const s of cx) if (s.dt === today) talkedToday.add(s.si);
+  const ord = cs.slice()
+    .filter(s => !talkedToday.has(s.id))
+    .sort((a, b) => {
+      if (a.urgent && !b.urgent) return -1;
+      if (!a.urgent && b.urgent) return 1;
+      const ac = a.cb && a.cb <= today, bc = b.cb && b.cb <= today;
+      if (ac && !bc) return -1;
+      if (!ac && bc) return 1;
+      const la = lastSess(a.id), lb = lastSess(b.id);
+      const da = la ? la.dt : '0', db = lb ? lb.dt : '0';
+      if (da !== db) return da < db ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  return [ord[0], ord[1], ord[2]].map(s => s ? { id: s.id, name: s.name } : null);
 }
 
 async function writeNotified(notified) {
@@ -66,8 +110,75 @@ async function writeNotified(notified) {
 
 module.exports = async (req, res) => {
   try {
-    const { tk, notified } = await loadTasks();
+    const { tk, cs, cx, notified, convNotified } = await loadTasks();
     const now = Date.now();
+    // ─── Conversation-slot alerts ────────────────────────────────────────
+    // 6 time windows per day (IL time). Each fires once per day thanks to
+    // _convNotified[YYYY-MM-DD_slot] flag. cron-job.org runs this endpoint
+    // every minute so we just check whether the current IL minute matches.
+    const nowIL = new Date(now + 3 * 3600 * 1000); // approx IL summer (+3)
+    const hh = nowIL.getUTCHours();
+    const mm = nowIL.getUTCMinutes();
+    const dateKey = nowIL.getUTCFullYear() + '-' + String(nowIL.getUTCMonth() + 1).padStart(2, '0') + '-' + String(nowIL.getUTCDate()).padStart(2, '0');
+    const convSlots = computeConvSlots(cs, cx);
+    // Reveal notifications: title generic, body prompts to open the app
+    // (SW opens /?cvreveal=<slot> which the client renders as a big card).
+    const revealHits = [
+      { h: 15, m: 30, slot: 0 },
+      { h: 19, m: 10, slot: 1 },
+      { h: 21, m: 45, slot: 2 }
+    ];
+    for (const r of revealHits) {
+      if (hh === r.h && mm === r.m) {
+        const key = dateKey + '_reveal_' + r.slot;
+        if (convNotified[key]) continue;
+        if (!convSlots[r.slot]) continue;
+        try {
+          await sendToAll('🎯 שיבוץ שיחה', 'לחץ לגילוי שם הבחור לשיחה', {
+            tag: 'conv-reveal-' + r.slot,
+            url: '/?cvreveal=' + r.slot
+          });
+          convNotified[key] = new Date().toISOString();
+        } catch (e) { console.error('reveal push failed', e); }
+      }
+    }
+    // Prep notifications (5 min before each conversation time): put the
+    // boy's name up front so the user knows who to prep and taps through
+    // to that boy's conversation history page.
+    const prepHits = [
+      { h: 17, m: 55, slot: 0, session: '18:00' },
+      { h: 19, m: 25, slot: 1, session: '19:30' },
+      { h: 22, m: 25, slot: 2, session: '22:30' }
+    ];
+    for (const p of prepHits) {
+      if (hh === p.h && mm === p.m) {
+        const key = dateKey + '_prep_' + p.slot;
+        if (convNotified[key]) continue;
+        const boy = convSlots[p.slot];
+        if (!boy) continue;
+        try {
+          await sendToAll(
+            '⏰ 5 דק׳ לשיחה — ' + boy.name,
+            'הכן שיחה של ' + p.session + ' · לחץ לפתיחת ההיסטוריה',
+            {
+              tag: 'conv-prep-' + p.slot,
+              url: '/?cvprep=' + encodeURIComponent(boy.id)
+            }
+          );
+          convNotified[key] = new Date().toISOString();
+        } catch (e) { console.error('prep push failed', e); }
+      }
+    }
+    // Prune conv-notified entries from previous days (keep only today's)
+    let convPruned = 0;
+    for (const k of Object.keys(convNotified)) {
+      if (!k.startsWith(dateKey + '_')) {
+        delete convNotified[k];
+        convPruned++;
+      }
+    }
+    try { await writeConvNotified(convNotified); } catch (e) { console.error('write convNotified failed', e); }
+    // ─── /Conversation-slot alerts ───────────────────────────────────────
     // Fire for tasks whose alertAt is in the last 2 minutes and not yet
     // notified. Tight window keeps the alert at the exact minute the user
     // asked for (cron now runs every minute).

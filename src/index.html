@@ -5413,6 +5413,57 @@ if(navigator.serviceWorker){
  });
 }
 try{if(location.search.indexOf('ingest=share')>=0)history.replaceState({},'','/');}catch(e){}
+// Conversation notification deep-links: ?cvreveal=<slot> shows a big card
+// with the boy assigned to that slot. ?cvprep=<boyId> jumps straight to
+// that boy's conversation history so the user can prep for the session.
+try{
+ var _sp=new URLSearchParams(location.search);
+ if(_sp.has('cvreveal')){
+  var _slot=parseInt(_sp.get('cvreveal'),10)||0;
+  setTimeout(function(){_showConvReveal(_slot);},600);
+  history.replaceState({},'','/');
+ }
+ if(_sp.has('cvprep')){
+  var _bid=_sp.get('cvprep');
+  setTimeout(function(){if(typeof cvI!=='undefined'){cvI=_bid;cvV='stud';pg='cv';rr();}},600);
+  history.replaceState({},'','/');
+ }
+}catch(e){}
+function _computeConvSlots(){
+ if(!D||!D.cs)return [null,null,null];
+ var today=td();
+ var talkedToday=new Set();(D.cx||[]).forEach(function(s){if(s.dt===today)talkedToday.add(s.si);});
+ var ord=(D.cs||[]).filter(function(s){return !talkedToday.has(s.id);}).sort(function(a,b){
+  if(a.urgent&&!b.urgent)return -1;if(!a.urgent&&b.urgent)return 1;
+  var ac=a.cb&&a.cb<=today,bc=b.cb&&b.cb<=today;
+  if(ac&&!bc)return -1;if(!ac&&bc)return 1;
+  var la=lS(a.id),lb=lS(b.id);
+  var da=la?la.dt:'0',db=lb?lb.dt:'0';
+  if(da!==db)return da.localeCompare(db);
+  return sLN(a.name,b.name);
+ });
+ return [ord[0]||null,ord[1]||null,ord[2]||null];
+}
+function _showConvReveal(slot){
+ var slots=_computeConvSlots();
+ var boy=slots[slot];
+ var el=document.createElement('div');
+ el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
+ var sessionLbl=['18:00','19:30','22:30'][slot]||'';
+ el.innerHTML=boy?('<div style="background:linear-gradient(160deg,var(--s1),var(--bg));border:2px solid var(--go);border-radius:20px;padding:32px 24px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.7)">'
+  +'<div style="font-size:14px;color:var(--t2);margin-bottom:6px">שיבוץ שיחה '+sessionLbl+'</div>'
+  +'<div style="font-size:36px;font-weight:800;color:var(--go);margin:12px 0;line-height:1.2">'+es(boy.name)+'</div>'
+  +'<div style="display:flex;gap:8px;margin-top:20px">'
+  +'<button style="flex:1;padding:14px;border-radius:12px;background:var(--go);border:none;color:#0a0f1c;font-size:15px;font-weight:800;cursor:pointer" onclick="document.body.removeChild(this.closest(\'.cvRevealOv\'));cvI=\''+boy.id+'\';cvV=\'stud\';pg=\'cv\';rr();">📋 פתח היסטוריה</button>'
+  +'<button style="flex:1;padding:14px;border-radius:12px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:15px;cursor:pointer" onclick="document.body.removeChild(this.closest(\'.cvRevealOv\'))">סגור</button>'
+  +'</div></div>'):('<div style="background:var(--s1);border:1px solid var(--bm);border-radius:16px;padding:28px 24px;max-width:400px;width:100%;text-align:center">'
+  +'<div style="font-size:22px;color:var(--t1);margin-bottom:10px">אין שיבוץ פנוי</div>'
+  +'<div style="font-size:14px;color:var(--t2)">כל הבחורים הרלוונטיים כבר קיבלו שיחה היום</div>'
+  +'<button style="margin-top:20px;padding:12px 24px;border-radius:10px;background:var(--go);border:none;color:#0a0f1c;font-size:15px;font-weight:700;cursor:pointer" onclick="document.body.removeChild(this.closest(\'.cvRevealOv\'))">סגור</button>'
+  +'</div>');
+ el.className='cvRevealOv';
+ document.body.appendChild(el);
+}
 // deep-link handling from notification taps: /?page=phones&t=tonight and
 // /?snooze=1 are the URLs the push payload embeds. Snooze runs a POST to
 // /api/snooze (fallback for iOS where the notification action button may
