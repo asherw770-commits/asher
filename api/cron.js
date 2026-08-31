@@ -40,12 +40,11 @@ module.exports = async (req, res) => {
     const t = (req.query && req.query.t) || 'af';
 
     if (t === 'pr') {
-      // Fires at 20:00 IL summer (17:00 UTC) on Sat/Sun/Mon/Tue/Wed —
-      // the evening before each Sunday-Thursday yeshiva day. Motzei
-      // Shabbat is covered by the same cron (Sat evening = Sun prep).
+      // Fires at 20:00 IL summer (17:00 UTC) on Sun-Thu — user prints the
+      // report the same evening they'll use it, not the night before.
       await sendToAll(
-        '🖨 הדפס דוח יומי למחר',
-        'הדפס עכשיו כדי שיהיה מוכן בבוקר',
+        '🖨 הדפס דוח יומי',
+        'הגיע הזמן להדפיס את הדוח היומי',
         { tag: 'print-report', url: '/?action=print-report' }
       );
       return res.status(200).json({ ok: true, type: 'print' });
