@@ -4312,9 +4312,21 @@ let h='<div style="display:flex;justify-content:space-between;align-items:flex-s
  var _pmC=Object.keys(D.floorLatePM||{}).filter(inRange).filter(function(dt){return(D.floorLatePM[dt]||[]).indexOf(nm)>=0;}).length;
  var _seenChip={};var _wpC=[...D.wt,...D.wh].filter(function(t){if(t.nm!==nm||!(t.status==='late'||t.status==='doubled'))return false;if(_seenChip[t.id])return false;_seenChip[t.id]=true;return true;}).length;
  var _cfC=(D._confCount||{})[nm]||0;
- var chips=[['🍽',_bwC,'קערה וספל'],['💡',_loC,'כיבוי אורות'],['🌅',_amC,'יציאה - בוקר'],['🕐',_pmC,'יציאה - צהריים'],['✍️',_wpC,'עונשי כתיבה'],['📵',_cfC,'החרמות']];
+ var _rtC=Object.keys(D.roomTalk||{}).filter(inRange).filter(function(dt){return(D.roomTalk[dt]||[]).indexOf(nm)>=0;}).length;
+ // Each chip: [emoji, count, label, explanation]. The explanation makes
+ // clear what the number MEANS so the user doesn't have to guess whether
+ // "כיבוי אורות" is missed times, late times, or something else.
+ var chips=[
+  ['🍽',_bwC,'קערה וספל','ימים שלא סידר את הקערה והספל בזמן שנקבע'],
+  ['💡',_loC,'כיבוי אורות','ימים שלא היה במיטה בזמן כיבוי אורות'],
+  ['🌙',_rtC,'דיברו בחדר','לילות שדיבר בחדר אחרי כיבוי אורות'],
+  ['🌅',_amC,'יציאה - בוקר','ימים שאיחר לצאת מהקומה בבוקר'],
+  ['🕐',_pmC,'יציאה - צהריים','ימים שאיחר לצאת מהקומה בצהריים'],
+  ['✍️',_wpC,'עונשי כתיבה','משימות כתיבה שנשארו באיחור או הוכפלו'],
+  ['📵',_cfC,'החרמות','פעמים שהטלפון הוחרם (בדרך כלל בגלל אי-הפקדה)']
+ ];
  h+='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;width:100%">';
- chips.forEach(function(c){h+='<div style="flex:1 1 calc(50% - 5px);min-width:0;box-sizing:border-box;display:flex;align-items:center;gap:10px;background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:14px 14px"><span style="font-size:23px;flex-shrink:0">'+c[0]+'</span><div style="min-width:0"><div style="font-size:19px;font-weight:800;color:'+(c[1]>0?'var(--am)':'var(--t2)')+';line-height:1.3">'+c[1]+'</div><div style="font-size:12px;color:var(--t2);line-height:1.5">'+c[2]+'</div></div></div>';});
+ chips.forEach(function(c){h+='<div style="flex:1 1 calc(50% - 5px);min-width:0;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;background:var(--s1);border:1px solid '+(c[1]>0?'rgba(245,158,11,.25)':'var(--bd)')+';border-radius:12px;padding:12px 14px"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:23px;flex-shrink:0">'+c[0]+'</span><div style="min-width:0;flex:1"><div style="font-size:19px;font-weight:800;color:'+(c[1]>0?'var(--am)':'var(--t2)')+';line-height:1.3">'+c[1]+'</div><div style="font-size:12.4px;color:var(--t1);line-height:1.4;font-weight:700">'+c[2]+'</div></div></div><div style="font-size:11.4px;color:var(--t2);line-height:1.45;padding-right:33px">'+c[3]+'</div></div>';});
  h+='</div>';
 }
 // at-a-glance action-items bar - the things that actually need attention
@@ -4342,18 +4354,33 @@ h+='</div>';
 if(st==='conf'){const cu=confUntil(nm);if(cu)h+='<div class="C" style="border-color:rgba(239,68,68,.25);margin-bottom:8px"><div style="font-size:13.2px;color:var(--rd)">📵 טלפון מוחרם — '+friendlyUntil(cu)+'</div></div>'}
 // ===== group: deposits =====
 h+='<div class="sl" style="margin-top:2px">📊 הפקדות</div>';
-// Evening deposits
+// Evening deposits. Split "מחוץ למניין" (confiscated/away/np) out from
+// "לא הפקיד" so the count reflects the reason he didn't deposit, not just
+// the missing status.
 const allDates=Object.keys(D.ph||{}).filter(inRange).sort().reverse();
-let depCount=0,missCount=0;
-allDates.forEach(dt=>{const ph=(D.ph||{})[dt];if(!ph)return;if(ph.dp&&ph.dp.includes(nm))depCount++;if(ph.m&&ph.m.includes(nm))missCount++});
+let depCount=0,missCount=0,confCount=0,awayCount=0;
+allDates.forEach(dt=>{
+ const ph=(D.ph||{})[dt];if(!ph)return;
+ if(ph.dp&&ph.dp.includes(nm)){depCount++;return;}
+ if(ph.m&&ph.m.includes(nm)){missCount++;return;}
+ // Not in dp or m — was in a special status. Look up dayStatus snapshot.
+ const snap=(D.dayStatus&&D.dayStatus.eve&&D.dayStatus.eve[dt])||null;
+ if(snap){
+  if(snap.conf&&snap.conf.indexOf(nm)>=0)confCount++;
+  else if(snap.away&&snap.away.indexOf(nm)>=0)awayCount++;
+ }
+});
 const totalPh=depCount+missCount;
 const depPct2=totalPh>0?Math.round(depCount/totalPh*100):0;
 const lateEveCount=Object.keys(D.phLate||{}).filter(inRange).filter(dt=>(D.phLate[dt]||[]).includes(nm)).length;
 h+='<div class="C"><div style="font-weight:700;font-size:15.6px;color:var(--t0);margin-bottom:8px">📱 ערב</div>';
-h+='<div style="display:flex;gap:10px"><div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--go)">'+depPct2+'%</div><div style="font-size:11px;color:var(--t2)">אחוז</div></div>';
+h+='<div style="display:flex;gap:10px;flex-wrap:wrap"><div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--go)">'+depPct2+'%</div><div style="font-size:11px;color:var(--t2)">אחוז</div></div>';
 h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--gr)">'+depCount+'</div><div style="font-size:11px;color:var(--t2)">הפקיד</div></div>';
 h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--rd)">'+missCount+'</div><div style="font-size:11px;color:var(--t2)">לא הפקיד</div></div>';
-h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--am)">'+lateEveCount+'</div><div style="font-size:11px;color:var(--t2)">איחר</div></div></div></div>';
+h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--am)">'+lateEveCount+'</div><div style="font-size:11px;color:var(--t2)">איחר</div></div>';
+h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--pu)">'+confCount+'</div><div style="font-size:11px;color:var(--t2)">מוחרם</div></div>';
+h+='<div style="text-align:center;flex:1"><div style="font-size:25.2px;font-weight:800;color:var(--bl)">'+awayCount+'</div><div style="font-size:11px;color:var(--t2)">בבית</div></div>';
+h+='</div></div>';
 // Afternoon deposits
 const allDatesA=Object.keys(D.phA||{}).filter(inRange).sort().reverse();
 let depCountA=0,missCountA=0;
