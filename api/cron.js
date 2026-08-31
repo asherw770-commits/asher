@@ -40,14 +40,29 @@ module.exports = async (req, res) => {
     const t = (req.query && req.query.t) || 'af';
 
     if (t === 'pr') {
-      // Fires at 20:00 IL summer (17:00 UTC) on Sun-Thu — user prints the
-      // report the same evening they'll use it, not the night before.
+      // Vercel cron runs UTC only, no TZ awareness. To hit exactly 20:00
+      // Israel time year-round (summer UTC+3 → 17:00 UTC, winter UTC+2 →
+      // 18:00 UTC), the vercel.json schedule fires at BOTH hours and the
+      // endpoint self-filters here using Intl to get real Asia/Jerusalem
+      // local time. Sat is the motzash slot at 21:00 IL instead.
+      const now = new Date();
+      const ilHour = parseInt(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Jerusalem', hour: '2-digit', hour12: false
+      }).format(now), 10);
+      const ilDay = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Jerusalem', weekday: 'short'
+      }).format(now);
+      const isSat = (ilDay === 'Sat');
+      const targetHour = isSat ? 21 : 20;
+      if (ilHour !== targetHour) {
+        return res.status(200).json({ ok: true, type: 'print', skipped: 'IL hour ' + ilHour + ' ≠ ' + targetHour });
+      }
       await sendToAll(
         '🖨 הדפס דוח יומי',
         'הגיע הזמן להדפיס את הדוח היומי',
         { tag: 'print-report', url: '/?action=print-report' }
       );
-      return res.status(200).json({ ok: true, type: 'print' });
+      return res.status(200).json({ ok: true, type: 'print', ilHour, ilDay });
     }
 
     if (t === 'af') {

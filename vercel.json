@@ -13,8 +13,8 @@
     }
   ],
   "crons": [
-    { "path": "/api/cron?t=pr", "schedule": "0 17 * * 0-4" },
-    { "path": "/api/cron?t=pr", "schedule": "0 18 * * 6" },
+    { "path": "/api/cron?t=pr", "schedule": "0 17,18 * * 0-4" },
+    { "path": "/api/cron?t=pr", "schedule": "0 18,19 * * 6" },
     { "path": "/api/cron?t=af", "schedule": "13 12 * * 0-4" },
     { "path": "/api/cron?t=ev", "schedule": "48 18 * * 0-4" },
     { "path": "/api/cron?t=sn", "schedule": "3 19 * * 0-4" },
