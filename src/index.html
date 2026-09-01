@@ -5087,6 +5087,29 @@ function pDl(){pV=pV.slice(0,-1);pE=false;rr()}
 // ═══ CONVERSATIONS (LTR, numbers from left) ═══
 let cvI=null,cvV='list',cvTm=0,cvPd='day';
 function rCv(){if(cvV==='sess'){const s=D.cs.find(x=>x.id===cvI);if(s)return rCS(s)}if(cvV==='stud'){const s=D.cs.find(x=>x.id===cvI);if(s)return rCSt(s)}return rCL()}
+// Export conversations to JSON file. Gated by requireAuth so someone
+// with brief physical access to an unlocked device can't lift the
+// conversation history off it.
+async function exportConversationsFile(){
+ if(!(await requireAuth('לייצוא שיחות לקובץ')))return;
+ try{
+  var payload={
+   version:1,
+   exportedAt:new Date().toISOString(),
+   type:'conversations',
+   boys:D.cs||[],
+   sessions:D.cx||[],
+   openItems:D.ci||[]
+  };
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download='yeshiva-conversations-'+td()+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showBanner('✅ קובץ השיחות הורד',3000);
+ }catch(e){alert('שגיאה: '+(e.message||e));}
+}
 function cvDash(){const now=new Date;let fd,label;
 const fmDu=m=>{if(m<60)return m+' דק׳';const h=Math.floor(m/60),r=m%60;return h+':'+String(r).padStart(2,'0')};
 if(cvPd==='day'){fd=td();label='היום'}
@@ -5145,6 +5168,8 @@ return sLN(a.name,b.name)}).forEach(s=>{const ls3=lS(s.id),sc2=D.cx.filter(x=>x.
 h+='<div class="C" style="cursor:pointer" onclick="cvI=\''+s.id+'\';cvV=\'stud\';go(\'cv\')"><div style="display:flex;align-items:center;gap:9px">'+aH(s.name,32,11)+'<div style="flex:1"><div style="font-size:16.8px;font-weight:500;color:var(--t0)">'+s.name+'</div><div style="font-size:13.2px;color:var(--t2)">'+sc2+' שיחות'+(ls3?' · '+fmR(ls3.dt):'')+'</div></div></div></div>'});
 h+='</div></div>';return h}
 h+='<div class="S" style="padding:8px 12px 100px;direction:rtl">';
+// Conversation export (JSON file, gated by requireAuth)
+h+='<div style="text-align:left;margin-bottom:6px"><button style="padding:6px 12px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t2);font-size:12.6px;font-weight:600;cursor:pointer" onclick="exportConversationsFile()">⬇️ ייצא שיחות לקובץ</button></div>';
 h+=cvDash();
 // Dashboard - open tasks
 const openCI=D.ci.filter(i=>i.st==='open').sort((a,b)=>{if(a.mvb&&!b.mvb)return 1;if(!a.mvb&&b.mvb)return -1;if(a.mvb&&b.mvb)return a.mvb-b.mvb;return 0});
