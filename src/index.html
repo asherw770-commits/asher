@@ -1596,31 +1596,39 @@ h+='</div></div>';
  // time. Empty/invalid falls back to the default in the block below.
  var _sched=D._notifSchedule||{};
  var _defs=[
-  {k:'conv1',lbl:'🎯 שיבוץ שיחה ראשונה',def:'15:30'},
-  {k:'prep1',lbl:'⏰ הכנה לשיחה 1 (18:00)',def:'17:55'},
-  {k:'conv2',lbl:'🎯 שיבוץ שיחה שנייה',def:'19:10'},
-  {k:'prep2',lbl:'⏰ הכנה לשיחה 2 (19:30)',def:'19:25'},
-  {k:'conv3',lbl:'🎯 שיבוץ שיחה שלישית',def:'21:45'},
-  {k:'prep3',lbl:'⏰ הכנה לשיחה 3 (22:30)',def:'22:25'}
+  {sec:'📱 הפקדות טלפונים',items:[
+   {k:'phAfternoon',lbl:'צהריים',def:'15:13'},
+   {k:'phEvening',lbl:'ערב (עם נודניק 15 דק׳)',def:'21:48'}
+  ]},
+  {sec:'🖨 הדפס דוח יומי',items:[
+   {k:'printWeek',lbl:'ראשון-חמישי',def:'20:00'},
+   {k:'printSat',lbl:'שבת (מוצ״ש)',def:'21:00'}
+  ]},
+  {sec:'🎯 שיבוצי שיחה',items:[
+   {k:'conv1',lbl:'שיבוץ ראשון',def:'15:30'},
+   {k:'prep1',lbl:'הכנה לשיחה 1 (18:00)',def:'17:55'},
+   {k:'conv2',lbl:'שיבוץ שני',def:'19:10'},
+   {k:'prep2',lbl:'הכנה לשיחה 2 (19:30)',def:'19:25'},
+   {k:'conv3',lbl:'שיבוץ שלישי',def:'21:45'},
+   {k:'prep3',lbl:'הכנה לשיחה 3 (22:30)',def:'22:25'}
+  ]}
  ];
  h+='<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)"><div style="font-weight:700;font-size:15px;color:var(--t0);margin-bottom:8px">⏱ שעות התראות</div>';
- h+='<div style="font-size:11.6px;color:var(--t2);margin-bottom:8px;line-height:1.5">שנה שעה של כל התראה. השינוי נכנס לתוקף מיד — נשמר לכל המכשירים.</div>';
- _defs.forEach(function(d){
-  var val=_sched[d.k]||d.def;
-  h+='<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;background:var(--s3);margin-bottom:5px">'
-   +'<div style="flex:1;font-size:13.2px;color:var(--t1)">'+es(d.lbl)+'</div>'
-   +'<input type="time" value="'+es(val)+'" style="padding:5px 8px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:14px;font-family:inherit;text-align:center;-webkit-appearance:none;width:100px" onchange="setNotifTime(\''+d.k+'\',this.value)">'
-   +'</div>';
+ h+='<div style="font-size:11.6px;color:var(--t2);margin-bottom:10px;line-height:1.5">שנה שעה של כל התראה. השינוי נכנס לתוקף תוך דקה — נשמר לכל המכשירים.</div>';
+ _defs.forEach(function(g){
+  h+='<div style="font-size:12.6px;font-weight:700;color:var(--t2);margin:10px 2px 4px">'+g.sec+'</div>';
+  g.items.forEach(function(d){
+   var val=_sched[d.k]||d.def;
+   h+='<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;background:var(--s3);margin-bottom:5px">'
+    +'<div style="flex:1;font-size:13.2px;color:var(--t1)">'+es(d.lbl)+'</div>'
+    +'<input type="time" value="'+es(val)+'" style="padding:5px 8px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:14px;font-family:inherit;text-align:center;-webkit-appearance:none;width:100px" onchange="setNotifTime(\''+d.k+'\',this.value)">'
+    +'</div>';
+  });
  });
- // Read-only entries — these still use the old Vercel cron schedule
- // (vercel.json) so they're shown for reference only, not editable here.
+ // Non-editable — the nightly cloud backup is a Vercel scheduled task, not
+ // a push, so it's noted for reference only.
  h+='<div style="font-size:11.6px;color:var(--t2);margin-top:10px;padding-top:8px;border-top:1px dashed var(--bd);line-height:1.6">'
-  +'<div style="font-weight:700;color:var(--t1);margin-bottom:4px">התראות קבועות (לעריכה — פנייה למפתח)</div>'
-  +'📱 הפקדות טלפונים צהריים · 15:13<br>'
-  +'📱 הפקדות טלפונים ערב · 21:48<br>'
-  +'😴 נודניק ערב · 22:03<br>'
-  +'🖨 הדפס דוח יומי · 20:00 (מוצ״ש 21:00)<br>'
-  +'☁️ גיבוי לילי · 00:00'
+  +'☁️ גיבוי לילי לענן · 00:00 (לא ניתן לשינוי — פועל כל לילה)'
   +'</div>';
  h+='</div>';
  h+='</div>';

@@ -1,17 +1,16 @@
-// Server-side task alert dispatcher. Runs on cron (every 10 minutes on
-// Vercel) so task reminders fire even when no phone/browser is open.
+// Server-side dispatcher for ALL time-based notifications. cron-job.org
+// hits this endpoint every minute; we compute current Asia/Jerusalem
+// wall-clock and fire whichever notification's time matches.
 //
-// Client-side checkTaskAlerts() only fires when a device is actively
-// running the app - phones lock, browsers close, PWAs go to sleep. Push
-// notifications for time-based reminders MUST be fired from a server
-// timer to be reliable.
+// Everything the user can retime lives under D._notifSchedule (edited
+// from Settings → 🔔 התראות → ⏱ שעות התראות). Snooze mechanics stay in
+// the endpoint since they need per-day state (_snoozeEvening flag).
 
 const { sendToAll } = require('./_push');
 
 const PROJECT_ID = 'asher-1b6e7';
 const FS_BASE = 'https://firestore.googleapis.com/v1/projects/' + PROJECT_ID + '/databases/(default)/documents';
 
-// Firestore Value → plain JS
 function fromV(v) {
   if (!v || typeof v !== 'object') return v;
   if ('stringValue' in v) return v.stringValue;
@@ -30,8 +29,6 @@ function fromV(v) {
   }
   return null;
 }
-
-// Plain JS → Firestore Value
 function toV(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === 'string') return { stringValue: v };
@@ -46,7 +43,7 @@ function toV(v) {
   return { nullValue: null };
 }
 
-async function loadTasks() {
+async function loadDoc() {
   const resp = await fetch(FS_BASE + '/shared/main');
   if (!resp.ok) throw new Error('load failed: ' + resp.status);
   const doc = await resp.json();
@@ -57,22 +54,23 @@ async function loadTasks() {
     cx: fromV(f.cx) || [],
     notified: fromV(f._notifiedTasks) || {},
     convNotified: fromV(f._convNotified) || {},
+    dailyNotified: fromV(f._dailyNotified) || {},
     inactive: fromV(f._inactiveBoys) || {},
-    schedule: fromV(f._notifSchedule) || {}
+    schedule: fromV(f._notifSchedule) || {},
+    snoozeEve: !!fromV(f._snoozeEvening),
+    pushSubs: fromV(f._pushSubs) || {}
   };
 }
-async function writeConvNotified(convNotified) {
-  const url = FS_BASE + '/shared/main?updateMask.fieldPaths=_convNotified';
+async function writeField(name, value) {
+  const url = FS_BASE + '/shared/main?updateMask.fieldPaths=' + encodeURIComponent(name);
   const resp = await fetch(url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields: { _convNotified: toV(convNotified) } })
+    body: JSON.stringify({ fields: { [name]: toV(value) } })
   });
-  if (!resp.ok) throw new Error('write convNotified failed: ' + resp.status);
+  if (!resp.ok) throw new Error('write ' + name + ' failed: ' + resp.status);
 }
-// Compute today's conversation slots (1st/2nd/3rd boys on the queue) using
-// the same sort the client uses: urgent > callback-due > oldest-conversation
-// first. Returns array of 3 boy names.
+
 function computeConvSlots(cs, cx, inactiveMap) {
   inactiveMap = inactiveMap || {};
   function lastSess(id) {
@@ -102,41 +100,79 @@ function computeConvSlots(cs, cx, inactiveMap) {
   return [ord[0], ord[1], ord[2]].map(s => s ? { id: s.id, name: s.name } : null);
 }
 
-async function writeNotified(notified) {
-  const url = FS_BASE + '/shared/main?updateMask.fieldPaths=_notifiedTasks';
-  const resp = await fetch(url, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields: { _notifiedTasks: toV(notified) } })
-  });
-  if (!resp.ok) throw new Error('write notified failed: ' + resp.status);
+// DST-safe IL time via Intl — same trick /api/cron uses. Returns
+// { hh, mm, weekday, dateKey } — weekday is short English (Sun/Mon/...).
+function nowInIL() {
+  const now = new Date();
+  const hh = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', hour: '2-digit', hour12: false }).format(now), 10);
+  const mm = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', minute: '2-digit' }).format(now), 10);
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', weekday: 'short' }).format(now);
+  // Reconstruct IL date components
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const y = parts.find(p => p.type === 'year').value;
+  const mo = parts.find(p => p.type === 'month').value;
+  const d = parts.find(p => p.type === 'day').value;
+  return { hh, mm, weekday, dateKey: y + '-' + mo + '-' + d };
+}
+function parseHM(s) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s || '');
+  return m ? { h: parseInt(m[1], 10), m: parseInt(m[2], 10) } : null;
 }
 
 module.exports = async (req, res) => {
   try {
-    const { tk, cs, cx, notified, convNotified, inactive, schedule } = await loadTasks();
-    // Default times if user hasn't customized. All in IL 24-hour format.
+    const doc = await loadDoc();
+    const { tk, cs, cx, notified, convNotified, dailyNotified, inactive, schedule, snoozeEve } = doc;
     const DEFAULT_SCHED = {
       conv1: '15:30', conv2: '19:10', conv3: '21:45',
-      prep1: '17:55', prep2: '19:25', prep3: '22:25'
+      prep1: '17:55', prep2: '19:25', prep3: '22:25',
+      phAfternoon: '15:13',
+      phEvening: '21:48',
+      printWeek: '20:00',
+      printSat: '21:00'
     };
     const sched = Object.assign({}, DEFAULT_SCHED, schedule || {});
-    function parseHM(s) {
-      const m = /^(\d{1,2}):(\d{2})$/.exec(s || '');
-      return m ? { h: parseInt(m[1], 10), m: parseInt(m[2], 10) } : null;
-    }
     const now = Date.now();
-    // ─── Conversation-slot alerts ────────────────────────────────────────
-    // 6 time windows per day (IL time). Each fires once per day thanks to
-    // _convNotified[YYYY-MM-DD_slot] flag. cron-job.org runs this endpoint
-    // every minute so we just check whether the current IL minute matches.
-    const nowIL = new Date(now + 3 * 3600 * 1000); // approx IL summer (+3)
-    const hh = nowIL.getUTCHours();
-    const mm = nowIL.getUTCMinutes();
-    const dateKey = nowIL.getUTCFullYear() + '-' + String(nowIL.getUTCMonth() + 1).padStart(2, '0') + '-' + String(nowIL.getUTCDate()).padStart(2, '0');
+    const il = nowInIL();
+    const { hh, mm, weekday, dateKey } = il;
+    const isSat = (weekday === 'Sat');
+    const isFri = (weekday === 'Fri');
+    // Sun-Thu are the yeshiva days
+    const isYeshivaDay = ['Sun','Mon','Tue','Wed','Thu'].indexOf(weekday) >= 0;
+
+    // ─── 1. Task deadline reminders (server-side, fires when app is closed)
+    const windowMs = 2 * 60 * 1000;
+    const fired = [];
+    for (const t of tk) {
+      if (!t || t.dn || !t.alertAt) continue;
+      if (notified[t.id]) continue;
+      const at = new Date(t.alertAt).getTime();
+      if (isNaN(at)) continue;
+      const delta = now - at;
+      if (delta < 0 || delta > windowMs) continue;
+      const title = t.tx ? ('🔔 ' + t.tx) : '🔔 תזכורת';
+      const body = t.ps ? ('👤 ' + t.ps) : '';
+      try {
+        await sendToAll(title, body, { tag: 'task-' + t.id, url: '/?page=tasks' });
+        notified[t.id] = new Date().toISOString();
+        fired.push({ id: t.id, tx: t.tx });
+      } catch (e) { console.error('task push failed', t.id, e); }
+    }
+    // Prune notified entries older than 24h or for deleted tasks
+    const cutoff = now - 24 * 60 * 60 * 1000;
+    const liveIds = new Set(tk.filter(t => t && t.id).map(t => t.id));
+    let taskPruned = 0;
+    for (const id of Object.keys(notified)) {
+      const notifiedAt = new Date(notified[id]).getTime();
+      if (!liveIds.has(id) || (isFinite(notifiedAt) && notifiedAt < cutoff)) {
+        delete notified[id];
+        taskPruned++;
+      }
+    }
+    if (fired.length || taskPruned) await writeField('_notifiedTasks', notified);
+
+    // ─── 2. Conversation slots (reveal + prep, 6 daily notifications) ───
     const convSlots = computeConvSlots(cs, cx, inactive);
-    // Reveal notifications: title generic, body prompts to open the app
-    // (SW opens /?cvreveal=<slot> which the client renders as a big card).
     const revealHits = [
       Object.assign({ slot: 0 }, parseHM(sched.conv1) || { h: 15, m: 30 }),
       Object.assign({ slot: 1 }, parseHM(sched.conv2) || { h: 19, m: 10 }),
@@ -156,9 +192,6 @@ module.exports = async (req, res) => {
         } catch (e) { console.error('reveal push failed', e); }
       }
     }
-    // Prep notifications (5 min before each conversation time): put the
-    // boy's name up front so the user knows who to prep and taps through
-    // to that boy's conversation history page.
     const prepHits = [
       Object.assign({ slot: 0, session: '18:00' }, parseHM(sched.prep1) || { h: 17, m: 55 }),
       Object.assign({ slot: 1, session: '19:30' }, parseHM(sched.prep2) || { h: 19, m: 25 }),
@@ -174,67 +207,96 @@ module.exports = async (req, res) => {
           await sendToAll(
             '⏰ 5 דק׳ לשיחה — ' + boy.name,
             'הכן שיחה של ' + p.session + ' · לחץ לפתיחת ההיסטוריה',
-            {
-              tag: 'conv-prep-' + p.slot,
-              url: '/?cvprep=' + encodeURIComponent(boy.id)
-            }
+            { tag: 'conv-prep-' + p.slot, url: '/?cvprep=' + encodeURIComponent(boy.id) }
           );
           convNotified[key] = new Date().toISOString();
         } catch (e) { console.error('prep push failed', e); }
       }
     }
-    // Prune conv-notified entries from previous days (keep only today's)
-    let convPruned = 0;
+    // Prune yesterday's conv-notified keys
     for (const k of Object.keys(convNotified)) {
-      if (!k.startsWith(dateKey + '_')) {
-        delete convNotified[k];
-        convPruned++;
-      }
+      if (!k.startsWith(dateKey + '_')) delete convNotified[k];
     }
-    try { await writeConvNotified(convNotified); } catch (e) { console.error('write convNotified failed', e); }
-    // ─── /Conversation-slot alerts ───────────────────────────────────────
-    // Fire for tasks whose alertAt is in the last 2 minutes and not yet
-    // notified. Tight window keeps the alert at the exact minute the user
-    // asked for (cron now runs every minute).
-    const windowMs = 2 * 60 * 1000;
-    const fired = [];
-    for (const t of tk) {
-      if (!t || t.dn || !t.alertAt) continue;
-      if (notified[t.id]) continue;
-      const at = new Date(t.alertAt).getTime();
-      if (isNaN(at)) continue;
-      const delta = now - at;
-      if (delta < 0 || delta > windowMs) continue;
-      // fire — put the task content as the title (iOS shows it in bold) so
-      // the notification READS AS the reminder itself, not "reminder from
-      // <app>: <content>". Body deliberately empty for clean single-line UX.
-      const title = t.tx ? ('🔔 ' + t.tx) : '🔔 תזכורת';
-      const body = t.ps ? ('👤 ' + t.ps) : '';
+    try { await writeField('_convNotified', convNotified); } catch (e) { console.error(e); }
+
+    // ─── 3. Daily notifications: phones + print (user-editable times) ───
+    async function fireOnce(schedKey, hmStr, title, body, opts) {
+      const t = parseHM(hmStr);
+      if (!t) return false;
+      if (hh !== t.h || mm !== t.m) return false;
+      const key = dateKey + '_' + schedKey;
+      if (dailyNotified[key]) return false;
       try {
-        await sendToAll(title, body, { tag: 'task-' + t.id, url: '/?page=tasks' });
-        notified[t.id] = new Date().toISOString();
-        fired.push({ id: t.id, tx: t.tx });
-      } catch (e) {
-        console.error('sendToAll failed for task', t.id, e);
-      }
+        await sendToAll(title, body, opts);
+        dailyNotified[key] = new Date().toISOString();
+        return true;
+      } catch (e) { console.error('daily push failed', schedKey, e); return false; }
     }
 
-    // Also prune notified entries for tasks that no longer exist or whose
-    // alertAt is over 24h old, so _notifiedTasks doesn't accumulate forever.
-    const cutoff = now - 24 * 60 * 60 * 1000;
-    const liveIds = new Set(tk.filter(t => t && t.id).map(t => t.id));
-    let pruned = 0;
-    for (const id of Object.keys(notified)) {
-      const notifiedAt = new Date(notified[id]).getTime();
-      if (!liveIds.has(id) || (isFinite(notifiedAt) && notifiedAt < cutoff)) {
-        delete notified[id];
-        pruned++;
+    if (isYeshivaDay) {
+      // 📱 Afternoon phone deposits reminder
+      await fireOnce('phAft', sched.phAfternoon,
+        '📱 הפקדות טלפונים - צהריים',
+        'זמן לעדכן מי הפקיד ומי איחר',
+        { tag: 'phones-afternoon', url: '/?page=phones&t=afternoon' });
+      // 📱 Evening phone deposits reminder — includes snooze action
+      const eveFired = await fireOnce('phEve', sched.phEvening,
+        '📱 הפקדות טלפונים - ערב',
+        'זמן לעדכן הפקדות ערב · לנודניק לחץ על ההתראה',
+        {
+          tag: 'phones-evening',
+          url: '/?page=phones&t=tonight&snoozeable=1',
+          actions: [{ action: 'snooze', title: '😴 נודניק 15 דק׳' }]
+        });
+      // Reset snooze flag when a fresh evening reminder fires
+      if (eveFired && snoozeEve) {
+        try { await writeField('_snoozeEvening', false); } catch (e) { console.error(e); }
       }
+      // 😴 Snooze follow-up — 15 min after evening reminder, only if snoozed
+      const eveHM = parseHM(sched.phEvening);
+      if (eveHM && snoozeEve) {
+        // Compute snooze time: eveHM + 15 min
+        let snH = eveHM.h, snM = eveHM.m + 15;
+        if (snM >= 60) { snH += 1; snM -= 60; }
+        if (snH >= 24) snH -= 24;
+        if (hh === snH && mm === snM) {
+          const key = dateKey + '_phSnooze';
+          if (!dailyNotified[key]) {
+            try {
+              await sendToAll('📱 הפקדות טלפונים - תזכורת',
+                'תזכורת אחרי נודניק - עדכן הפקדות ערב',
+                { tag: 'phones-evening-snooze', url: '/?page=phones&t=tonight' });
+              dailyNotified[key] = new Date().toISOString();
+              await writeField('_snoozeEvening', false);
+            } catch (e) { console.error(e); }
+          }
+        }
+      }
+      // 🖨 Print report reminder (weekday)
+      await fireOnce('printWeek', sched.printWeek,
+        '🖨 הדפס דוח יומי',
+        'הגיע הזמן להדפיס את הדוח היומי',
+        { tag: 'print-report', url: '/?action=print-report' });
     }
+    if (isSat) {
+      // 🖨 Print report on motzash for that evening's use
+      await fireOnce('printSat', sched.printSat,
+        '🖨 הדפס דוח יומי',
+        'הגיע הזמן להדפיס את הדוח היומי',
+        { tag: 'print-report', url: '/?action=print-report' });
+    }
+    // Prune yesterday's daily-notified keys
+    for (const k of Object.keys(dailyNotified)) {
+      if (!k.startsWith(dateKey + '_')) delete dailyNotified[k];
+    }
+    try { await writeField('_dailyNotified', dailyNotified); } catch (e) { console.error(e); }
 
-    if (fired.length || pruned) await writeNotified(notified);
-
-    res.status(200).json({ ok: true, fired: fired.length, pruned, tasks: fired });
+    res.status(200).json({
+      ok: true,
+      il: { hh, mm, weekday, dateKey },
+      taskFired: fired.length,
+      taskPruned
+    });
   } catch (e) {
     res.status(500).json({ error: String(e && e.message || e) });
   }
