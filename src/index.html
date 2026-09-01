@@ -331,6 +331,18 @@ async function sendTestNotification(){
 // Diagnostic: report the exact state of push on THIS device - notification
 // permission, service worker registration, push subscription. Helps the
 // user (and me) figure out why notifications aren't arriving.
+// Update one entry in D._notifSchedule (user-editable notification time)
+// and push immediately so the server-side cron sees the new time on its
+// next minute-tick. Silently no-ops on invalid HH:MM input.
+function setNotifTime(key,val){
+ if(!/^\d{2}:\d{2}$/.test(val))return;
+ if(!D._notifSchedule)D._notifSchedule={};
+ D._notifSchedule[key]=val;
+ sv();
+ try{flushSv();}catch(e){}
+ showBanner('⏱ נשמר — '+val,2500);
+ rr();
+}
 async function diagnosePush(){
  var lines=[];
  lines.push('🔍 אבחון התראות במכשיר הזה');
@@ -946,7 +958,7 @@ function heal(){
  ['pb','wt','wh','cs','cx','ci','tk','archive'].forEach(function(k){
   if(!Array.isArray(D[k])){D[k]=Array.isArray(d[k])?d[k]:[];fixed++;}
  });
- ['pt','ptA','ph','phA','ps','boyRoom','boyBed','rooms','_confiscate','_returnDue','_confCount','phLate','phLateA','bwLate','loOut','roomTalk','_omrGrids','prt','lockStatus','upperLock','sleepTables','_sleepAlerts','cleanStatus','roomClean','floorLateAM','floorLatePM','dayStatus','reportTalks','_barcodeMap','_inactiveBoys']
+ ['pt','ptA','ph','phA','ps','boyRoom','boyBed','rooms','_confiscate','_returnDue','_confCount','phLate','phLateA','bwLate','loOut','roomTalk','_omrGrids','prt','lockStatus','upperLock','sleepTables','_sleepAlerts','cleanStatus','roomClean','floorLateAM','floorLatePM','dayStatus','reportTalks','_barcodeMap','_inactiveBoys','_notifSchedule']
   .forEach(function(k){
    if(D[k]===null||D[k]===undefined||typeof D[k]!=='object'||Array.isArray(D[k])){
     D[k]=(d[k]&&typeof d[k]==='object'&&!Array.isArray(d[k]))?d[k]:{};fixed++;}
@@ -1578,6 +1590,39 @@ h+='</div></div>';
  h+='<button style="width:100%;padding:9px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:13.2px;font-weight:600;cursor:'+(_pushCount?'pointer':'not-allowed')+'" '+(_pushCount?'':'disabled ')+'onclick="sendTestNotification()">🔔 שלח התראת בדיקה לכל המכשירים</button>';
  h+='<button style="width:100%;padding:9px;margin-top:6px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:13.2px;font-weight:600;cursor:pointer" onclick="diagnosePush()">🔍 בדוק מצב התראות במכשיר הזה</button>';
  h+='<div style="font-size:12.0px;color:var(--t2);margin-top:8px">'+(_pushCount?'✓ '+_pushCount+' מכשיר'+(_pushCount>1?'ים':'')+' רשומים':'לא רשומים מכשירים עדיין')+'</div>';
+ // ─── Schedule of all timed notifications, user-editable ───────────────
+ // Times are IL wall-clock. The server (task-alerts) reads D._notifSchedule
+ // every minute and fires the matching notification when now == the chosen
+ // time. Empty/invalid falls back to the default in the block below.
+ var _sched=D._notifSchedule||{};
+ var _defs=[
+  {k:'conv1',lbl:'🎯 שיבוץ שיחה ראשונה',def:'15:30'},
+  {k:'prep1',lbl:'⏰ הכנה לשיחה 1 (18:00)',def:'17:55'},
+  {k:'conv2',lbl:'🎯 שיבוץ שיחה שנייה',def:'19:10'},
+  {k:'prep2',lbl:'⏰ הכנה לשיחה 2 (19:30)',def:'19:25'},
+  {k:'conv3',lbl:'🎯 שיבוץ שיחה שלישית',def:'21:45'},
+  {k:'prep3',lbl:'⏰ הכנה לשיחה 3 (22:30)',def:'22:25'}
+ ];
+ h+='<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)"><div style="font-weight:700;font-size:15px;color:var(--t0);margin-bottom:8px">⏱ שעות התראות</div>';
+ h+='<div style="font-size:11.6px;color:var(--t2);margin-bottom:8px;line-height:1.5">שנה שעה של כל התראה. השינוי נכנס לתוקף מיד — נשמר לכל המכשירים.</div>';
+ _defs.forEach(function(d){
+  var val=_sched[d.k]||d.def;
+  h+='<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;background:var(--s3);margin-bottom:5px">'
+   +'<div style="flex:1;font-size:13.2px;color:var(--t1)">'+es(d.lbl)+'</div>'
+   +'<input type="time" value="'+es(val)+'" style="padding:5px 8px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:14px;font-family:inherit;text-align:center;-webkit-appearance:none;width:100px" onchange="setNotifTime(\''+d.k+'\',this.value)">'
+   +'</div>';
+ });
+ // Read-only entries — these still use the old Vercel cron schedule
+ // (vercel.json) so they're shown for reference only, not editable here.
+ h+='<div style="font-size:11.6px;color:var(--t2);margin-top:10px;padding-top:8px;border-top:1px dashed var(--bd);line-height:1.6">'
+  +'<div style="font-weight:700;color:var(--t1);margin-bottom:4px">התראות קבועות (לעריכה — פנייה למפתח)</div>'
+  +'📱 הפקדות טלפונים צהריים · 15:13<br>'
+  +'📱 הפקדות טלפונים ערב · 21:48<br>'
+  +'😴 נודניק ערב · 22:03<br>'
+  +'🖨 הדפס דוח יומי · 20:00 (מוצ״ש 21:00)<br>'
+  +'☁️ גיבוי לילי · 00:00'
+  +'</div>';
+ h+='</div>';
  h+='</div>';
 }
 // device access control - approve/remove devices that can view the app

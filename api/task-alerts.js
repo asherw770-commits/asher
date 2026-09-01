@@ -57,7 +57,8 @@ async function loadTasks() {
     cx: fromV(f.cx) || [],
     notified: fromV(f._notifiedTasks) || {},
     convNotified: fromV(f._convNotified) || {},
-    inactive: fromV(f._inactiveBoys) || {}
+    inactive: fromV(f._inactiveBoys) || {},
+    schedule: fromV(f._notifSchedule) || {}
   };
 }
 async function writeConvNotified(convNotified) {
@@ -113,7 +114,17 @@ async function writeNotified(notified) {
 
 module.exports = async (req, res) => {
   try {
-    const { tk, cs, cx, notified, convNotified, inactive } = await loadTasks();
+    const { tk, cs, cx, notified, convNotified, inactive, schedule } = await loadTasks();
+    // Default times if user hasn't customized. All in IL 24-hour format.
+    const DEFAULT_SCHED = {
+      conv1: '15:30', conv2: '19:10', conv3: '21:45',
+      prep1: '17:55', prep2: '19:25', prep3: '22:25'
+    };
+    const sched = Object.assign({}, DEFAULT_SCHED, schedule || {});
+    function parseHM(s) {
+      const m = /^(\d{1,2}):(\d{2})$/.exec(s || '');
+      return m ? { h: parseInt(m[1], 10), m: parseInt(m[2], 10) } : null;
+    }
     const now = Date.now();
     // ─── Conversation-slot alerts ────────────────────────────────────────
     // 6 time windows per day (IL time). Each fires once per day thanks to
@@ -127,9 +138,9 @@ module.exports = async (req, res) => {
     // Reveal notifications: title generic, body prompts to open the app
     // (SW opens /?cvreveal=<slot> which the client renders as a big card).
     const revealHits = [
-      { h: 15, m: 30, slot: 0 },
-      { h: 19, m: 10, slot: 1 },
-      { h: 21, m: 45, slot: 2 }
+      Object.assign({ slot: 0 }, parseHM(sched.conv1) || { h: 15, m: 30 }),
+      Object.assign({ slot: 1 }, parseHM(sched.conv2) || { h: 19, m: 10 }),
+      Object.assign({ slot: 2 }, parseHM(sched.conv3) || { h: 21, m: 45 })
     ];
     for (const r of revealHits) {
       if (hh === r.h && mm === r.m) {
@@ -137,7 +148,7 @@ module.exports = async (req, res) => {
         if (convNotified[key]) continue;
         if (!convSlots[r.slot]) continue;
         try {
-          await sendToAll('🎯 שיבוץ שיחה', 'לחץ לגילוי שם הבחור לשיחה', {
+          await sendToAll('🎯 שיבוץ שיחה', '', {
             tag: 'conv-reveal-' + r.slot,
             url: '/?cvreveal=' + r.slot
           });
@@ -149,9 +160,9 @@ module.exports = async (req, res) => {
     // boy's name up front so the user knows who to prep and taps through
     // to that boy's conversation history page.
     const prepHits = [
-      { h: 17, m: 55, slot: 0, session: '18:00' },
-      { h: 19, m: 25, slot: 1, session: '19:30' },
-      { h: 22, m: 25, slot: 2, session: '22:30' }
+      Object.assign({ slot: 0, session: '18:00' }, parseHM(sched.prep1) || { h: 17, m: 55 }),
+      Object.assign({ slot: 1, session: '19:30' }, parseHM(sched.prep2) || { h: 19, m: 25 }),
+      Object.assign({ slot: 2, session: '22:30' }, parseHM(sched.prep3) || { h: 22, m: 25 })
     ];
     for (const p of prepHits) {
       if (hh === p.h && mm === p.m) {
