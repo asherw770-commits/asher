@@ -343,6 +343,31 @@ function setNotifTime(key,val){
  showBanner('⏱ נשמר — '+val,2500);
  rr();
 }
+// Force a fresh read of shared/main from Firestore + apply. Bypasses the
+// snapshot listener's guards (localTs/remoteTs comparisons) so a device
+// that thinks it's ahead can still pull the current authoritative state.
+// Also refreshes counters like task lists that might be showing stale local
+// state after a series of bg writes.
+async function forceSyncFromCloud(){
+ try{
+  showBanner('🔄 קורא מהענן...',2000);
+  await flushSv();
+  var snap=await _fbDocRef.get();
+  if(!snap.exists){alert('אין נתונים בענן');return;}
+  var remote=snap.data();
+  var remoteCount=(Array.isArray(remote.pb)?remote.pb.length:0)+(Array.isArray(remote.wt)?remote.wt.length:0);
+  var localCount=(Array.isArray(D.pb)?D.pb.length:0)+(Array.isArray(D.wt)?D.wt.length:0);
+  var msg='📊 מקומי: '+localCount+' פריטים · ענן: '+remoteCount+' פריטים\n\nלטעון את הענן ולדרוס את המקומי?';
+  if(!confirm(msg))return;
+  D={...df(),...remote};
+  heal();
+  _mergePhotos();
+  D._updatedAt=Date.now();
+  try{localStorage.setItem(K,JSON.stringify(D));}catch(e){}
+  rr();
+  showBanner('✅ סונכרן מהענן',3000);
+ }catch(e){alert('שגיאה: '+(e.message||e));}
+}
 async function diagnosePush(){
  var lines=[];
  lines.push('🔍 אבחון התראות במכשיר הזה');
@@ -1589,6 +1614,7 @@ h+='</div></div>';
  h+='</div>';
  h+='<button style="width:100%;padding:9px;border-radius:8px;background:var(--bld);border:1px solid rgba(59,130,246,.3);color:var(--bl);font-size:13.2px;font-weight:600;cursor:'+(_pushCount?'pointer':'not-allowed')+'" '+(_pushCount?'':'disabled ')+'onclick="sendTestNotification()">🔔 שלח התראת בדיקה לכל המכשירים</button>';
  h+='<button style="width:100%;padding:9px;margin-top:6px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:13.2px;font-weight:600;cursor:pointer" onclick="diagnosePush()">🔍 בדוק מצב התראות במכשיר הזה</button>';
+ h+='<button style="width:100%;padding:9px;margin-top:6px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:13.2px;font-weight:700;cursor:pointer" onclick="forceSyncFromCloud()">🔄 סנכרן עכשיו מהענן</button>';
  h+='<div style="font-size:12.0px;color:var(--t2);margin-top:8px">'+(_pushCount?'✓ '+_pushCount+' מכשיר'+(_pushCount>1?'ים':'')+' רשומים':'לא רשומים מכשירים עדיין')+'</div>';
  // ─── Schedule of all timed notifications, user-editable ───────────────
  // Times are IL wall-clock. The server (task-alerts) reads D._notifSchedule
