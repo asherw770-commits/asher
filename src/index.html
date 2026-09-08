@@ -2744,7 +2744,11 @@ function checkSleepTableStatus(){
   var _sPushBody=_sSigned+' מתוך '+_sSchoolDays.length+' ימים חתומים';
   try{fetch('/api/send-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:_sPushTitle,body:_sPushBody,tag:'sleep-'+nm,url:'/?page=sleeptbl'})}).catch(function(){});}catch(e){}
  });
- if(changed)sv();
+ // Same reasoning as checkConfExpiry: sleep-table auto-transitions are
+ // deterministic (last day passed, status becomes success/failed). Every
+ // device computes it identically, so don't bump _updatedAt and don't
+ // sync — otherwise a background auto-run races real user edits.
+ if(changed)sv({bg:true});
 }
 function dismissSleepAlert(nm){if(D._sleepAlerts)delete D._sleepAlerts[nm];sv();rr();}
 setInterval(checkSleepTableStatus,60000);
@@ -3857,8 +3861,11 @@ function printReport(){
 var _rm=function(n){var r=parseInt((D.boyRoom||{})[n],10);return isNaN(r)?9999:r;};
 var _bd=function(n){var r=parseInt((D.boyBed||{})[n],10);return isNaN(r)?9999:r;};
 if(!D.boyRoom)D.boyRoom={};if(!D.boyBed)D.boyBed={};
-const boys=sortByRoomBed(D.pb);
-const pend=D.wt.filter(t=>t.status==='waiting'||t.status==='late'||t.status==='doubled')
+// Exclude inactive boys from the printed report entirely — they only live
+// under the conversations page's 'לא פעיל' tab and shouldn't show up on
+// any list, printed or on-screen.
+const boys=sortByRoomBed(D.pb).filter(function(b){return !isInactive(b);});
+const pend=D.wt.filter(t=>(t.status==='waiting'||t.status==='late'||t.status==='doubled')&&!isInactive(t.nm))
  .sort(function(a,b){return _rm(a.nm)-_rm(b.nm)||_bd(a.nm)-_bd(b.nm)||sLN(a.nm,b.nm)||0;});
 const _phaToday=(D.phA||{})[td()];
 const afM=_phaToday?boys.filter(b=>_phaToday.m&&_phaToday.m.includes(b)):[];
@@ -4319,7 +4326,13 @@ Object.entries(D._confiscate).forEach(([nm,v])=>{
    // the dashboard instead of just silently deleting, so nothing gets missed
    D._returnDue[nm]={since:v.until,reason:v.reason||''};
    delete D._confiscate[nm];changed=true}});
-if(changed){sv();rr()}}
+// Confiscation expiry is a DETERMINISTIC time transition (every device
+// computes it identically from v.until<=now), so this must NOT bump the
+// _updatedAt timestamp or push to Firestore. If it did, an auto-run on
+// device B at exactly the moment device A finishes a real user edit
+// would win the timestamp race and overwrite A's user change on the next
+// snapshot. sv({bg:true}) → save to localStorage, don't sync.
+if(changed){sv({bg:true});rr()}}
 setInterval(checkConfExpiry,30000);checkConfExpiry();
 function returnPhone(nm){if(!D._returnDue)return;delete D._returnDue[nm];sv();rr();}
 // manual early return - the boy got his phone back before the confiscation
