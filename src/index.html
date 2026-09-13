@@ -3857,7 +3857,35 @@ h+='</body></html>';
 printHTML(h,'\u05d3\u05d5\u05d7 \u05e0\u05d9\u05e7\u05d9\u05d5\u05df');
 }
 
-function printReport(){
+// Sync-safe print entry point. Before generating the report we (1) flush
+// any pending local write so a fresh queue on the phone doesn't miss its
+// own edits, and (2) block on a snapshot round-trip so anything a
+// different device just did lands here first. This is what stops the
+// "phone printed 15 tasks but cloud only has 12" pattern that came from
+// printing on stale local state.
+async function printReport(){
+ try{
+  showBanner('🔄 מסנכרן לפני הדפסה...',1500);
+  try{await flushSv();}catch(e){}
+  try{
+   var snap=await _fbDocRef.get();
+   if(snap.exists){
+    var remote=snap.data();
+    var remoteTs=remote._updatedAt||0, localTs=D._updatedAt||0;
+    // Only overwrite local if remote is strictly newer — protects a fresh
+    // unpushed edit from being wiped by a stale cloud read.
+    if(remoteTs>localTs){
+     D={...df(),...remote};
+     heal();
+     _mergePhotos();
+     try{localStorage.setItem(K,JSON.stringify(D));}catch(e){}
+    }
+   }
+  }catch(e){/* offline or transient — proceed with local state */}
+ }catch(e){}
+ _printReportImpl();
+}
+function _printReportImpl(){
 var _rm=function(n){var r=parseInt((D.boyRoom||{})[n],10);return isNaN(r)?9999:r;};
 var _bd=function(n){var r=parseInt((D.boyBed||{})[n],10);return isNaN(r)?9999:r;};
 if(!D.boyRoom)D.boyRoom={};if(!D.boyBed)D.boyBed={};
@@ -4924,10 +4952,29 @@ if(!it.length)h+='<div style="text-align:center;padding:40px 20px;color:var(--t2
 h+='<div class="dcolgrid">';
 it.forEach(t=>{const sm={waiting:['ממתין','var(--am)','var(--amd)'],late:['לא הביא','var(--rd)','var(--rdd)'],done:['הביא','var(--gr)','var(--grd)'],doubled:['הוכפל','var(--go)','var(--gd)'],frozen:['מוקפא','var(--bl)','var(--bld)'],cancelled:['בוטל','var(--t2)','var(--s3)']};const[sL,sC,sB]=sm[t.status]||sm.waiting;const reason=rD(t);
 h+='<div class="C" style="border-color:'+(t.status==='late'||t.status==='doubled'?'rgba(239,68,68,.18)':'var(--bd)')+'"><div style="display:flex;align-items:center;gap:9px;margin-bottom:4px">'+aH(t.nm,32,11)+'<div style="flex:1"><div style="font-size:16.8px;font-weight:600;color:var(--t0)">'+es(t.nm)+'</div><div style="font-size:13.2px;color:var(--t2)">'+pD(t)+'</div></div>'+cH(sC,sB,sL)+'</div>'+(reason?'<div style="font-size:12.0px;color:var(--t2);margin-bottom:4px">סיבה: '+reason+'</div>':'')+'<div style="font-size:12.0px;color:var(--t2);margin-bottom:4px">ניתן: '+fmR(t.ca)+(t.status==='done'&&t.doneAt?' · הביא: '+fmR(t.doneAt):t.status!=='done'?' · עד: '+dll(t.dln):'')+'</div>'+((t.status==='late'||t.status==='doubled')?(()=>{const dlDate=new Date(t.dl),hrs=Math.floor((Date.now()-dlDate)/36e5);return'<div class="al" style="padding:6px 10px;margin-bottom:4px"><div style="font-size:13.2px;font-weight:600;color:var(--rd)">⚠️ באיחור'+(hrs<24?' '+hrs+' שעות':' '+Math.floor(hrs/24)+' ימים')+'</div></div>'})():'')+
-((t.status==='waiting'||t.status==='late'||t.status==='doubled')?'<div style="display:flex;gap:4px;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--bd);flex-wrap:wrap"><button class="ab" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.1);color:var(--gr)" onclick="wD(\''+t.id+'\')">✅ הביא</button><button class="ab" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:var(--rd)" onclick="wA(\''+t.id+'\')">❌ לא הביא</button><button class="ab" style="border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.1);color:var(--bl)" onclick="wFz(\''+t.id+'\',3)">❄️</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="wMvB(\''+t.id+'\')">↓</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="wDl(\''+t.id+'\')">🗑</button></div>':'')+(t.status==='frozen'?(()=>{const rm=t.fu?Math.max(0,Math.ceil((new Date(t.fu)-Date.now())/864e5)):0;return'<div style="display:flex;gap:4px;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--bd)"><span style="font-size:12.0px;color:var(--bl)">נותרו '+rm+' ימים להקפאה</span><button class="ab" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.1);color:var(--am)" onclick="wUfz(\''+t.id+'\')">↩ החזר לפעיל</button></div>'})():'')+'</div>'});
+((t.status==='waiting'||t.status==='late'||t.status==='doubled')?'<div style="display:flex;gap:4px;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--bd);flex-wrap:wrap"><button class="ab" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.1);color:var(--gr)" onclick="wD(\''+t.id+'\')">✅ הביא</button><button class="ab" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:var(--rd)" onclick="wA(\''+t.id+'\')">❌ לא הביא</button><button class="ab" style="border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.1);color:var(--bl)" onclick="wFz(\''+t.id+'\',3)">❄️</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="wMvB(\''+t.id+'\')">↓</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="wDl(\''+t.id+'\')">🗑</button></div>':'')+(t.status==='done'?'<div style="display:flex;gap:4px;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--bd);flex-wrap:wrap"><button class="ab" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.1);color:var(--am)" onclick="wReopen(\''+t.id+'\')">↩ החזר לפעיל</button><button class="ab" style="border-color:var(--bm);background:var(--s3);color:var(--t2)" onclick="wDl(\''+t.id+'\')">🗑 מחק</button></div>':'')+(t.status==='frozen'?(()=>{const rm=t.fu?Math.max(0,Math.ceil((new Date(t.fu)-Date.now())/864e5)):0;return'<div style="display:flex;gap:4px;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--bd)"><span style="font-size:12.0px;color:var(--bl)">נותרו '+rm+' ימים להקפאה</span><button class="ab" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.1);color:var(--am)" onclick="wUfz(\''+t.id+'\')">↩ החזר לפעיל</button></div>'})():'')+'</div>'});
 h+='</div>'; // close dcolgrid (writing)
 h+='</div></div>';return h}
-function wD(id){_presSc(()=>{D.wt.forEach(t=>{if(t.id===id){t.status='done';t.doneAt=new Date().toISOString()}});D.wh.forEach(t=>{if(t.id===id){t.status='done';t.doneAt=new Date().toISOString()}});sv();rr()})}
+function wD(id){_presSc(()=>{D.wt.forEach(t=>{if(t.id===id){t.status='done';t.doneAt=new Date().toISOString()}});D.wh.forEach(t=>{if(t.id===id){t.status='done';t.doneAt=new Date().toISOString()}});sv();try{flushSv();}catch(e){}rr()})}
+// Reopen a "done" task — reverts to waiting/late depending on whether the
+// deadline has passed. Fixes accidentally-tapped ✅ from the active tab
+// without needing to recreate the task from scratch.
+function wReopen(id){
+ if(!confirm('להחזיר את המשימה למצב פעיל?'))return;
+ _presSc(()=>{
+  var now=new Date();
+  D.wt.forEach(t=>{if(t.id===id){
+   var newStatus=(t.dl&&new Date(t.dl)<now)?'late':'waiting';
+   t.status=newStatus;delete t.doneAt;
+  }});
+  D.wh.forEach(t=>{if(t.id===id){
+   var newStatus=(t.dl&&new Date(t.dl)<now)?'late':'waiting';
+   t.status=newStatus;delete t.doneAt;
+  }});
+  sv();try{flushSv();}catch(e){}rr();
+  showBanner('↩ המשימה חזרה לפעיל',2500);
+ });
+}
 function cpWr(){const pending=D.wt.filter(t=>t.status==='waiting'||t.status==='late'||t.status==='doubled').sort((a,b)=>sLN(a.nm,b.nm));
 if(!pending.length){alert('אין משימות');return}
 const txt=pending.map(t=>{const pkTxt=t.pk&&t.pk.length?t.pk.join(', '):'?';return t.nm+' — פרק '+pkTxt}).join('\n');
