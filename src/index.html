@@ -1394,6 +1394,13 @@ function rHm(){
  colA+='<div class="hm-actrow"><div class="hm-actlbl">⏰ איחור מהקומה</div><button class="hm-actbtn" style="background:var(--amd);border-color:rgba(245,158,11,.3);color:var(--am)" onclick="showFloorLateModal(\'am\')">🌅 בוקר</button><button class="hm-actbtn" style="background:var(--amd);border-color:rgba(245,158,11,.3);color:var(--am)" onclick="showFloorLateModal(\'pm\')">🕐 צהריים</button></div>';
  colA+='<div class="hm-actrow hm-actrow-single"><button class="hm-actbtn hm-actbtn-wide" style="background:var(--bld);border-color:rgba(59,130,246,.3);color:var(--bl)" onclick="go(\'locks\')">🔐 עדכון מנעולים</button></div>';
  colA+='<div class="hm-actrow hm-actrow-single"><button class="hm-actbtn hm-actbtn-wide" style="background:var(--pud);border-color:rgba(167,139,250,.3);color:var(--pu)" onclick="go(\'sleeptbl\')">🛏 טבלת שינה</button></div>';
+ // Cabinet scanner entry — a badge appears if a fresh unapplied scan is
+ // waiting from the native scanner app.
+ {
+  var _cabPending=(D._cabinetScan&&D._cabinetScan.ts&&!D._cabinetScan.applied);
+  var _cabLabel='🗄 סריקת ארון טלפונים'+(_cabPending?' <span style="background:var(--rd);color:#fff;padding:1px 6px;border-radius:6px;font-size:11px;margin-inline-start:6px;font-weight:800">חדש</span>':'');
+  colA+='<div class="hm-actrow hm-actrow-single"><button class="hm-actbtn hm-actbtn-wide" style="background:'+(_cabPending?'var(--grd)':'var(--gd)')+';border-color:'+(_cabPending?'rgba(34,197,94,.4)':'var(--gb)')+';color:var(--go)" onclick="openCabinetEditor()">'+_cabLabel+'</button></div>';
+ }
  colA+='</div></div>';
  // Scan card removed at user request — updating the report is done manually
  // via the "✏️ עדכן" button. Scan flow still exists (openCamera) but not
@@ -3820,50 +3827,135 @@ function closeCabinetEditor(){
 }
 function _cabRender(){
  var body=document.getElementById('cabEdBody');if(!body)return;
- var _cs=D._cabinetSize||{rows:4,cols:8};
+ // Physical model: the cabinet is `M` shelves (rows) of `cols` slots each.
+ // Slot ids are "<shelf>-<pos>", pos counted right→left (RTL: pos=1 is
+ // rightmost). Boys are placed in room order (rooms sorted asc, boys inside
+ // each room sorted by bed), flowing right→left along shelf 1, then
+ // wrapping to shelf 2, etc. Anything the map doesn't touch is "empty".
+ var _cs=D._cabinetSize||{cols:8};
+ var COLS=_cs.cols||8;
  var _cm=D.cabinetMap||{};
- var _ac=D.pb.filter(iA).sort(function(a,b){return a.localeCompare(b,'he');});
+ var _ac=D.pb.filter(iA);
  var _used={};Object.keys(_cm).forEach(function(k){if(_cm[k])_used[_cm[k]]=k;});
  var _mapped=Object.keys(_cm).filter(function(k){return _cm[k];}).length;
- var _unmapped=_ac.filter(function(b){return !_used[b];});
+ // Palette of subtle room tints so each room's cells share a color band.
+ var _tints=['#3b82f622','#22c55e22','#f59e0b22','#a78bfa22','#ec489922','#06b6d422','#f43f5e22','#84cc1622','#eab30822','#8b5cf622','#14b8a622','#f9731622','#0ea5e922'];
+ var _tintBorders=['#3b82f666','#22c55e66','#f59e0b66','#a78bfa66','#ec489966','#06b6d466','#f43f5e66','#84cc1666','#eab30866','#8b5cf666','#14b8a666','#f9731666','#0ea5e966'];
+ function _roomColor(rm){var n=parseInt(rm,10);if(isNaN(n))return null;return {bg:_tints[(n-1)%_tints.length],bd:_tintBorders[(n-1)%_tintBorders.length]};}
+ // Group active boys by room to render the sequence and the per-room chips.
+ var byRoom={};
+ _ac.forEach(function(b){var r=((D.boyRoom||{})[b]||'').toString();(byRoom[r]=byRoom[r]||[]).push(b);});
+ var roomKeys=Object.keys(byRoom).filter(function(r){return r!=='';}).sort(function(a,b){return +a-+b;});
+ var noRoom=byRoom['']||[];
+ var _bedOf=function(nm){var v=parseInt((D.boyBed||{})[nm],10);return isNaN(v)?9999:v;};
+ var _sortBed=function(a,b){return _bedOf(a)-_bedOf(b)||a.localeCompare(b,'he');};
+ // Sort boys inside each room by bed.
+ roomKeys.forEach(function(r){byRoom[r].sort(_sortBed);});
+ // Total shelves needed = ceil(total boys / cols) + 1 spare shelf for slack.
+ var totalBoys=_ac.length;
+ var SHELVES=Math.max(1,Math.ceil(totalBoys/COLS)+1);
+ // ── header ──
  var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">'
-  +'<div style="font-size:18px;font-weight:800">🗄 מיפוי חורי ארון</div>'
+  +'<div style="font-size:18px;font-weight:800">🗄 מיפוי הארון</div>'
   +'<button style="padding:8px 14px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14px;font-weight:700;cursor:pointer" onclick="closeCabinetEditor()">✕ סגור</button>'
   +'</div>';
- h+='<div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:9px;background:var(--s3);margin-bottom:10px;flex-wrap:wrap">'
-  +'<label style="font-size:13.2px;color:var(--t1)">שורות '
-  +'<input type="number" min="1" max="20" value="'+_cs.rows+'" style="width:56px;padding:5px 7px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:14px;text-align:center;margin-inline-start:4px" onchange="setCabinetSize(this.value,null)"></label>'
-  +'<label style="font-size:13.2px;color:var(--t1)">עמודות '
-  +'<input type="number" min="1" max="20" value="'+_cs.cols+'" style="width:56px;padding:5px 7px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:14px;text-align:center;margin-inline-start:4px" onchange="setCabinetSize(null,this.value)"></label>'
-  +'<div style="flex:1;text-align:end;font-size:12.6px;color:var(--t2)">ממופים: <b style="color:var(--gr)">'+_mapped+'</b> · לא ממופים: <b style="color:var(--am)">'+_unmapped.length+'</b></div>'
+ // ── scan actions ──
+ var _lastScan=D._cabinetScan;
+ h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+  +'<button style="flex:1;min-width:180px;padding:11px;border-radius:9px;background:var(--go);border:none;color:#0a0f1c;font-size:14.4px;font-weight:800;cursor:pointer" onclick="openCabinetScanner()">📸 פתח סורק בטלפון</button>'
+  +(_lastScan&&_lastScan.ts&&!_lastScan.applied?'<button style="flex:1;min-width:180px;padding:11px;border-radius:9px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:14.4px;font-weight:800;cursor:pointer" onclick="applyCabinetScan();closeCabinetEditor()">✓ החל תוצאות סריקה</button>':'')
   +'</div>';
- if(_unmapped.length){
-  h+='<div style="padding:8px 10px;border-radius:8px;background:var(--amd);border:1px solid rgba(245,158,11,.3);margin-bottom:10px;font-size:12.6px;color:var(--am);line-height:1.5"><b>לא ממופים:</b> '+_unmapped.map(es).join(' · ')+'</div>';
+ if(_lastScan&&_lastScan.ts){
+  var _sd=new Date(_lastScan.ts);
+  var _res=_lastScan.results||{};
+  var _empty=[],_phoneN=0;
+  Object.keys(_res).forEach(function(k){
+   var b=_cm[k];if(!b)return;
+   if(_res[k]==='empty')_empty.push(b);
+   else if(_res[k]==='phone')_phoneN++;
+  });
+  h+='<div style="padding:9px 11px;border-radius:9px;background:var(--bld);border:1px solid rgba(59,130,246,.25);margin-bottom:10px">'
+   +'<div style="font-size:12.6px;font-weight:700;color:var(--bl);margin-bottom:3px">📸 סריקה אחרונה · '+es(_sd.toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}))+'</div>'
+   +'<div style="font-size:12px;color:var(--t1)">✅ הפקידו: '+_phoneN+' · ❌ לא הפקידו: '+_empty.length+(_empty.length?' — '+_empty.map(es).join(', '):'')+'</div>'
+   +'</div>';
  }
- h+='<div style="overflow-x:auto"><table style="border-collapse:separate;border-spacing:4px;margin:0 auto"><tbody>';
- for(var r=1;r<=_cs.rows;r++){
-  h+='<tr>';
-  for(var c=1;c<=_cs.cols;c++){
-   var k=r+'-'+c;
+ // ── cols setter + stats ──
+ h+='<div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:9px;background:var(--s3);margin-bottom:10px;flex-wrap:wrap">'
+  +'<label style="font-size:13.2px;color:var(--t1)">חורים במדף '
+  +'<input type="number" min="1" max="20" value="'+COLS+'" style="width:56px;padding:5px 7px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:14px;text-align:center;margin-inline-start:4px" onchange="setCabinetSize(null,this.value)"></label>'
+  +'<div style="flex:1;text-align:end;font-size:12.6px;color:var(--t2)">ממופים: <b style="color:var(--gr)">'+_mapped+'</b> / '+_ac.length+'</div>'
+  +'</div>';
+ // ── room legend (colored chips) ──
+ if(roomKeys.length){
+  h+='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">';
+  roomKeys.forEach(function(r){
+   var col=_roomColor(r);
+   h+='<span style="padding:3px 8px;border-radius:6px;font-size:11.4px;font-weight:700;background:'+col.bg+';border:1px solid '+col.bd+';color:var(--t0)">🏠 חדר '+r+' · '+byRoom[r].length+'</span>';
+  });
+  h+='</div>';
+ }
+ if(noRoom.length){
+  h+='<div style="padding:8px 10px;border-radius:8px;background:var(--amd);border:1px solid rgba(245,158,11,.3);margin-bottom:10px;font-size:12.6px;color:var(--am);line-height:1.5"><b>⚠️ '+noRoom.length+' בחורים ללא חדר משויך:</b> '+noRoom.map(es).join(' · ')+'<div style="margin-top:4px;font-size:11.4px">שייך אותם לחדר בהגדרות → ניהול בחורים כדי שיכללו במיפוי.</div></div>';
+ }
+ // ── shelf grid — right-to-left per shelf, top shelf first ──
+ // The outer container uses direction:rtl so grid columns fill rightmost first.
+ for(var s=1;s<=SHELVES;s++){
+  h+='<div style="margin-bottom:8px"><div style="font-size:12.6px;color:var(--t2);font-weight:700;margin-bottom:4px">📚 מדף '+s+' <span style="color:var(--t2);font-weight:400;font-size:11px">(ימין → שמאל)</span></div>';
+  h+='<div style="direction:rtl;display:grid;grid-template-columns:repeat('+COLS+',minmax(90px,1fr));gap:5px">';
+  for(var c=1;c<=COLS;c++){
+   var k=s+'-'+c;
    var cur=_cm[k]||'';
-   h+='<td style="padding:0"><div style="background:var(--s3);border:1px solid var(--bd);border-radius:8px;padding:5px;min-width:110px"><div style="font-size:10.8px;color:var(--t2);text-align:center;font-weight:700;margin-bottom:3px">חור '+r+'-'+c+'</div>'
-    +'<select style="width:100%;padding:4px 4px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:12.4px" onchange="setCabinetCell(\''+k+'\',this.value)">'
+   var rm=cur?((D.boyRoom||{})[cur]||''):'';
+   var col=rm?_roomColor(rm):null;
+   var cellBg=col?col.bg:'var(--s3)';
+   var cellBd=col?col.bd:'var(--bd)';
+   h+='<div style="background:'+cellBg+';border:1px solid '+cellBd+';border-radius:8px;padding:5px 6px">'
+    +'<div style="font-size:10.4px;color:var(--t2);text-align:center;font-weight:700;margin-bottom:3px">'+s+'-'+c+(rm?' <span style="color:var(--t1)">· חדר '+rm+'</span>':'')+'</div>'
+    +'<select style="width:100%;padding:5px 4px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:12.2px" onchange="setCabinetCell(\''+k+'\',this.value)">'
     +'<option value="">— ריק —</option>';
-   _ac.forEach(function(b){
-    var otherSlot=_used[b];var disabled=(otherSlot&&otherSlot!==k)?' disabled':'';
-    h+='<option value="'+es(b)+'"'+(cur===b?' selected':'')+disabled+'>'+es(b)+(disabled?' ('+otherSlot+')':'')+'</option>';
+   // options grouped by room, in room order
+   roomKeys.forEach(function(r){
+    h+='<optgroup label="חדר '+r+'">';
+    byRoom[r].forEach(function(b){
+     var otherSlot=_used[b];var disabled=(otherSlot&&otherSlot!==k)?' disabled':'';
+     var bd=(D.boyBed||{})[b]||'';
+     h+='<option value="'+es(b)+'"'+(cur===b?' selected':'')+disabled+'>'+(bd?'🛏'+bd+' ':'')+es(b)+(disabled?' ('+otherSlot+')':'')+'</option>';
+    });
+    h+='</optgroup>';
    });
-   h+='</select></div></td>';
+   if(noRoom.length){
+    h+='<optgroup label="ללא חדר">';
+    noRoom.forEach(function(b){
+     var otherSlot=_used[b];var disabled=(otherSlot&&otherSlot!==k)?' disabled':'';
+     h+='<option value="'+es(b)+'"'+(cur===b?' selected':'')+disabled+'>'+es(b)+(disabled?' ('+otherSlot+')':'')+'</option>';
+    });
+    h+='</optgroup>';
+   }
+   h+='</select>';
+   if(cur){h+='<div style="font-size:10.4px;color:var(--t0);text-align:center;margin-top:3px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+es(cur)+'">'+es(cur)+'</div>';}
+   h+='</div>';
   }
-  h+='</tr>';
+  h+='</div></div>';
  }
- h+='</tbody></table></div>';
+ // ── footer buttons ──
  h+='<div style="display:flex;gap:8px;margin-top:12px">'
   +'<button style="flex:1;padding:9px;border-radius:8px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:13.2px;font-weight:700;cursor:pointer" onclick="if(confirm(\'למחוק את כל המיפוי?\')){D.cabinetMap={};sv();_cabRender();}">🗑 נקה הכל</button>'
-  +'<button style="flex:2;padding:9px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:13.2px;font-weight:700;cursor:pointer" onclick="_cabAutoFill()">⚡ מלא אוטומטית לפי חדר/מיטה</button>'
+  +'<button style="flex:2;padding:9px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:13.2px;font-weight:800;cursor:pointer" onclick="_cabAutoFill()">⚡ מלא אוטומטית לפי סדר החדרים</button>'
   +'</div>';
- h+='<div style="margin-top:10px;font-size:11.4px;color:var(--t2);line-height:1.5;padding-top:8px;border-top:1px dashed var(--bd)">בחור שכבר משויך לחור אחר מופיע מנוטרל ברשימה עם מספר החור שלו. אפשר לבחור אותו רק אם קודם מרוקנים את החור הקיים.</div>';
+ h+='<div style="margin-top:10px;font-size:11.4px;color:var(--t2);line-height:1.5;padding-top:8px;border-top:1px dashed var(--bd)">הבחורים ממוקמים לפי סדר החדרים (1, 2, 3…), ימין→שמאל בכל מדף, ואז יורדים למדף הבא. הצבע של כל חור מציג לאיזה חדר הבחור שם שייך. "מלא אוטומטית" משבץ מחדש את כולם ברצף לפי סדר החדרים ומספר המיטה.</div>';
  body.innerHTML=h;
+}
+// ── open the native cabinet-scanner iOS app via URL scheme.
+// If the app is installed it hijacks navigation and opens the scanner;
+// if it isn't, iOS silently ignores the redirect and the fallback text
+// tells the user what to do. The scheme name is a working contract for
+// the future Swift companion — nothing on the web side actually knows
+// whether it succeeded.
+function openCabinetScanner(){
+ try{window.location.href='yeshivacab://scan';}catch(e){}
+ setTimeout(function(){
+  showBanner('📸 אם האפליקציה הנייטיבית מותקנת — היא נפתחת כעת. אחרת: יש להתקין את סורק הארון לאייפון.',5000);
+ },500);
 }
 function setCabinetSize(rows,cols){
  if(!D._cabinetSize)D._cabinetSize={rows:4,cols:8};
@@ -3883,24 +3975,37 @@ function setCabinetCell(key,val){
  sv();_cabRender();
 }
 function _cabAutoFill(){
- // Convention: room number → row, bed number → column (best-effort).
- // Only fills cells that are currently empty; never overrides an existing
- // assignment. Boys without room/bed are skipped and stay unmapped.
- if(!D.cabinetMap)D.cabinetMap={};
+ // Physical model: shelves × cols; boys placed in room-order (rooms asc,
+ // bed asc inside a room), flowing RTL across shelf 1 then wrapping to
+ // shelf 2, etc. Unlike the previous room→row mapping this rebuilds the
+ // whole map so the sequence stays contiguous — a confirm() guards the
+ // overwrite in case the user hand-tuned something.
  if(!D.boyRoom)D.boyRoom={};if(!D.boyBed)D.boyBed={};
- var _cs=D._cabinetSize||{rows:4,cols:8};
- var _used={};Object.keys(D.cabinetMap).forEach(function(k){if(D.cabinetMap[k])_used[D.cabinetMap[k]]=1;});
- var placed=0;
- D.pb.filter(iA).forEach(function(b){
-  if(_used[b])return;
-  var r=parseInt(D.boyRoom[b],10),c=parseInt(D.boyBed[b],10);
-  if(!(r>=1&&r<=_cs.rows)||!(c>=1&&c<=_cs.cols))return;
-  var k=r+'-'+c;
-  if(D.cabinetMap[k])return;
-  D.cabinetMap[k]=b;placed++;
+ var _cs=D._cabinetSize||{cols:8};
+ var COLS=_cs.cols||8;
+ var _ac=D.pb.filter(iA);
+ var byRoom={};
+ _ac.forEach(function(b){var r=((D.boyRoom||{})[b]||'').toString();(byRoom[r]=byRoom[r]||[]).push(b);});
+ var rooms=Object.keys(byRoom).filter(function(r){return r!=='';}).sort(function(a,b){return +a-+b;});
+ var _bedOf=function(nm){var v=parseInt((D.boyBed||{})[nm],10);return isNaN(v)?9999:v;};
+ var seq=[];
+ rooms.forEach(function(r){
+  byRoom[r].sort(function(a,b){return _bedOf(a)-_bedOf(b)||a.localeCompare(b,'he');}).forEach(function(b){seq.push(b);});
  });
- if(placed)sv();
- showBanner(placed?('⚡ שובצו אוטומטית '+placed+' בחורים'):'לא נמצאו התאמות חדשות',2500);
+ // boys without a room: placed at the very end (they still need a slot).
+ (byRoom['']||[]).sort(function(a,b){return a.localeCompare(b,'he');}).forEach(function(b){seq.push(b);});
+ if(!seq.length){showBanner('אין בחורים פעילים לשיבוץ',2500);return;}
+ var hadMap=D.cabinetMap&&Object.keys(D.cabinetMap).filter(function(k){return D.cabinetMap[k];}).length>0;
+ if(hadMap&&!confirm('לבנות מיפוי חדש? הפעולה תדרוס את המיפוי הנוכחי לפי סדר החדרים (ימין→שמאל, יורד למדף הבא).'))return;
+ var newMap={};
+ seq.forEach(function(b,i){
+  var shelf=Math.floor(i/COLS)+1;
+  var pos=(i%COLS)+1;
+  newMap[shelf+'-'+pos]=b;
+ });
+ D.cabinetMap=newMap;
+ sv();
+ showBanner('⚡ שובצו '+seq.length+' בחורים ב-'+Math.ceil(seq.length/COLS)+' מדפים',2800);
  _cabRender();
 }
 function applyCabinetScan(){
