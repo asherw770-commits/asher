@@ -3992,14 +3992,20 @@ function openCabinetReview(photoDataUrl){
  mappedKeys.forEach(function(k){window._cabReview.results[k]='phone';});
  var w=document.createElement('div');
  w.id='cabinetReviewOverlay';
- w.style.cssText='position:fixed;inset:0;background:var(--s0);z-index:10002;overflow-y:auto;padding:12px;color:var(--t0)';
- w.innerHTML='<div id="cabRevBody"></div>';
+ // Solid opaque backdrop — the whole viewport is covered so nothing
+ // from the underlying page bleeds through. Using #0a0f1c (the app's
+ // deepest dark) rather than a bogus var(--s0) which doesn't exist.
+ w.style.cssText='position:fixed;inset:0;background:#0a0f1c;z-index:10002;overflow-y:auto;padding:12px;color:var(--t0);-webkit-overflow-scrolling:touch';
+ w.innerHTML='<div id="cabRevBody" style="max-width:900px;margin:0 auto"></div>';
  document.body.appendChild(w);
+ // Prevent the underlying page from scrolling behind the modal on iOS
+ document.body.style.overflow='hidden';
  _cabReviewRender();
 }
 function closeCabinetReview(){
  var w=document.getElementById('cabinetReviewOverlay');if(w)w.remove();
  window._cabReview=null;
+ document.body.style.overflow='';
  rr();
 }
 function _cabReviewRender(){
@@ -4050,7 +4056,7 @@ function _cabReviewRender(){
    h+='<div style="margin-bottom:8px"><div style="font-size:12px;color:var(--t2);font-weight:700;margin-bottom:4px">📚 מדף '+s+' <span style="color:var(--t2);font-weight:400;font-size:11px">(ימין → שמאל)</span></div>'+shelfBody+'</div>';
   }
  }
- h+='<div style="position:sticky;bottom:0;background:var(--s0);padding:10px 0 4px;margin-top:10px;border-top:1px solid var(--bd);display:flex;gap:8px">'
+ h+='<div style="position:sticky;bottom:0;background:#0a0f1c;padding:10px 4px 12px;margin-top:10px;border-top:1px solid var(--bd);display:flex;gap:8px">'
   +'<button style="flex:1;padding:12px;border-radius:9px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14.4px;font-weight:700;cursor:pointer" onclick="closeCabinetReview()">✕ ביטול</button>'
   +'<button style="flex:2;padding:12px;border-radius:9px;background:var(--go);border:none;color:#0a0f1c;font-size:15px;font-weight:800;cursor:pointer" onclick="submitCabinetReview()">💾 שמור והחל '+_emptyN+' חוסרים</button>'
   +'</div>';
