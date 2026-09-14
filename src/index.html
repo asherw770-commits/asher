@@ -1607,7 +1607,7 @@ h+='</div></div>';
 {
  var _cm=D.cabinetMap||{},_cs=D._cabinetSize||{rows:4,cols:8};
  var _mapped=Object.keys(_cm).filter(function(k){return _cm[k];}).length;
- var _ac=D.pb.filter(iA);
+ var _ac=D.pb.filter(function(b){return !isInactive(b);});
  var _lastScan=D._cabinetScan;
  h+='<div class="C" style="margin-bottom:10px"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:6px">🗄 ארון טלפונים</div>';
  h+='<div style="font-size:13.2px;color:var(--t2);margin-bottom:10px;line-height:1.5">מפה איזה בחור שייך לאיזה חור בארון. אפליקציית הסריקה מזהה כל חור בנפרד ומדווחת ריק/מלא.</div>';
@@ -3835,7 +3835,10 @@ function _cabRender(){
  var _cs=D._cabinetSize||{cols:8};
  var COLS=_cs.cols||8;
  var _cm=D.cabinetMap||{};
- var _ac=D.pb.filter(iA);
+ // Cabinet mapping includes every non-archived boy — a confiscated or
+ // signed-out boy still has a physical slot in the cabinet, iA() would
+ // wrongly exclude them.
+ var _ac=D.pb.filter(function(b){return !isInactive(b);});
  var _used={};Object.keys(_cm).forEach(function(k){if(_cm[k])_used[_cm[k]]=k;});
  var _mapped=Object.keys(_cm).filter(function(k){return _cm[k];}).length;
  // Palette of subtle room tints so each room's cells share a color band.
@@ -3945,17 +3948,138 @@ function _cabRender(){
  h+='<div style="margin-top:10px;font-size:11.4px;color:var(--t2);line-height:1.5;padding-top:8px;border-top:1px dashed var(--bd)">הבחורים ממוקמים לפי סדר החדרים (1, 2, 3…), ימין→שמאל בכל מדף, ואז יורדים למדף הבא. הצבע של כל חור מציג לאיזה חדר הבחור שם שייך. "מלא אוטומטית" משבץ מחדש את כולם ברצף לפי סדר החדרים ומספר המיטה.</div>';
  body.innerHTML=h;
 }
-// ── open the native cabinet-scanner iOS app via URL scheme.
-// If the app is installed it hijacks navigation and opens the scanner;
-// if it isn't, iOS silently ignores the redirect and the fallback text
-// tells the user what to do. The scheme name is a working contract for
-// the future Swift companion — nothing on the web side actually knows
-// whether it succeeded.
+// ── PWA-native cabinet scan flow ────────────────────────────────────────
+// Until the CoreML iOS companion ships, the "scan" is a manual review:
+// user takes a photo of the cabinet, then flips per-slot toggles on top
+// of a shelf grid rendered from cabinetMap. On submit it writes
+// _cabinetScan (without the photo — Firestore doc cap is 1MB and a
+// camera JPEG easily blows that) and immediately applies to D.pt via
+// applyCabinetScan(), so one motion = both scan + deposit update.
+// When the CoreML app arrives it writes _cabinetScan with the same
+// shape and the same applyCabinetScan() drives everything.
 function openCabinetScanner(){
- try{window.location.href='yeshivacab://scan';}catch(e){}
- setTimeout(function(){
-  showBanner('📸 אם האפליקציה הנייטיבית מותקנת — היא נפתחת כעת. אחרת: יש להתקין את סורק הארון לאייפון.',5000);
- },500);
+ var _cm=D.cabinetMap||{};
+ var mappedKeys=Object.keys(_cm).filter(function(k){return _cm[k];});
+ if(!mappedKeys.length){
+  alert('אין מיפוי חורים עדיין. פתח את "ערוך מיפוי" ולחץ על "⚡ מלא אוטומטית לפי סדר החדרים".');
+  return;
+ }
+ var inp=document.createElement('input');
+ inp.type='file';inp.accept='image/*';inp.setAttribute('capture','environment');
+ inp.style.cssText='position:fixed;left:-9999px;top:-9999px';
+ inp.onchange=function(e){
+  var f=e.target.files&&e.target.files[0];
+  document.body.removeChild(inp);
+  if(!f){return;}
+  var reader=new FileReader();
+  reader.onload=function(ev){openCabinetReview(ev.target.result);};
+  reader.onerror=function(){alert('שגיאה בקריאת התמונה');};
+  reader.readAsDataURL(f);
+ };
+ document.body.appendChild(inp);
+ inp.click();
+}
+function openCabinetReview(photoDataUrl){
+ // Close the map editor if it's currently open — the review IS the
+ // scan flow, and the two shouldn't stack visually.
+ var e=document.getElementById('cabinetOverlay');if(e)e.remove();
+ var _cm=D.cabinetMap||{};
+ var mappedKeys=Object.keys(_cm).filter(function(k){return _cm[k];});
+ // seed review state — start with everyone "phone" (deposited). The user
+ // taps the ones that are empty. This matches the common case: most
+ // boys deposit, a few didn't.
+ window._cabReview={photo:photoDataUrl||null,results:{}};
+ mappedKeys.forEach(function(k){window._cabReview.results[k]='phone';});
+ var w=document.createElement('div');
+ w.id='cabinetReviewOverlay';
+ w.style.cssText='position:fixed;inset:0;background:var(--s0);z-index:10002;overflow-y:auto;padding:12px;color:var(--t0)';
+ w.innerHTML='<div id="cabRevBody"></div>';
+ document.body.appendChild(w);
+ _cabReviewRender();
+}
+function closeCabinetReview(){
+ var w=document.getElementById('cabinetReviewOverlay');if(w)w.remove();
+ window._cabReview=null;
+ rr();
+}
+function _cabReviewRender(){
+ var body=document.getElementById('cabRevBody');if(!body)return;
+ var st=window._cabReview;if(!st)return;
+ var _cm=D.cabinetMap||{};
+ var _cs=D._cabinetSize||{cols:8};
+ var COLS=_cs.cols||8;
+ var totalBoys=D.pb.filter(function(b){return !isInactive(b);}).length;
+ var SHELVES=Math.max(1,Math.ceil(totalBoys/COLS)+1);
+ var _phoneN=0,_emptyN=0;
+ Object.keys(st.results).forEach(function(k){if(st.results[k]==='phone')_phoneN++;else if(st.results[k]==='empty')_emptyN++;});
+ var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px">'
+  +'<div style="font-size:17px;font-weight:800">📸 סימון הפקדות מהתמונה</div>'
+  +'<button style="padding:7px 12px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:13.2px;font-weight:700;cursor:pointer" onclick="closeCabinetReview()">✕ ביטול</button>'
+  +'</div>';
+ if(st.photo){
+  h+='<div style="margin-bottom:10px;border-radius:9px;overflow:hidden;border:1px solid var(--bd);max-height:38vh"><img src="'+st.photo+'" style="width:100%;display:block;max-height:38vh;object-fit:contain;background:#000"></div>';
+ }
+ h+='<div style="padding:8px 10px;border-radius:8px;background:var(--s3);margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
+  +'<div style="font-size:12.6px;color:var(--t1);flex:1;line-height:1.5"><b>לחץ על חור כדי להפוך למצב "לא הפקיד" (אדום). לחיצה שנייה מחזירה למצב "הפקיד" (ירוק).</b></div>'
+  +'<div style="font-size:12.6px;color:var(--t1);white-space:nowrap"><span style="color:var(--gr);font-weight:700">✅ '+_phoneN+'</span> · <span style="color:var(--rd);font-weight:700">❌ '+_emptyN+'</span></div>'
+  +'</div>';
+ h+='<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
+  +'<button style="flex:1;min-width:120px;padding:8px;border-radius:7px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:12.6px;font-weight:700;cursor:pointer" onclick="_cabReviewAll(\'empty\')">סמן הכל כלא הפקידו</button>'
+  +'<button style="flex:1;min-width:120px;padding:8px;border-radius:7px;background:var(--grd);border:1px solid rgba(34,197,94,.3);color:var(--gr);font-size:12.6px;font-weight:700;cursor:pointer" onclick="_cabReviewAll(\'phone\')">סמן הכל כהפקידו</button>'
+  +'</div>';
+ for(var s=1;s<=SHELVES;s++){
+  var hadAny=false;
+  var shelfBody='<div style="direction:rtl;display:grid;grid-template-columns:repeat('+COLS+',minmax(80px,1fr));gap:5px">';
+  for(var c=1;c<=COLS;c++){
+   var k=s+'-'+c;
+   var boy=_cm[k];
+   if(!boy){shelfBody+='<div style="background:transparent;border:1px dashed var(--bd);border-radius:7px;padding:6px 4px;font-size:10.4px;color:var(--t2);text-align:center">—</div>';continue;}
+   hadAny=true;
+   var state=st.results[k]||'phone';
+   var bg=state==='phone'?'var(--grd)':'var(--rdd)';
+   var bd=state==='phone'?'rgba(34,197,94,.55)':'rgba(239,68,68,.55)';
+   var fg=state==='phone'?'var(--gr)':'var(--rd)';
+   var icon=state==='phone'?'✅':'❌';
+   shelfBody+='<button style="background:'+bg+';border:2px solid '+bd+';border-radius:7px;padding:7px 4px;color:'+fg+';font-size:11.6px;font-weight:700;cursor:pointer;text-align:center;line-height:1.3;min-height:56px" onclick="_cabReviewToggle(\''+k+'\')">'
+    +'<div style="font-size:15px;margin-bottom:2px">'+icon+'</div>'
+    +'<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+es(boy)+'">'+es(boy)+'</div>'
+    +'</button>';
+  }
+  shelfBody+='</div>';
+  if(hadAny){
+   h+='<div style="margin-bottom:8px"><div style="font-size:12px;color:var(--t2);font-weight:700;margin-bottom:4px">📚 מדף '+s+' <span style="color:var(--t2);font-weight:400;font-size:11px">(ימין → שמאל)</span></div>'+shelfBody+'</div>';
+  }
+ }
+ h+='<div style="position:sticky;bottom:0;background:var(--s0);padding:10px 0 4px;margin-top:10px;border-top:1px solid var(--bd);display:flex;gap:8px">'
+  +'<button style="flex:1;padding:12px;border-radius:9px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14.4px;font-weight:700;cursor:pointer" onclick="closeCabinetReview()">✕ ביטול</button>'
+  +'<button style="flex:2;padding:12px;border-radius:9px;background:var(--go);border:none;color:#0a0f1c;font-size:15px;font-weight:800;cursor:pointer" onclick="submitCabinetReview()">💾 שמור והחל '+_emptyN+' חוסרים</button>'
+  +'</div>';
+ body.innerHTML=h;
+}
+function _cabReviewToggle(k){
+ var st=window._cabReview;if(!st)return;
+ st.results[k]=(st.results[k]==='phone')?'empty':'phone';
+ _cabReviewRender();
+}
+function _cabReviewAll(val){
+ var st=window._cabReview;if(!st)return;
+ Object.keys(st.results).forEach(function(k){st.results[k]=val;});
+ _cabReviewRender();
+}
+function submitCabinetReview(){
+ var st=window._cabReview;if(!st)return;
+ // Persist as _cabinetScan then run applyCabinetScan(). The photo isn't
+ // stored — one whole JPEG doesn't fit in the 1MB Firestore doc cap
+ // once base64-encoded. Only the per-slot decisions travel.
+ D._cabinetScan={
+  ts:Date.now(),
+  device:'📱 סריקה ידנית (PWA)',
+  results:st.results,
+  applied:false
+ };
+ sv();try{flushSv();}catch(e){}
+ applyCabinetScan();
+ closeCabinetReview();
 }
 function setCabinetSize(rows,cols){
  if(!D._cabinetSize)D._cabinetSize={rows:4,cols:8};
@@ -3983,7 +4107,7 @@ function _cabAutoFill(){
  if(!D.boyRoom)D.boyRoom={};if(!D.boyBed)D.boyBed={};
  var _cs=D._cabinetSize||{cols:8};
  var COLS=_cs.cols||8;
- var _ac=D.pb.filter(iA);
+ var _ac=D.pb.filter(function(b){return !isInactive(b);});
  var byRoom={};
  _ac.forEach(function(b){var r=((D.boyRoom||{})[b]||'').toString();(byRoom[r]=byRoom[r]||[]).push(b);});
  var rooms=Object.keys(byRoom).filter(function(r){return r!=='';}).sort(function(a,b){return +a-+b;});
@@ -3994,9 +4118,9 @@ function _cabAutoFill(){
  });
  // boys without a room: placed at the very end (they still need a slot).
  (byRoom['']||[]).sort(function(a,b){return a.localeCompare(b,'he');}).forEach(function(b){seq.push(b);});
- if(!seq.length){showBanner('אין בחורים פעילים לשיבוץ',2500);return;}
- var hadMap=D.cabinetMap&&Object.keys(D.cabinetMap).filter(function(k){return D.cabinetMap[k];}).length>0;
- if(hadMap&&!confirm('לבנות מיפוי חדש? הפעולה תדרוס את המיפוי הנוכחי לפי סדר החדרים (ימין→שמאל, יורד למדף הבא).'))return;
+ if(!seq.length){alert('אין בחורים פעילים ברשימה. הוסף בחורים בהגדרות → ניהול בחורים.');return;}
+ var existingCount=D.cabinetMap?Object.keys(D.cabinetMap).filter(function(k){return D.cabinetMap[k];}).length:0;
+ if(existingCount>0&&!confirm('לבנות מיפוי חדש עם '+seq.length+' בחורים? המיפוי הנוכחי ('+existingCount+' חורים) יימחק ויוחלף.'))return;
  var newMap={};
  seq.forEach(function(b,i){
   var shelf=Math.floor(i/COLS)+1;
@@ -4004,8 +4128,8 @@ function _cabAutoFill(){
   newMap[shelf+'-'+pos]=b;
  });
  D.cabinetMap=newMap;
- sv();
- showBanner('⚡ שובצו '+seq.length+' בחורים ב-'+Math.ceil(seq.length/COLS)+' מדפים',2800);
+ sv();try{flushSv();}catch(e){}
+ alert('⚡ שובצו '+seq.length+' בחורים ב-'+Math.ceil(seq.length/COLS)+' מדפים ('+COLS+' חורים במדף).'+(rooms.length?'\nחדרים: '+rooms.join(', '):'')+(byRoom['']?'\n\n⚠️ '+(byRoom['']||[]).length+' בחורים ללא חדר משויך — שובצו בסוף הרצף.':''));
  _cabRender();
 }
 function applyCabinetScan(){
