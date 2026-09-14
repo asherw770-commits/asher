@@ -983,7 +983,7 @@ function heal(){
  ['pb','wt','wh','cs','cx','ci','tk','archive'].forEach(function(k){
   if(!Array.isArray(D[k])){D[k]=Array.isArray(d[k])?d[k]:[];fixed++;}
  });
- ['pt','ptA','ph','phA','ps','boyRoom','boyBed','rooms','_confiscate','_returnDue','_confCount','phLate','phLateA','bwLate','loOut','roomTalk','_omrGrids','prt','lockStatus','upperLock','sleepTables','_sleepAlerts','cleanStatus','roomClean','floorLateAM','floorLatePM','dayStatus','reportTalks','_barcodeMap','_inactiveBoys','_notifSchedule']
+ ['pt','ptA','ph','phA','ps','boyRoom','boyBed','rooms','_confiscate','_returnDue','_confCount','phLate','phLateA','bwLate','loOut','roomTalk','_omrGrids','prt','lockStatus','upperLock','sleepTables','_sleepAlerts','cleanStatus','roomClean','floorLateAM','floorLatePM','dayStatus','reportTalks','_barcodeMap','_inactiveBoys','_notifSchedule','cabinetMap','_cabinetSize','_cabinetScan']
   .forEach(function(k){
    if(D[k]===null||D[k]===undefined||typeof D[k]!=='object'||Array.isArray(D[k])){
     D[k]=(d[k]&&typeof d[k]==='object'&&!Array.isArray(d[k]))?d[k]:{};fixed++;}
@@ -1590,6 +1590,47 @@ else h+='<div style="font-size:14.4px;color:var(--t2)">אין בחורים בא�
 h+='</div>';
 
 h+='</div></div>';
+// ─── Cabinet / phone-slots mapping + last AI scan result ────────────────
+// Shape:
+//   D.cabinetMap   : {"<row>-<col>": "<boy name>", ...}   — one boy per slot
+//   D._cabinetSize : {rows, cols}                          — grid dims
+//   D._cabinetScan : {ts, device, results:{"r-c":"phone"|"empty"}, applied:bool}
+//     written by the native iOS scanner app after each cabinet photo.
+// The map is edited here in the PWA (native app only reads it).
+{
+ var _cm=D.cabinetMap||{},_cs=D._cabinetSize||{rows:4,cols:8};
+ var _mapped=Object.keys(_cm).filter(function(k){return _cm[k];}).length;
+ var _ac=D.pb.filter(iA);
+ var _lastScan=D._cabinetScan;
+ h+='<div class="C" style="margin-bottom:10px"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:6px">🗄 ארון טלפונים</div>';
+ h+='<div style="font-size:13.2px;color:var(--t2);margin-bottom:10px;line-height:1.5">מפה איזה בחור שייך לאיזה חור בארון. אפליקציית הסריקה מזהה כל חור בנפרד ומדווחת ריק/מלא.</div>';
+ h+='<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;background:var(--s3);margin-bottom:8px">'
+  +'<div style="flex:1"><div style="font-size:14.4px;font-weight:700;color:var(--t0)">'+_mapped+' / '+_ac.length+' בחורים ממופים</div>'
+  +'<div style="font-size:12px;color:var(--t2);margin-top:2px">רשת: '+_cs.rows+' שורות · '+_cs.cols+' עמודות</div></div>'
+  +'<button style="padding:8px 14px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:14px;font-weight:700;cursor:pointer" onclick="openCabinetEditor()">✏️ ערוך מיפוי</button>'
+  +'</div>';
+ if(_lastScan&&_lastScan.ts){
+  var _sd=new Date(_lastScan.ts);
+  var _res=_lastScan.results||{};
+  var _empty=[],_phone=[];
+  Object.keys(_res).forEach(function(k){
+   var b=_cm[k];if(!b)return;
+   if(_res[k]==='empty')_empty.push(b);
+   else if(_res[k]==='phone')_phone.push(b);
+  });
+  h+='<div style="padding:9px 11px;border-radius:9px;background:var(--bld);border:1px solid rgba(59,130,246,.25);margin-bottom:8px">'
+   +'<div style="font-size:13.2px;font-weight:700;color:var(--bl);margin-bottom:4px">📸 סריקה אחרונה · '+es(_sd.toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}))+(_lastScan.device?' · '+es(_lastScan.device):'')+'</div>'
+   +'<div style="font-size:12.6px;color:var(--t1);line-height:1.5">'
+   +'✅ הפקידו: '+_phone.length+' · ❌ לא הפקידו: '+_empty.length
+   +(_empty.length?'<div style="margin-top:5px;color:var(--rd);font-weight:600">'+_empty.map(es).join(' · ')+'</div>':'')
+   +'</div>'
+   +(_lastScan.applied?'<div style="margin-top:6px;font-size:11.4px;color:var(--gr);font-weight:600">✓ הוחלו על מצב ההפקדות</div>':'<button style="margin-top:8px;width:100%;padding:8px;border-radius:7px;background:var(--go);border:none;color:#0a0f1c;font-size:13.2px;font-weight:700;cursor:pointer" onclick="applyCabinetScan()">החל תוצאות על מצב הפקדות</button>')
+   +'</div>';
+ } else {
+  h+='<div style="padding:9px 11px;border-radius:9px;background:var(--s3);color:var(--t2);font-size:12.6px;line-height:1.5">עוד לא הגיעה סריקה מהאפליקציה הנייטיבית. אחרי הצילום הראשון תופיע כאן תוצאה.</div>';
+ }
+ h+='</div>';
+}
 h+='<div class="C"><div style="font-weight:700;font-size:16.8px;color:var(--t0);margin-bottom:8px">🔑 קוד נעילה</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:8px">הקוד מוסתר. להחליף — הזן קוד חדש בן 4 ספרות ולחץ שמור.</div><div style="display:flex;gap:8px;align-items:center"><input class="inp" id="pinInp" type="password" inputmode="numeric" autocomplete="new-password" placeholder="••••" value="" style="width:110px;text-align:center;font-size:21.6px;letter-spacing:6px" maxlength="4"><button style="padding:8px 16px;border-radius:8px;background:var(--go);color:#0a0f1c;border:none;font-size:15.6px;font-weight:700;cursor:pointer" onclick="(async function(){var v=(document.getElementById(\'pinInp\').value||\'\').trim();if(!/^[0-9]{4}$/.test(v)){alert(\'הזן בדיוק 4 ספרות\');return;}if(!(await requireAuth(\'להחלפת הקוד\')))return;await _pinSet(v);document.getElementById(\'pinInp\').value=\'\';alert(\'הקוד עודכן\');})()">שמור</button></div>';
 var _bioReg=bioIsRegistered();
 h+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)"><div style="font-weight:700;font-size:15.6px;color:var(--t0);margin-bottom:4px">🔐 Face ID / Touch ID</div><div style="font-size:13.2px;color:var(--t2);margin-bottom:8px">כדי לפתוח את השיחות בלי להזין קוד. מוגדר לכל מכשיר בנפרד.</div>';
@@ -3757,6 +3798,128 @@ delete D.ps[nm];delete D.pt[nm];
 sv();rr()}
 function unarchiveBoy(nm){if(!D.archive)return;
 D.archive=D.archive.filter(b=>b!==nm);D.pb.push(nm);sv();rr()}
+
+// ─── Cabinet map editor ────────────────────────────────────────────────
+// A modal overlay: rows×cols grid of slot selects. Each cell writes to
+// D.cabinetMap[<r-c>] and sv() (debounced) — no separate save button
+// needed. Dims live in D._cabinetSize; changing them triggers a re-render.
+function openCabinetEditor(){
+ if(!D.cabinetMap)D.cabinetMap={};
+ if(!D._cabinetSize)D._cabinetSize={rows:4,cols:8};
+ var w=document.createElement('div');
+ w.id='cabinetOverlay';
+ w.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:14px';
+ w.innerHTML='<div style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px;max-width:900px;width:100%;color:var(--t0)"><div id="cabEdBody"></div></div>';
+ document.body.appendChild(w);
+ _cabRender();
+}
+function closeCabinetEditor(){
+ var w=document.getElementById('cabinetOverlay');
+ if(w)w.remove();
+ rr();
+}
+function _cabRender(){
+ var body=document.getElementById('cabEdBody');if(!body)return;
+ var _cs=D._cabinetSize||{rows:4,cols:8};
+ var _cm=D.cabinetMap||{};
+ var _ac=D.pb.filter(iA).sort(function(a,b){return a.localeCompare(b,'he');});
+ var _used={};Object.keys(_cm).forEach(function(k){if(_cm[k])_used[_cm[k]]=k;});
+ var _mapped=Object.keys(_cm).filter(function(k){return _cm[k];}).length;
+ var _unmapped=_ac.filter(function(b){return !_used[b];});
+ var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">'
+  +'<div style="font-size:18px;font-weight:800">🗄 מיפוי חורי ארון</div>'
+  +'<button style="padding:8px 14px;border-radius:8px;background:var(--s3);border:1px solid var(--bm);color:var(--t1);font-size:14px;font-weight:700;cursor:pointer" onclick="closeCabinetEditor()">✕ סגור</button>'
+  +'</div>';
+ h+='<div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:9px;background:var(--s3);margin-bottom:10px;flex-wrap:wrap">'
+  +'<label style="font-size:13.2px;color:var(--t1)">שורות '
+  +'<input type="number" min="1" max="20" value="'+_cs.rows+'" style="width:56px;padding:5px 7px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:14px;text-align:center;margin-inline-start:4px" onchange="setCabinetSize(this.value,null)"></label>'
+  +'<label style="font-size:13.2px;color:var(--t1)">עמודות '
+  +'<input type="number" min="1" max="20" value="'+_cs.cols+'" style="width:56px;padding:5px 7px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:14px;text-align:center;margin-inline-start:4px" onchange="setCabinetSize(null,this.value)"></label>'
+  +'<div style="flex:1;text-align:end;font-size:12.6px;color:var(--t2)">ממופים: <b style="color:var(--gr)">'+_mapped+'</b> · לא ממופים: <b style="color:var(--am)">'+_unmapped.length+'</b></div>'
+  +'</div>';
+ if(_unmapped.length){
+  h+='<div style="padding:8px 10px;border-radius:8px;background:var(--amd);border:1px solid rgba(245,158,11,.3);margin-bottom:10px;font-size:12.6px;color:var(--am);line-height:1.5"><b>לא ממופים:</b> '+_unmapped.map(es).join(' · ')+'</div>';
+ }
+ h+='<div style="overflow-x:auto"><table style="border-collapse:separate;border-spacing:4px;margin:0 auto"><tbody>';
+ for(var r=1;r<=_cs.rows;r++){
+  h+='<tr>';
+  for(var c=1;c<=_cs.cols;c++){
+   var k=r+'-'+c;
+   var cur=_cm[k]||'';
+   h+='<td style="padding:0"><div style="background:var(--s3);border:1px solid var(--bd);border-radius:8px;padding:5px;min-width:110px"><div style="font-size:10.8px;color:var(--t2);text-align:center;font-weight:700;margin-bottom:3px">חור '+r+'-'+c+'</div>'
+    +'<select style="width:100%;padding:4px 4px;border-radius:6px;border:1px solid var(--bm);background:var(--s1);color:var(--t0);font-size:12.4px" onchange="setCabinetCell(\''+k+'\',this.value)">'
+    +'<option value="">— ריק —</option>';
+   _ac.forEach(function(b){
+    var otherSlot=_used[b];var disabled=(otherSlot&&otherSlot!==k)?' disabled':'';
+    h+='<option value="'+es(b)+'"'+(cur===b?' selected':'')+disabled+'>'+es(b)+(disabled?' ('+otherSlot+')':'')+'</option>';
+   });
+   h+='</select></div></td>';
+  }
+  h+='</tr>';
+ }
+ h+='</tbody></table></div>';
+ h+='<div style="display:flex;gap:8px;margin-top:12px">'
+  +'<button style="flex:1;padding:9px;border-radius:8px;background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);font-size:13.2px;font-weight:700;cursor:pointer" onclick="if(confirm(\'למחוק את כל המיפוי?\')){D.cabinetMap={};sv();_cabRender();}">🗑 נקה הכל</button>'
+  +'<button style="flex:2;padding:9px;border-radius:8px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:13.2px;font-weight:700;cursor:pointer" onclick="_cabAutoFill()">⚡ מלא אוטומטית לפי חדר/מיטה</button>'
+  +'</div>';
+ h+='<div style="margin-top:10px;font-size:11.4px;color:var(--t2);line-height:1.5;padding-top:8px;border-top:1px dashed var(--bd)">בחור שכבר משויך לחור אחר מופיע מנוטרל ברשימה עם מספר החור שלו. אפשר לבחור אותו רק אם קודם מרוקנים את החור הקיים.</div>';
+ body.innerHTML=h;
+}
+function setCabinetSize(rows,cols){
+ if(!D._cabinetSize)D._cabinetSize={rows:4,cols:8};
+ if(rows!=null){var n=parseInt(rows,10);if(n>=1&&n<=20)D._cabinetSize.rows=n;}
+ if(cols!=null){var m=parseInt(cols,10);if(m>=1&&m<=20)D._cabinetSize.cols=m;}
+ sv();_cabRender();
+}
+function setCabinetCell(key,val){
+ if(!D.cabinetMap)D.cabinetMap={};
+ if(val){
+  // remove any other slot that referenced the same boy
+  Object.keys(D.cabinetMap).forEach(function(k){if(D.cabinetMap[k]===val&&k!==key)delete D.cabinetMap[k];});
+  D.cabinetMap[key]=val;
+ }else{
+  delete D.cabinetMap[key];
+ }
+ sv();_cabRender();
+}
+function _cabAutoFill(){
+ // Convention: room number → row, bed number → column (best-effort).
+ // Only fills cells that are currently empty; never overrides an existing
+ // assignment. Boys without room/bed are skipped and stay unmapped.
+ if(!D.cabinetMap)D.cabinetMap={};
+ if(!D.boyRoom)D.boyRoom={};if(!D.boyBed)D.boyBed={};
+ var _cs=D._cabinetSize||{rows:4,cols:8};
+ var _used={};Object.keys(D.cabinetMap).forEach(function(k){if(D.cabinetMap[k])_used[D.cabinetMap[k]]=1;});
+ var placed=0;
+ D.pb.filter(iA).forEach(function(b){
+  if(_used[b])return;
+  var r=parseInt(D.boyRoom[b],10),c=parseInt(D.boyBed[b],10);
+  if(!(r>=1&&r<=_cs.rows)||!(c>=1&&c<=_cs.cols))return;
+  var k=r+'-'+c;
+  if(D.cabinetMap[k])return;
+  D.cabinetMap[k]=b;placed++;
+ });
+ if(placed)sv();
+ showBanner(placed?('⚡ שובצו אוטומטית '+placed+' בחורים'):'לא נמצאו התאמות חדשות',2500);
+ _cabRender();
+}
+function applyCabinetScan(){
+ var sc=D._cabinetScan;
+ if(!sc||!sc.results){showBanner('אין תוצאות סריקה להחיל',2000);return;}
+ if(!D.cabinetMap){showBanner('אין מיפוי חורים — מלא קודם את המיפוי',2500);return;}
+ var _cm=D.cabinetMap;
+ var applied=0,unmapped=0;
+ Object.keys(sc.results).forEach(function(k){
+  var b=_cm[k];if(!b){unmapped++;return;}
+  if(!D.pb.includes(b))return;
+  if(sc.results[k]==='phone'){D.pt[b]=true;applied++;}
+  else if(sc.results[k]==='empty'){D.pt[b]=false;applied++;}
+ });
+ sc.applied=true;sc.appliedAt=Date.now();
+ sv();try{flushSv();}catch(e){}
+ rr();
+ showBanner('✓ הוחלו '+applied+' תוצאות'+(unmapped?' · '+unmapped+' חורים לא ממופים':''),3000);
+}
 
 // Print report
 // Print cleaning report - separate, standalone report: room-grouped, with
