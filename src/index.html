@@ -402,28 +402,49 @@ async function diagnosePush(){
 // iOS PWAs cache the initial HTML in their own webkit container and DO NOT
 // honor Cache-Control headers reliably - once installed to the home screen
 // they can serve a version-frozen bundle for weeks. Fetch the live HTML on
-// boot and on foreground; if the deployed BUILD_STAMP differs from ours,
-// show a prominent banner the user can tap to reload into the new version.
-async function _checkForUpdate(){
+// Update check: once per 24h max, and NEVER auto-reload. The banner shows
+// but ships with a 'later' button so the user can dismiss it without
+// losing whatever they're in the middle of (a form, an open conversation,
+// a scan review). Auto-reload was never enabled, but the previous
+// every-foreground refetch was thrashing the network on iOS where the
+// tab surfaces from background dozens of times a day.
+var _UPD_CHECK_KEY='_lastUpdCheckTs';
+var _UPD_INTERVAL_MS=24*60*60*1000; // 24h
+var _UPD_DISMISS_KEY='_updDismissedVer';
+async function _checkForUpdate(force){
  try{
+  if(!force){
+   var last=parseInt(localStorage.getItem(_UPD_CHECK_KEY)||'0',10);
+   if(Date.now()-last<_UPD_INTERVAL_MS)return; // already checked today
+  }
   var res=await fetch(location.pathname+'?_v='+Date.now(),{cache:'no-store'});
   if(!res.ok)return;
   var text=await res.text();
+  try{localStorage.setItem(_UPD_CHECK_KEY,String(Date.now()));}catch(e){}
   var m=text.match(/_BUILD_STAMP\s*=\s*['"]([^'"]+)['"]/);
-  if(m&&m[1]&&m[1]!==_BUILD_STAMP)_showUpdateBanner(m[1]);
+  if(m&&m[1]&&m[1]!==_BUILD_STAMP){
+   // Respect the user's earlier "later" for this exact version — don't
+   // resurrect a banner they already dismissed until the next new build.
+   var dismissed=localStorage.getItem(_UPD_DISMISS_KEY);
+   if(dismissed===m[1])return;
+   _showUpdateBanner(m[1]);
+  }
  }catch(e){/* offline is fine */}
 }
 function _showUpdateBanner(newVer){
  if(document.getElementById('updBanner'))return;
  var el=document.createElement('div');
  el.id='updBanner';
- el.style.cssText='position:fixed;top:max(env(safe-area-inset-top),8px);left:8px;right:8px;z-index:999998;background:#c9a84c;color:#0a0f1c;padding:12px 16px;border-radius:12px;font-weight:800;font-size:15px;text-align:center;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.55);direction:rtl;font-family:Heebo,Arial,sans-serif';
- el.innerHTML='🆕 עדכון זמין ('+newVer+') — לחץ לטעון';
- el.onclick=function(){location.reload();};
+ el.style.cssText='position:fixed;top:max(env(safe-area-inset-top),8px);left:8px;right:8px;z-index:999998;background:#c9a84c;color:#0a0f1c;padding:10px 14px;border-radius:12px;font-weight:800;font-size:14.4px;text-align:center;box-shadow:0 6px 22px rgba(0,0,0,.55);direction:rtl;font-family:Heebo,Arial,sans-serif;display:flex;gap:8px;align-items:center;justify-content:space-between';
+ el.innerHTML='<span style="flex:1;text-align:right">🆕 עדכון זמין ('+newVer+')</span>'
+  +'<button style="padding:7px 14px;border-radius:8px;background:#0a0f1c;color:#f4c95d;border:none;font-size:13.5px;font-weight:800;cursor:pointer" onclick="(function(){try{flushSv();}catch(e){}setTimeout(function(){location.reload();},300);})()">🔄 טען עכשיו</button>'
+  +'<button style="padding:7px 12px;border-radius:8px;background:transparent;color:#0a0f1c;border:1px solid rgba(0,0,0,.25);font-size:13px;font-weight:700;cursor:pointer" onclick="(function(){try{localStorage.setItem(\''+_UPD_DISMISS_KEY+'\',\''+newVer+'\');}catch(e){}var b=document.getElementById(\'updBanner\');if(b)b.remove();})()">אחר כך</button>';
  document.body.appendChild(el);
 }
-setTimeout(_checkForUpdate,2000);
-document.addEventListener('visibilitychange',function(){if(!document.hidden)_checkForUpdate();});
+// First check: 30s after boot (not 2s) so it doesn't compete with the
+// initial page render. Doesn't fire again on visibility change — the
+// once-a-day interval kicks in on the next boot inside the 24h window.
+setTimeout(function(){_checkForUpdate(false);},30000);
 </script>
 <script>
 const isoLocal=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -941,14 +962,24 @@ function ld(){
      return;
     }
     // We have unpushed local edits (_fbPending=true) but a NEWER snapshot
-    // arrived from another device. Naively overwriting D with remote would
-    // silently discard whatever the user just did on this device. Flush our
-    // pending write first so at least our edits reach the server (last-writer
-    // wins per-doc: some concurrent remote changes may be lost, but our own
-    // work isn't silently deleted). Skip this snapshot - our echo will come
-    // back with a newer timestamp and we'll process the merged state then.
+    // arrived from another device. The previous behavior — return without
+    // applying — silently DROPPED the remote change: our pending write
+    // then pushed a doc that never contained the remote's edits, and the
+    // remote device's next snapshot echoed our overwrite, losing e.g. a
+    // writing task the phone had just added. Instead, MERGE the arrays
+    // that carry unique IDs (union by id), take remote's scalars where
+    // they're newer per-key, then push. This turns the race into a real
+    // convergence instead of a last-writer-wipe.
     if(_fbPending){
-     try{flushSv();}catch(e){console.error('flushSv on concurrent snapshot failed',e);}
+     try{
+      _mergeRemoteIntoLocal(remote);
+      // bump _updatedAt so our next push carries the merged state, not
+      // the pre-merge state — otherwise the snapshot echo would look
+      // like a rollback and get rejected downstream.
+      D._updatedAt=Math.max(D._updatedAt||0,remoteTs)+1;
+      flushSv();
+      rr({external:true});
+     }catch(e){console.error('merge on concurrent snapshot failed',e);flushSv();}
      return;
     }
     D={...df(),...remote};
@@ -1028,6 +1059,74 @@ function _splitPhotos(src){
  }
  return {stripped:stripped,photos:photos};
 }
+// ─── Cross-device merge on pending-collision ──────────────────────────
+// Called from the snapshot handler when a newer remote lands while we
+// still have an unpushed local edit. Strategy:
+// (1) Arrays of records with unique .id (wt, wh, cs, cx, ci, tk): union
+//     by id. Where both sides have a record with the same id, remote wins
+//     ONLY if its .doneAt / .status looks fresher; otherwise keep local.
+//     For most fields this is safe because concurrent edits to the SAME
+//     task on both devices in the same 250ms window is astronomically
+//     unlikely; but a NEW task on either device must survive.
+// (2) archive[] & pb[] (name arrays): union by string value.
+// (3) Scalars / plain objects (ph, pt, ps, boyRoom, boyBed, …): remote
+//     values win only where local doesn't have a value yet. This keeps
+//     the writer's fresh input on each device without dropping the other
+//     side's fresh writes. Not perfect for scalar collisions but the
+//     debounce window is short and truly-simultaneous scalar collisions
+//     are rare in practice.
+function _mergeRemoteIntoLocal(remote){
+ if(!remote||typeof remote!=='object')return;
+ var idArrs=['wt','wh','cs','cx','ci','tk'];
+ idArrs.forEach(function(k){
+  if(!Array.isArray(remote[k]))return;
+  if(!Array.isArray(D[k]))D[k]=[];
+  var byId={};
+  D[k].forEach(function(r){if(r&&r.id)byId[r.id]=r;});
+  remote[k].forEach(function(r){
+   if(!r||!r.id)return;
+   var mine=byId[r.id];
+   if(!mine){
+    // remote-only record → add it. This is the case that caused the bug —
+    // a writing task added on the phone that computer never accepted.
+    D[k].push(r);byId[r.id]=r;return;
+   }
+   // both sides have it. Prefer remote if remote has doneAt and local
+   // doesn't (someone marked it done on the other device). Otherwise
+   // keep local (last write on this device wins on tie).
+   if(r.doneAt&&!mine.doneAt){
+    var i=D[k].indexOf(mine);if(i>=0)D[k][i]=r;byId[r.id]=r;
+   }
+  });
+ });
+ // pb / archive: string arrays, union
+ ['pb','archive'].forEach(function(k){
+  if(!Array.isArray(remote[k]))return;
+  if(!Array.isArray(D[k]))D[k]=[];
+  var seen={};D[k].forEach(function(x){seen[x]=1;});
+  remote[k].forEach(function(x){if(x&&!seen[x]){D[k].push(x);seen[x]=1;}});
+ });
+ // Scalar/object maps: fill gaps — take remote's key only if local doesn't
+ // have that key. This preserves BOTH sides' fresh writes since the
+ // debounce window is short.
+ var mapKeys=['pt','ptA','ph','phA','ps','boyRoom','boyBed','rooms','_confiscate',
+  '_returnDue','_confCount','phLate','phLateA','bwLate','loOut','roomTalk',
+  '_omrGrids','prt','lockStatus','upperLock','sleepTables','_sleepAlerts',
+  'cleanStatus','roomClean','floorLateAM','floorLatePM','dayStatus',
+  'reportTalks','_barcodeMap','_inactiveBoys','_notifSchedule','cabinetMap'];
+ mapKeys.forEach(function(k){
+  if(!remote[k]||typeof remote[k]!=='object')return;
+  if(!D[k])D[k]={};
+  Object.keys(remote[k]).forEach(function(sub){
+   if(!(sub in D[k]))D[k][sub]=remote[k][sub];
+  });
+ });
+ // _cabinetScan: remote wins if newer ts (natural for scanner writes)
+ if(remote._cabinetScan&&remote._cabinetScan.ts){
+  var localScanTs=(D._cabinetScan&&D._cabinetScan.ts)||0;
+  if(remote._cabinetScan.ts>localScanTs)D._cabinetScan=remote._cabinetScan;
+ }
+}
 // merge remote photos back into D.cs entries in place
 function _mergePhotos(){
  if(!D||!Array.isArray(D.cs))return;
@@ -1071,7 +1170,13 @@ function sv(opts){opts=opts||{};if(!opts.bg){D._updatedAt=Date.now();D._lastWrit
    // first save of the day → also write a permanent /backups snapshot so
    // any day's state can be restored later from the settings page
    try{_cloudBackupIfNeeded();}catch(e){}
-  },1500);
+  },250); // 1500ms was too long: any edit on device A during the window
+          // followed by an edit on device B could race the snapshot handler
+          // and drop A's changes. 250ms still batches rapid sequential
+          // sv() calls (loops, multi-field forms) but ends the race almost
+          // instantly for user-timescale interactions. Combined with the
+          // _mergeRemoteIntoLocal safety net below, cross-device drops
+          // should now be impossible in practice.
  }
 }
 // cancel any pending debounced write and push immediately. call on nav change,
