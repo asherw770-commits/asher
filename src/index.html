@@ -352,7 +352,10 @@ async function forceSyncFromCloud(){
  try{
   showBanner('🔄 קורא מהענן...',2000);
   await flushSv();
-  var snap=await _fbDocRef.get();
+  // Force network read — cache-preferred .get() can return the very copy
+  // we just wrote back, missing edits from other devices that landed
+  // while our local snapshot listener was idle.
+  var snap=await _fbDocRef.get({source:'server'});
   if(!snap.exists){alert('אין נתונים בענן');return;}
   var remote=snap.data();
   var remoteCount=(Array.isArray(remote.pb)?remote.pb.length:0)+(Array.isArray(remote.wt)?remote.wt.length:0);
@@ -1074,23 +1077,48 @@ function sv(opts){opts=opts||{};if(!opts.bg){D._updatedAt=Date.now();D._lastWrit
 // cancel any pending debounced write and push immediately. call on nav change,
 // tab hide, and page unload so a change made right before switching or closing
 // is guaranteed to reach the cloud instead of dying with the setTimeout.
+// Returns a Promise that resolves when the actual Firestore .set() completes —
+// callers that need read-your-own-writes semantics (e.g. printReport, which
+// then reads the doc back) MUST await it, otherwise the follow-up read races
+// the in-flight write and can see stale state.
 function flushSv(){
- if(!_fbPending)return;
+ if(!_fbPending)return Promise.resolve();
  clearTimeout(_fbSaveTimer);_fbSaveTimer=null;_fbPending=false;
- if(typeof _fbDocRef!=='undefined'){
-  var split=_splitPhotos(D);
-  _fbDocRef.set(split.stripped).catch(function(e){console.error('Firestore save failed',e);});
-  Object.keys(split.photos).forEach(function(id){
-   _fbPhotosCol.doc(id).set({photos:split.photos[id],_updatedAt:D._updatedAt}).catch(function(e){console.error('Firestore photo save failed',id,e);});
-   window._remotePhotos[id]=split.photos[id];
-  });
- }
+ if(typeof _fbDocRef==='undefined')return Promise.resolve();
+ var split=_splitPhotos(D);
+ var mainP=_fbDocRef.set(split.stripped).catch(function(e){console.error('Firestore save failed',e);});
+ var photoPs=Object.keys(split.photos).map(function(id){
+  window._remotePhotos[id]=split.photos[id];
+  return _fbPhotosCol.doc(id).set({photos:split.photos[id],_updatedAt:D._updatedAt}).catch(function(e){console.error('Firestore photo save failed',id,e);});
+ });
+ return Promise.all([mainP].concat(photoPs));
 }
 // tab-visibility + page-hide: push whatever's queued before the tab loses
 // focus (user switches to another app/tab, phone locks, browser closes)
 document.addEventListener('visibilitychange',function(){if(document.hidden)flushSv();});
 window.addEventListener('pagehide',flushSv);
 window.addEventListener('beforeunload',flushSv);
+// tab RE-focus: pull authoritative state from the server. Fixes the common
+// case where phone made changes offline and computer never got them by the
+// time the user opened the computer tab and hit print — visibilitychange
+// on wake actively probes the server rather than waiting for a snapshot
+// that might not fire promptly on iOS PWA wakeups.
+document.addEventListener('visibilitychange',function(){
+ if(document.hidden)return;
+ if(typeof _fbDocRef==='undefined')return;
+ // Read the server directly (bypass cache) so we notice any newer state
+ // written by another device while this tab was hidden.
+ _fbDocRef.get({source:'server'}).then(function(snap){
+  if(!snap.exists)return;
+  var remote=snap.data();
+  var remoteTs=remote._updatedAt||0,localTs=D._updatedAt||0;
+  if(remoteTs>localTs&&!_fbPending){
+   D={...df(),...remote};heal();_mergePhotos();
+   try{localStorage.setItem(K,JSON.stringify(D));}catch(e){}
+   try{rr({external:true});}catch(e){}
+  }
+ }).catch(function(e){console.warn('wake sync failed',e);});
+});
 // ─── Sync status pill (top-left corner, tiny) ───
 // tracks: online/offline, pending write, last successful write. Shown as
 // a small colored dot with a tooltip on hover/tap; expands to a short
@@ -4262,16 +4290,22 @@ printHTML(h,'\u05d3\u05d5\u05d7 \u05e0\u05d9\u05e7\u05d9\u05d5\u05df');
 // "phone printed 15 tasks but cloud only has 12" pattern that came from
 // printing on stale local state.
 async function printReport(){
+ // Pre-print sync: (1) push any pending local edit and WAIT for the
+ // .set() to actually complete (flushSv now returns a Promise — before
+ // this fix the await was awaiting undefined and the .get() below raced
+ // an in-flight write); (2) read the doc back from the SERVER, not from
+ // Firestore's local cache, so we notice any newer state another device
+ // wrote while this one was offline / backgrounded / just slow to fire
+ // a snapshot. Only overwrites local when remote is strictly newer.
+ var banner=null;
  try{
-  showBanner('🔄 מסנכרן לפני הדפסה...',1500);
-  try{await flushSv();}catch(e){}
+  banner=_openSyncModal('🔄 מסנכרן עם הענן לפני הדפסה...');
+  try{await flushSv();}catch(e){console.warn('flushSv err',e);}
   try{
-   var snap=await _fbDocRef.get();
+   var snap=await _fbDocRef.get({source:'server'});
    if(snap.exists){
     var remote=snap.data();
-    var remoteTs=remote._updatedAt||0, localTs=D._updatedAt||0;
-    // Only overwrite local if remote is strictly newer — protects a fresh
-    // unpushed edit from being wiped by a stale cloud read.
+    var remoteTs=remote._updatedAt||0,localTs=D._updatedAt||0;
     if(remoteTs>localTs){
      D={...df(),...remote};
      heal();
@@ -4279,10 +4313,27 @@ async function printReport(){
      try{localStorage.setItem(K,JSON.stringify(D));}catch(e){}
     }
    }
-  }catch(e){/* offline or transient — proceed with local state */}
- }catch(e){}
+  }catch(e){
+   // No server access — warn once and let the user decide. Better than
+   // silently printing local state that might be stale.
+   _closeSyncModal(banner);banner=null;
+   if(!confirm('לא הצלחתי לסנכרן מהענן (ייתכן שאין אינטרנט).\n\nהמשך בהדפסה על המצב המקומי בלבד? ייתכן שדברים חדשים שנעשו במכשיר אחר לא יופיעו.'))return;
+  }
+ }catch(e){console.warn('preprint sync err',e);}
+ if(banner)_closeSyncModal(banner);
  _printReportImpl();
 }
+// Blocking modal shown during pre-print sync — prevents the user from
+// hitting print again mid-flight and makes it visible that a sync is in
+// progress (before this we relied on a toast which vanishes in 1.5s).
+function _openSyncModal(txt){
+ var w=document.createElement('div');
+ w.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10003;display:flex;align-items:center;justify-content:center;color:#fff';
+ w.innerHTML='<div style="padding:18px 26px;border-radius:12px;background:#131926;border:1px solid #334;font-size:15.6px;font-weight:700;text-align:center;max-width:80vw">'+es(txt)+'<div style="margin-top:8px;font-size:12px;color:#aab;font-weight:400">אנא המתן — יכול לקחת עד 3 שניות</div></div>';
+ document.body.appendChild(w);
+ return w;
+}
+function _closeSyncModal(w){if(w&&w.parentNode)w.parentNode.removeChild(w);}
 function _printReportImpl(){
 var _rm=function(n){var r=parseInt((D.boyRoom||{})[n],10);return isNaN(r)?9999:r;};
 var _bd=function(n){var r=parseInt((D.boyBed||{})[n],10);return isNaN(r)?9999:r;};
