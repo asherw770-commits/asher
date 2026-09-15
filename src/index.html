@@ -3992,6 +3992,14 @@ function openCabinetScanner(){
   alert('אין מיפוי חורים עדיין. פתח את "ערוך מיפוי" ולחץ על "⚡ מלא אוטומטית לפי סדר החדרים".');
   return;
  }
+ // Detect the native iOS companion by its custom User-Agent (set in
+ // WebViewBridge.swift: "YeshivaScannerNative/<v>"). When present, hand
+ // off to the native scanner which uses the camera + CoreML; otherwise
+ // fall through to the PWA's own file-input manual review.
+ if(/YeshivaScannerNative/.test(navigator.userAgent||'')){
+  try{window.location.href='yeshivacab://scan';}catch(e){}
+  return;
+ }
  var inp=document.createElement('input');
  inp.type='file';inp.accept='image/*';inp.setAttribute('capture','environment');
  inp.style.cssText='position:fixed;left:-9999px;top:-9999px';
