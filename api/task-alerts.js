@@ -11,6 +11,44 @@ const { sendToAll } = require('./_push');
 const PROJECT_ID = 'asher-1b6e7';
 const FS_BASE = 'https://firestore.googleapis.com/v1/projects/' + PROJECT_ID + '/databases/(default)/documents';
 
+// Days when the yeshiva is NOT in session. Must stay in sync with the
+// YOFF constant in src/index.html — checked in the weekly-digest reminder
+// (Sat night) to count how many of Sun-Thu that just passed were actual
+// yeshiva days. Only the dates matter here (name lookup lives in the app).
+const YOFF_DATES = new Set([
+  '2026-08-14','2026-08-15','2026-08-29','2026-09-18','2026-09-19','2026-09-20',
+  '2026-09-21','2026-09-22','2026-09-23','2026-09-24','2026-09-25','2026-09-26',
+  '2026-09-27','2026-09-28','2026-09-29','2026-09-30','2026-10-01','2026-10-02',
+  '2026-10-03','2026-10-04','2026-10-05','2026-10-06','2026-10-07','2026-10-17',
+  '2026-10-31','2026-11-14','2026-11-28','2026-12-08','2026-12-09','2026-12-10',
+  '2026-12-11','2026-12-12','2026-12-26','2027-01-09','2027-01-23','2027-02-06',
+  '2027-02-20','2027-03-06','2027-03-20','2027-03-21','2027-03-22','2027-03-23',
+  '2027-03-24','2027-04-08','2027-04-09','2027-04-10','2027-04-11','2027-04-12',
+  '2027-04-13','2027-04-14','2027-04-15','2027-04-16','2027-04-17','2027-04-18',
+  '2027-04-19','2027-04-20','2027-04-21','2027-04-22','2027-04-23','2027-04-24',
+  '2027-04-25','2027-04-26','2027-04-27','2027-04-28','2027-04-29','2027-04-30',
+  '2027-05-01','2027-05-02','2027-05-03','2027-05-15','2027-05-29','2027-06-10',
+  '2027-06-19','2027-07-10','2027-07-24','2027-08-10','2027-08-11','2027-08-12',
+  '2027-08-13','2027-08-14','2027-08-15','2027-08-16','2027-08-17','2027-08-18',
+  '2027-08-19','2027-08-20','2027-08-21','2027-08-22','2027-08-23','2027-08-24',
+  '2027-08-25','2027-08-26','2027-08-27','2027-08-28','2027-08-29','2027-08-30',
+  '2027-08-31','2027-09-01','2027-09-02'
+]);
+// Given a Saturday's date (as ISO YYYY-MM-DD), count how many of the
+// preceding Sun-Thu were actual yeshiva days (not in YOFF_DATES).
+function schoolDaysInWeekEndingSat(satISO){
+  const sat = new Date(satISO + 'T00:00:00Z');
+  let count = 0;
+  // Sat is offset 0; Sun (6 days ago), Mon (5), Tue (4), Wed (3), Thu (2), Fri (1)
+  for (let offset = 6; offset >= 2; offset--) {
+    const d = new Date(sat);
+    d.setUTCDate(d.getUTCDate() - offset);
+    const iso = d.toISOString().slice(0, 10);
+    if (!YOFF_DATES.has(iso)) count++;
+  }
+  return count;
+}
+
 function fromV(v) {
   if (!v || typeof v !== 'object') return v;
   if ('stringValue' in v) return v.stringValue;
@@ -129,7 +167,8 @@ module.exports = async (req, res) => {
       phAfternoon: '15:13',
       phEvening: '21:48',
       printWeek: '20:00',
-      printSat: '21:00'
+      printSat: '21:00',
+      weeklyDigest: '21:15'
     };
     const sched = Object.assign({}, DEFAULT_SCHED, schedule || {});
     const now = Date.now();
@@ -284,6 +323,17 @@ module.exports = async (req, res) => {
         '🖨 הדפס דוח יומי',
         'הגיע הזמן להדפיס את הדוח היומי',
         { tag: 'print-report', url: '/?action=print-report' });
+      // 📤 Weekly WhatsApp digest reminder — only if the week that just
+      // ended had at least 4 actual yeshiva days (Sun-Thu, minus YOFF).
+      // Skips short weeks (בין הזמנים, חופש) so the user doesn't get a
+      // useless reminder after a break week.
+      const schoolDayCount = schoolDaysInWeekEndingSat(dateKey);
+      if (schoolDayCount >= 4) {
+        await fireOnce('weeklyDigest', sched.weeklyDigest,
+          '📤 סיכום שבועי',
+          'סוף שבוע ישיבה — הזמן לשלוח סיכום שיחות בוואטסאפ',
+          { tag: 'weekly-digest', url: '/?page=cv&period=week' });
+      }
     }
     // Prune yesterday's daily-notified keys
     for (const k of Object.keys(dailyNotified)) {

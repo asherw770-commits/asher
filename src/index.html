@@ -1811,6 +1811,9 @@ h+='</div></div>';
    {k:'printWeek',lbl:'ראשון-חמישי',def:'20:00'},
    {k:'printSat',lbl:'שבת (מוצ״ש)',def:'21:00'}
   ]},
+  {sec:'📤 סיכום שבועי בוואטסאפ',items:[
+   {k:'weeklyDigest',lbl:'מוצ״ש (רק אחרי ≥4 ימי ישיבה)',def:'21:15'}
+  ]},
   {sec:'🎯 שיבוצי שיחה',items:[
    {k:'conv1',lbl:'שיבוץ ראשון',def:'15:30'},
    {k:'prep1',lbl:'הכנה לשיחה 1 (18:00)',def:'17:55'},
@@ -5738,6 +5741,70 @@ function rCv(){if(cvV==='sess'){const s=D.cs.find(x=>x.id===cvI);if(s)return rCS
 // Export conversations to JSON file. Gated by requireAuth so someone
 // with brief physical access to an unlocked device can't lift the
 // conversation history off it.
+// ─── Share conversation-summary as image (for WhatsApp / Photos) ──────
+// Renders #cvSummaryCapture to a PNG blob via html2canvas, then hands
+// the file to the OS share sheet (Web Share API — WhatsApp / Photos /
+// AirDrop all appear as targets on iOS). Fallbacks: image/png clipboard
+// on desktop, then plain download if neither is available. Only the
+// summary card (counts + duration per boy for the selected period) is
+// captured — the full conversation content is never included.
+function _loadH2C(){
+ if(window.html2canvas)return Promise.resolve();
+ return new Promise(function(resolve,reject){
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  s.onload=function(){resolve();};
+  s.onerror=function(){reject(new Error('load html2canvas failed'));};
+  document.head.appendChild(s);
+ });
+}
+async function shareCvSummary(){
+ var box=document.getElementById('cvSummaryCapture');
+ if(!box){alert('לא נמצאה טבלת סיכום');return;}
+ showBanner('📸 מכין תמונה...',1500);
+ try{await _loadH2C();}catch(e){alert('נכשל בהורדת ספריית התמונה. בדוק חיבור לאינטרנט.');return;}
+ // Force explicit colors html2canvas can parse — it doesn't understand
+ // CSS variables. Read them off the computed style at capture time.
+ var canvas;
+ try{
+  var cs=getComputedStyle(document.documentElement);
+  var bg=cs.getPropertyValue('--s1').trim()||'#131926';
+  canvas=await html2canvas(box,{
+   backgroundColor:bg,
+   scale:Math.min(2,window.devicePixelRatio||2),
+   logging:false,
+   useCORS:true
+  });
+ }catch(e){alert('שגיאה ביצירת התמונה: '+e.message);return;}
+ canvas.toBlob(async function(blob){
+  if(!blob){alert('נכשל ביצירת קובץ תמונה');return;}
+  var periodLabel={day:'יום',week:'שבוע',month:'חודש',all:'הכל'}[cvPd]||'תקופה';
+  var fname='סיכום-שיחות-'+periodLabel+'-'+td()+'.png';
+  var file=new File([blob],fname,{type:'image/png'});
+  // Preferred: iOS/Android share sheet → user picks WhatsApp/Photos.
+  if(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share){
+   try{
+    await navigator.share({files:[file],title:'סיכום שיחות · '+periodLabel});
+    return;
+   }catch(err){/* user canceled — fall through to clipboard */}
+  }
+  // Desktop: try to put PNG on the clipboard.
+  if(navigator.clipboard&&window.ClipboardItem){
+   try{
+    await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+    showBanner('✅ הועתק ללוח — הדבק בוואטסאפ',3000);
+    return;
+   }catch(err){/* clipboard blocked — fall through to download */}
+  }
+  // Last resort: download the file so the user can attach it manually.
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download=fname;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showBanner('✅ התמונה הורדה',3000);
+ },'image/png');
+}
 async function exportConversationsFile(){
  if(!(await requireAuth('לייצוא שיחות לקובץ')))return;
  try{
@@ -5767,11 +5834,33 @@ else{fd='2000-01-01';label='הכל'}
 const sx=D.cx.filter(s=>s.dt>=fd);const tm=sx.reduce((a,e)=>a+(e.du||0),0);
 const byS={};sx.forEach(s=>{const st=D.cs.find(x=>x.id===s.si);const nm=st?st.name:'(לא נמצא)';if(!byS[nm])byS[nm]={c:0,m:0};byS[nm].c++;byS[nm].m+=(s.du||0)});
 const sorted=Object.entries(byS).sort((a,b)=>b[1].m-a[1].m);
+// Outer wrapper NOT captured — carries the share button + period selector.
+// Inner #cvSummaryCapture is the actual table sent to WhatsApp.
 let h='<div style="background:var(--s1);border:1px solid var(--bm);border-radius:14px;padding:12px;margin-bottom:10px">';
-h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:15.6px;color:var(--t0)">📊 סיכום שיחות</span><div style="display:flex;gap:4px">'+['day','week','month','all'].map(p=>'<button class="fb'+(cvPd===p?' on':'')+'" style="font-size:12.0px;padding:3px 8px" onclick="cvPd=\''+p+'\';rr()">'+(p==='day'?'יום':p==='week'?'שבוע':p==='month'?'חודש':'הכל')+'</button>').join('')+'</div></div>';
-h+='<div style="display:flex;gap:10px;margin-bottom:8px">'+cH('var(--go)','var(--gd)',sx.length+' שיחות')+cH('var(--go)','var(--gd)',fmDu(tm))+cH('var(--t2)','var(--s3)',label)+'</div>';
-if(sorted.length){const showAll=D._cvDashAll;const sl=showAll?sorted:sorted.slice(0,6);sl.forEach(([nm,d])=>{h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--bd)">'+aH(nm,24,9)+'<div style="flex:1;font-size:14.4px;color:var(--t0)">'+es(nm)+'</div><span style="font-size:13.2px;color:var(--t1)">'+d.c+' שיחות</span>'+cH('var(--go)','var(--gd)',fmDu(d.m))+'</div>'});if(sorted.length>6&&!showAll)h+='<div style="font-size:13.2px;color:var(--go);margin-top:4px;cursor:pointer;text-align:center" onclick="D._cvDashAll=true;rr()">⬇ הצג עוד '+(sorted.length-6)+' בחורים</div>';if(showAll&&sorted.length>6)h+='<div style="font-size:13.2px;color:var(--t2);margin-top:4px;cursor:pointer;text-align:center" onclick="D._cvDashAll=false;rr()">⬆ הסתר</div>'}
-else h+='<div style="font-size:14.4px;color:var(--t2)">אין שיחות בתקופה זו</div>';
+h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">'
+ +'<div style="display:flex;align-items:center;gap:8px">'
+ +'<span style="font-weight:700;font-size:15.6px;color:var(--t0)">📊 סיכום שיחות</span>'
+ +'<button style="padding:4px 10px;border-radius:7px;background:var(--gd);border:1px solid var(--gb);color:var(--go);font-size:12px;font-weight:800;cursor:pointer" onclick="shareCvSummary()">📤 שתף</button>'
+ +'</div>'
+ +'<div style="display:flex;gap:4px">'+['day','week','month','all'].map(p=>'<button class="fb'+(cvPd===p?' on':'')+'" style="font-size:12.0px;padding:3px 8px" onclick="cvPd=\''+p+'\';rr()">'+(p==='day'?'יום':p==='week'?'שבוע':p==='month'?'חודש':'הכל')+'</button>').join('')+'</div>'
+ +'</div>';
+// Everything from here down is inside the capture box — this is what gets
+// rasterized to PNG when the user taps 📤 שתף.
+h+='<div id="cvSummaryCapture" style="background:var(--s1);padding:8px 4px 4px;border-radius:9px">';
+h+='<div style="font-size:13.2px;font-weight:800;color:var(--t0);margin-bottom:6px;text-align:center">סיכום שיחות · '+es(label)+'</div>';
+h+='<div style="display:flex;gap:10px;margin-bottom:8px;justify-content:center;flex-wrap:wrap">'+cH('var(--go)','var(--gd)',sx.length+' שיחות')+cH('var(--go)','var(--gd)',fmDu(tm))+cH('var(--t2)','var(--s3)',label)+'</div>';
+if(sorted.length){
+ // For the shared image we ALWAYS show the full list — otherwise the
+ // recipient sees an arbitrary truncation. The in-app "הצג עוד" toggle
+ // still controls what appears on the screen, but the shared image
+ // uses `sorted` in full.
+ const showAll=D._cvDashAll;const sl=showAll?sorted:sorted.slice(0,6);
+ sl.forEach(([nm,d])=>{h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--bd)">'+aH(nm,24,9)+'<div style="flex:1;font-size:14.4px;color:var(--t0)">'+es(nm)+'</div><span style="font-size:13.2px;color:var(--t1)">'+d.c+' שיחות</span>'+cH('var(--go)','var(--gd)',fmDu(d.m))+'</div>'});
+ if(sorted.length>6&&!showAll)h+='<div style="font-size:13.2px;color:var(--go);margin-top:4px;cursor:pointer;text-align:center" onclick="D._cvDashAll=true;rr()">⬇ הצג עוד '+(sorted.length-6)+' בחורים</div>';
+ if(showAll&&sorted.length>6)h+='<div style="font-size:13.2px;color:var(--t2);margin-top:4px;cursor:pointer;text-align:center" onclick="D._cvDashAll=false;rr()">⬆ הסתר</div>'
+}
+else h+='<div style="font-size:14.4px;color:var(--t2);text-align:center;padding:8px">אין שיחות בתקופה זו</div>';
+h+='</div>'; // close #cvSummaryCapture
 h+='</div>';return h}
 function rCL(){const tc=D.cx.filter(s=>s.dt===td()).length,uc=D.cs.filter(s=>s.urgent).length;
 const u=D.cs.filter(s=>s.urgent),cb=D.cs.filter(s=>!s.urgent&&s.cb&&s.cb<=td()),rs=D.cs.filter(s=>!s.urgent&&!(s.cb&&s.cb<=td())&&!cT(s.id)),dn=D.cs.filter(s=>!s.urgent&&!(s.cb&&s.cb<=td())&&cT(s.id));
@@ -6144,6 +6233,14 @@ try{
  var _act=_u.searchParams.get('action');
  if(_pg==='phones'){pg='phones';if(_pTab==='afternoon'||_pTab==='tonight')pT=_pTab;}
  if(_pg==='settings')pg='settings';
+ if(_pg==='cv'){
+  // deep-link from the מוצ״ש weekly-digest push — land on the conversation
+  // list with the summary period pre-selected so the copy-image button is
+  // already on the right timeframe.
+  pg='cv';
+  var _pp=_u.searchParams.get('period');
+  if(_pp==='day'||_pp==='week'||_pp==='month'||_pp==='all')cvPd=_pp;
+ }
  if(_sn==='1'){fetch('/api/snooze',{method:'POST'}).catch(function(){});}
  // notification-driven quick-actions: printing the daily report needs a slight
  // delay so the app has finished mounting before printHTML opens its iframe
